@@ -1,0 +1,41 @@
+{
+  "respuestas": [
+    {
+      "id": "chat-clientes-sku",
+      "alertaId": "alerta-hogar",
+      "palabras": ["clientes", "sku"],
+      "texto": "En los últimos 60 días, {0} clientes compraron los {1} SKU afectados, por {2} en total. Los 3 que más compran concentran el {3} de esas ventas, así que un alza de precio los toca primero a ellos.",
+      "cifras": [
+        { "valor": 23, "unidad": "unidades", "consultaId": "c-chat-clientes-sku" },
+        { "valor": 4, "unidad": "unidades", "consultaId": "c-hogar-costo-sku" },
+        { "valor": 214000000, "unidad": "COP", "consultaId": "c-chat-clientes-sku" },
+        { "valor": 61, "unidad": "porcentaje", "consultaId": "c-chat-concentracion" }
+      ],
+      "evidenciaSuficiente": true
+    },
+    {
+      "id": "chat-margen-hogar",
+      "alertaId": null,
+      "palabras": ["margen", "hogar"],
+      "texto": "El margen de la línea Hogar fue {0} la semana del 7 de septiembre de 2026, frente a {1} en promedio en las 8 semanas anteriores a la caída.",
+      "cifras": [
+        { "valor": 25.5, "unidad": "porcentaje", "consultaId": "c-hogar-caida" },
+        { "valor": 31.55, "unidad": "porcentaje", "consultaId": "c-hogar-caida" }
+      ],
+      "serie": [
+        { "fecha": "2026-08-03", "valor": 31.3 },
+        { "fecha": "2026-08-10", "valor": 31.5 },
+        { "fecha": "2026-08-17", "valor": 31.7 },
+        { "fecha": "2026-08-24", "valor": 29.4 },
+        { "fecha": "2026-08-31", "valor": 27.6 },
+        { "fecha": "2026-09-07", "valor": 25.5 }
+      ],
+      "evidenciaSuficiente": true
+    }
+  ],
+  "sinEvidencia": {
+    "texto": "No tengo evidencia suficiente para responder eso con los datos que reviso. Puedo responder sobre ventas, márgenes por línea, cartera, días de pago, inventario, descuentos y actividad de compra de los clientes.",
+    "cifras": [],
+    "evidenciaSuficiente": false
+  }
+}

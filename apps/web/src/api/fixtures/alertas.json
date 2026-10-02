@@ -1,0 +1,398 @@
+[
+  {
+    "id": "alerta-cartera-a",
+    "severidad": "alta",
+    "metrica": "saldo_vencido",
+    "fechaSimulada": "2026-09-14",
+    "titulo": {
+      "texto": "Cliente de ejemplo A tiene {0} vencidos, con facturas de hasta {1} días de mora",
+      "cifras": [
+        { "valor": 47500000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" },
+        { "valor": 38, "unidad": "dias", "consultaId": "c-cartera-a-saldo" }
+      ]
+    },
+    "pesosEnRiesgo": { "valor": 47500000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" },
+    "recuperableMes": null,
+    "confianza": { "nivel": "alta", "supuestos": ["Los pagos registrados hasta el día simulado están completos"] },
+    "causa": {
+      "tipo": "identificada",
+      "frase": {
+        "texto": "Sus pagos se alargaron de {0} a {1} días desde junio, con un plazo pactado de {2} días",
+        "cifras": [
+          { "valor": 31, "unidad": "dias", "consultaId": "c-cartera-a-dias-pago" },
+          { "valor": 58, "unidad": "dias", "consultaId": "c-cartera-a-dias-pago" },
+          { "valor": 30, "unidad": "dias", "consultaId": "c-cartera-a-saldo" }
+        ]
+      },
+      "evidencia": [
+        {
+          "afirmacion": {
+            "texto": "Las facturas de agosto de 2026 se pagaron en {0} días en promedio",
+            "cifras": [{ "valor": 58, "unidad": "dias", "consultaId": "c-cartera-a-dias-pago" }]
+          },
+          "consultaId": "c-cartera-a-dias-pago",
+          "serie": [
+            { "fecha": "2026-03-01", "valor": 31 },
+            { "fecha": "2026-04-01", "valor": 30 },
+            { "fecha": "2026-05-01", "valor": 33 },
+            { "fecha": "2026-06-01", "valor": 41 },
+            { "fecha": "2026-07-01", "valor": 49 },
+            { "fecha": "2026-08-01", "valor": 58 }
+          ]
+        },
+        {
+          "afirmacion": {
+            "texto": "El saldo abierto es de {0}, de los cuales {1} están vencidos, por encima del límite de mora de la política de crédito",
+            "cifras": [
+              { "valor": 62300000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" },
+              { "valor": 47500000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" }
+            ]
+          },
+          "consultaId": "c-cartera-a-saldo"
+        }
+      ]
+    },
+    "acciones": [
+      {
+        "id": "cartera-a-recordatorio",
+        "titulo": "Recordatorio de pago",
+        "tipo": "borrador_correo",
+        "descripcion": {
+          "texto": "Borrador de correo a Cliente de ejemplo A que pide el pago de {0} vencidos y propone un acuerdo de pago",
+          "cifras": [{ "valor": 47500000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" }]
+        },
+        "impacto": {
+          "cifra": { "valor": 47500000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" },
+          "periodo": "unico"
+        },
+        "confianza": { "nivel": "media", "supuestos": ["El cliente conserva capacidad de pago"] },
+        "parametros": { "destinatario": "Cliente de ejemplo A", "plazo_acuerdo_dias": 15 }
+      },
+      {
+        "id": "cartera-a-cupo",
+        "titulo": "Revisar el cupo de crédito",
+        "tipo": "tarea",
+        "descripcion": {
+          "texto": "Tarea para cartera: revisar el cupo del cliente antes de despachar nuevos pedidos a crédito mientras tenga {0} vencidos",
+          "cifras": [{ "valor": 47500000, "unidad": "COP", "consultaId": "c-cartera-a-saldo" }]
+        },
+        "impacto": null,
+        "confianza": { "nivel": "alta", "supuestos": [] },
+        "parametros": { "responsable": "Jefe de cartera" }
+      }
+    ],
+    "guion": {
+      "analista": "Comparando los días de pago del cliente mes a mes y leyendo la política de crédito",
+      "estratega": "Preparando el recordatorio de pago y la revisión del cupo"
+    }
+  },
+  {
+    "id": "alerta-quiebre",
+    "severidad": "critica",
+    "metrica": "cobertura_dias",
+    "fechaSimulada": "2026-09-14",
+    "titulo": {
+      "texto": "SKU de ejemplo 1 se agota en {0} días en la bodega de Bogotá",
+      "cifras": [{ "valor": 4.2, "unidad": "dias", "consultaId": "c-quiebre-cobertura" }]
+    },
+    "pesosEnRiesgo": { "valor": 39400000, "unidad": "COP", "consultaId": "c-quiebre-ventas" },
+    "recuperableMes": null,
+    "confianza": { "nivel": "alta", "supuestos": ["La demanda de los próximos días se parece a la de los últimos 30"] },
+    "causa": {
+      "tipo": "identificada",
+      "frase": {
+        "texto": "La existencia de {0} unidades no alcanza para los {1} unidades pendientes de despacho, con una demanda de {2} unidades al día",
+        "cifras": [
+          { "valor": 630, "unidad": "unidades", "consultaId": "c-quiebre-cobertura" },
+          { "valor": 900, "unidad": "unidades", "consultaId": "c-quiebre-cobertura" },
+          { "valor": 150, "unidad": "unidades", "consultaId": "c-quiebre-cobertura" }
+        ]
+      },
+      "evidencia": [
+        {
+          "afirmacion": {
+            "texto": "La cobertura es de {0} días, por debajo del mínimo de la política de inventario para productos clase A",
+            "cifras": [{ "valor": 4.2, "unidad": "dias", "consultaId": "c-quiebre-cobertura" }]
+          },
+          "consultaId": "c-quiebre-cobertura"
+        },
+        {
+          "afirmacion": {
+            "texto": "Si se agota, se dejan de vender {0} hasta que llegue la reposición",
+            "cifras": [{ "valor": 39400000, "unidad": "COP", "consultaId": "c-quiebre-ventas" }]
+          },
+          "consultaId": "c-quiebre-ventas"
+        }
+      ]
+    },
+    "acciones": [
+      {
+        "id": "quiebre-orden",
+        "titulo": "Orden de compra de reposición",
+        "tipo": "borrador_orden_compra",
+        "descripcion": {
+          "texto": "Borrador de orden de compra por {0} unidades de SKU de ejemplo 1 para la bodega de Bogotá, 30 días de demanda",
+          "cifras": [{ "valor": 4500, "unidad": "unidades", "consultaId": "c-quiebre-cobertura" }]
+        },
+        "impacto": {
+          "cifra": { "valor": 39400000, "unidad": "COP", "consultaId": "c-quiebre-ventas" },
+          "periodo": "unico"
+        },
+        "confianza": { "nivel": "alta", "supuestos": ["El proveedor entrega en su plazo habitual"] },
+        "parametros": { "unidades": 4500, "bodega": "BOD-BOG" }
+      },
+      {
+        "id": "quiebre-traslado",
+        "titulo": "Traslado entre bodegas",
+        "tipo": "tarea",
+        "descripcion": {
+          "texto": "Tarea para logística: trasladar {0} unidades desde la bodega de Medellín, que tiene más de 30 días de cobertura",
+          "cifras": [{ "valor": 1200, "unidad": "unidades", "consultaId": "c-quiebre-otra-bodega" }]
+        },
+        "impacto": null,
+        "confianza": { "nivel": "media", "supuestos": ["El traslado llega antes que la orden de compra"] },
+        "parametros": { "unidades": 1200, "origen": "BOD-MDE", "destino": "BOD-BOG" }
+      }
+    ],
+    "guion": {
+      "analista": "Cruzando la existencia con la demanda y los pedidos pendientes",
+      "estratega": "Calculando la reposición y buscando unidades en la otra bodega"
+    }
+  },
+  {
+    "id": "alerta-hogar",
+    "severidad": "alta",
+    "metrica": "margen_pct",
+    "fechaSimulada": "2026-09-15",
+    "titulo": {
+      "texto": "El margen de la línea Hogar cayó {0} puntos en 3 semanas",
+      "cifras": [{ "valor": 6.05, "unidad": "puntos", "consultaId": "c-hogar-caida" }]
+    },
+    "pesosEnRiesgo": { "valor": 58200000, "unidad": "COP", "consultaId": "c-hogar-riesgo" },
+    "recuperableMes": { "valor": 42000000, "unidad": "COP", "consultaId": "c-hogar-recuperable" },
+    "confianza": {
+      "nivel": "alta",
+      "supuestos": ["Los precios de venta de la línea no cambiaron en el período", "El alza de costo del proveedor X es permanente"]
+    },
+    "causa": {
+      "tipo": "identificada",
+      "frase": {
+        "texto": "El proveedor X subió el costo de {0} SKU de la línea, en promedio un {1}",
+        "cifras": [
+          { "valor": 4, "unidad": "unidades", "consultaId": "c-hogar-costo-sku" },
+          { "valor": 9.8, "unidad": "porcentaje", "consultaId": "c-hogar-costo-sku" }
+        ]
+      },
+      "evidencia": [
+        {
+          "afirmacion": {
+            "texto": "El margen pasó de {0} en promedio a {1} la semana del 7 de septiembre de 2026",
+            "cifras": [
+              { "valor": 31.55, "unidad": "porcentaje", "consultaId": "c-hogar-caida" },
+              { "valor": 25.5, "unidad": "porcentaje", "consultaId": "c-hogar-caida" }
+            ]
+          },
+          "consultaId": "c-hogar-margen-serie",
+          "serie": [
+            { "fecha": "2026-06-29", "valor": 31.8 },
+            { "fecha": "2026-07-06", "valor": 31.2 },
+            { "fecha": "2026-07-13", "valor": 31.6 },
+            { "fecha": "2026-07-20", "valor": 31.4 },
+            { "fecha": "2026-07-27", "valor": 31.9 },
+            { "fecha": "2026-08-03", "valor": 31.3 },
+            { "fecha": "2026-08-10", "valor": 31.5 },
+            { "fecha": "2026-08-17", "valor": 31.7 },
+            { "fecha": "2026-08-24", "valor": 29.4 },
+            { "fecha": "2026-08-31", "valor": 27.6 },
+            { "fecha": "2026-09-07", "valor": 25.5 }
+          ]
+        },
+        {
+          "afirmacion": {
+            "texto": "{0} SKU del proveedor X subieron su costo unitario un {1} desde la semana del 24 de agosto de 2026; el resto de la línea no cambió",
+            "cifras": [
+              { "valor": 4, "unidad": "unidades", "consultaId": "c-hogar-costo-sku" },
+              { "valor": 9.8, "unidad": "porcentaje", "consultaId": "c-hogar-costo-sku" }
+            ]
+          },
+          "consultaId": "c-hogar-costo-sku"
+        },
+        {
+          "afirmacion": {
+            "texto": "Si la caída se mantiene, la línea deja de ganar {0} al mes",
+            "cifras": [{ "valor": 58200000, "unidad": "COP", "consultaId": "c-hogar-riesgo" }]
+          },
+          "consultaId": "c-hogar-riesgo"
+        }
+      ]
+    },
+    "acciones": [
+      {
+        "id": "hogar-precio",
+        "titulo": "Subir el precio de los SKU afectados",
+        "tipo": "borrador_ajuste_precio",
+        "descripcion": {
+          "texto": "Borrador de ajuste de precio: subir un {0} el precio de lista de los {1} SKU afectados",
+          "cifras": [
+            { "valor": 3, "unidad": "porcentaje", "consultaId": "c-hogar-recuperable" },
+            { "valor": 4, "unidad": "unidades", "consultaId": "c-hogar-costo-sku" }
+          ]
+        },
+        "impacto": {
+          "cifra": { "valor": 42000000, "unidad": "COP", "consultaId": "c-hogar-recuperable" },
+          "periodo": "mes"
+        },
+        "confianza": { "nivel": "media", "supuestos": ["La demanda de los 4 SKU no cae con un alza del 3 %"] },
+        "parametros": { "alza_pct": 3 }
+      },
+      {
+        "id": "hogar-renegociar",
+        "titulo": "Renegociar con el proveedor X",
+        "tipo": "borrador_correo",
+        "descripcion": {
+          "texto": "Borrador de correo al proveedor X que pide devolver la mitad del alza de costo de los {0} SKU",
+          "cifras": [{ "valor": 4, "unidad": "unidades", "consultaId": "c-hogar-costo-sku" }]
+        },
+        "impacto": {
+          "cifra": { "valor": 29100000, "unidad": "COP", "consultaId": "c-hogar-renegociar" },
+          "periodo": "mes"
+        },
+        "confianza": { "nivel": "baja", "supuestos": ["El proveedor acepta devolver la mitad del alza"] },
+        "parametros": { "destinatario": "Proveedor X", "reduccion_pedida_pct": 50 }
+      },
+      {
+        "id": "hogar-sustitutos",
+        "titulo": "Buscar sustitutos",
+        "tipo": "tarea",
+        "descripcion": {
+          "texto": "Tarea para compras: cotizar con otro proveedor sustitutos de los {0} SKU",
+          "cifras": [{ "valor": 4, "unidad": "unidades", "consultaId": "c-hogar-costo-sku" }]
+        },
+        "impacto": null,
+        "confianza": { "nivel": "media", "supuestos": [] },
+        "parametros": { "responsable": "Jefe de compras" }
+      }
+    ],
+    "guion": {
+      "analista": "Comparando el costo de cada SKU de Hogar semana a semana",
+      "estratega": "Calculando cuánto recupera cada acción en pesos"
+    }
+  },
+  {
+    "id": "alerta-sin-evidencia",
+    "severidad": "media",
+    "metrica": "dias_pago_prom",
+    "fechaSimulada": "2026-09-16",
+    "titulo": {
+      "texto": "Cliente de ejemplo B paga en {0} días, un {1} más lento que su promedio",
+      "cifras": [
+        { "valor": 44, "unidad": "dias", "consultaId": "c-sinev-dias" },
+        { "valor": 57.1, "unidad": "porcentaje", "consultaId": "c-sinev-dias" }
+      ]
+    },
+    "pesosEnRiesgo": { "valor": 23000000, "unidad": "COP", "consultaId": "c-sinev-saldo" },
+    "recuperableMes": null,
+    "confianza": {
+      "nivel": "baja",
+      "supuestos": ["Ninguna factura del cliente está vencida todavía", "Las políticas no registran un plazo especial para este cliente"]
+    },
+    "causa": {
+      "tipo": "sin_evidencia",
+      "motivo": "No tengo evidencia suficiente para explicar por qué este cliente paga más tarde. Sus compras siguen a su ritmo habitual y no tiene facturas vencidas; la causa puede estar fuera de los datos que reviso.",
+      "consultasRevisadas": ["c-sinev-dias", "c-sinev-saldo", "c-sinev-actividad"]
+    },
+    "acciones": [
+      {
+        "id": "sin-evidencia-conversar",
+        "titulo": "Preguntar al cliente",
+        "tipo": "tarea",
+        "descripcion": {
+          "texto": "Tarea para el responsable de la cuenta: preguntar a Cliente de ejemplo B por qué paga más tarde, antes de que venza su saldo de {0}",
+          "cifras": [{ "valor": 23000000, "unidad": "COP", "consultaId": "c-sinev-saldo" }]
+        },
+        "impacto": null,
+        "confianza": { "nivel": "baja", "supuestos": [] },
+        "parametros": { "responsable": "Responsable de la cuenta" }
+      }
+    ],
+    "guion": {
+      "analista": "Buscando la causa en la cartera, la actividad de compra y la política de crédito",
+      "estratega": "Sin causa demostrada: preparando solo una tarea de revisión"
+    }
+  },
+  {
+    "id": "alerta-descuentos",
+    "severidad": "media",
+    "metrica": "descuento_en_exceso",
+    "fechaSimulada": "2026-09-18",
+    "titulo": {
+      "texto": "Vendedor de ejemplo 3 dio {0} descuentos por encima del tope sin aprobación en 2 semanas",
+      "cifras": [{ "valor": 37, "unidad": "unidades", "consultaId": "c-desc-lineas" }]
+    },
+    "pesosEnRiesgo": { "valor": 12400000, "unidad": "COP", "consultaId": "c-desc-lineas" },
+    "recuperableMes": { "valor": 26600000, "unidad": "COP", "consultaId": "c-desc-mes" },
+    "confianza": { "nivel": "alta", "supuestos": ["Ninguna aprobación especial quedó sin registrar"] },
+    "causa": {
+      "tipo": "identificada",
+      "frase": {
+        "texto": "Los descuentos superan el tope de su segmento en {0} puntos en promedio y ninguno tiene aprobación especial",
+        "cifras": [{ "valor": 6.5, "unidad": "puntos", "consultaId": "c-desc-puntos" }]
+      },
+      "evidencia": [
+        {
+          "afirmacion": {
+            "texto": "{0} líneas de pedido suman {1} de descuento por encima del tope",
+            "cifras": [
+              { "valor": 37, "unidad": "unidades", "consultaId": "c-desc-lineas" },
+              { "valor": 12400000, "unidad": "COP", "consultaId": "c-desc-lineas" }
+            ]
+          },
+          "consultaId": "c-desc-lineas"
+        },
+        {
+          "afirmacion": {
+            "texto": "Proyectado a un mes, el descuento en exceso llega a {0}",
+            "cifras": [{ "valor": 26600000, "unidad": "COP", "consultaId": "c-desc-mes" }]
+          },
+          "consultaId": "c-desc-mes"
+        }
+      ]
+    },
+    "acciones": [
+      {
+        "id": "descuentos-aviso",
+        "titulo": "Aviso al jefe de ventas",
+        "tipo": "borrador_correo",
+        "descripcion": {
+          "texto": "Borrador de correo al jefe de ventas con las {0} líneas fuera de política y el tope de cada segmento",
+          "cifras": [{ "valor": 37, "unidad": "unidades", "consultaId": "c-desc-lineas" }]
+        },
+        "impacto": {
+          "cifra": { "valor": 26600000, "unidad": "COP", "consultaId": "c-desc-mes" },
+          "periodo": "mes"
+        },
+        "confianza": { "nivel": "media", "supuestos": ["El vendedor ajusta sus descuentos tras el aviso"] },
+        "parametros": { "destinatario": "Jefe de ventas" }
+      },
+      {
+        "id": "descuentos-aprobacion",
+        "titulo": "Exigir aprobación especial",
+        "tipo": "tarea",
+        "descripcion": {
+          "texto": "Tarea para comercial: exigir aprobación especial a cada descuento de Vendedor de ejemplo 3 durante el próximo mes",
+          "cifras": []
+        },
+        "impacto": {
+          "cifra": { "valor": 26600000, "unidad": "COP", "consultaId": "c-desc-mes" },
+          "periodo": "mes"
+        },
+        "confianza": { "nivel": "alta", "supuestos": [] },
+        "parametros": { "responsable": "Gerente comercial", "duracion_dias": 30 }
+      }
+    ],
+    "guion": {
+      "analista": "Agrupando los descuentos fuera de política por vendedor y semana",
+      "estratega": "Preparando el aviso y el control de aprobación"
+    }
+  }
+]

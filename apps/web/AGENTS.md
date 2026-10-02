@@ -22,6 +22,18 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   there. Serve it over HTTP, because opened from `file://` its stylesheet does not load.
 - **Agent progress arrives by SSE** from the API, so the screen shows the step in course while the
   agents work.
+- **The screens run on a simulated API until `apps/api` serves one.** `src/api/client.ts` mirrors
+  the minimal API with one function per endpoint, streams agent progress and chat as async
+  iterators shaped like SSE events, and reveals each alert when the simulated day reaches its date.
+  It is replaced by a fetch client without touching a screen. `src/api/types.ts` is a draft
+  contract: `apps/api`'s Pydantic models are the source, and these types follow them. Every number
+  travels as a `Cifra` with its `consultaId`, so the type itself asks each figure for its query.
+- **The fixtures in `src/api/fixtures/` are illustrative.** They are built from the brief's public
+  example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
+  examples, never from the dataset, because figures read from `data/csv/` would name the seeded
+  scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
+  figure cites an example query against a real `v_*` view, so "how I got here" has something to
+  show; the queries are not run.
 
 ## Commands
 
