@@ -65,7 +65,7 @@ with a proposal ready to approve.**
 | API | Python + FastAPI + Pydantic, REST + SSE streaming | Node.js + Hono or NestJS |
 | orchestration | LangGraph, for state and the pause for human approval | Claude Agent SDK, OpenAI Agents SDK, ADK, CrewAI |
 | tools | MCP servers: read-only SQL, policies, actions | the model's native function calling |
-| language models | Claude: a large model to reason, a fast one to classify | GPT, Gemini, open models through Ollama |
+| language models | Qwen3 through Ollama, local; one model, thinking on to reason and off to classify | Claude, which the brief recommends; GPT, Gemini |
 | data | PostgreSQL + pgvector | DuckDB for local analysis |
 | anomaly detection | business rules + statistics (z-score, trend) | scikit-learn Isolation Forest, Prophet |
 | observability and evals | Langfuse traces + promptfoo | LangSmith, Arize Phoenix, Ragas |

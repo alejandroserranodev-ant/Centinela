@@ -52,9 +52,8 @@ On approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Ev
 the `bitácora`, which `apps/api` owns.
 
 **Still undecided, and owned by no page yet:** who embeds the policies into pgvector and when,
-whether `apps/api` runs the agents in its own process or calls them as a service, how agents
-reach the MCP servers, and where personal data is masked. Whoever settles one writes the decision
-on the page of the level that owns it.
+whether `apps/api` runs the agents in its own process or calls them as a service, and how agents
+reach the MCP servers. Whoever settles one writes the decision on the page of the level that owns it.
 
 ## Commands
 

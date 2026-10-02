@@ -1,5 +1,5 @@
-# Disposable PostgreSQL that runs sql/01_esquema.sql, sql/02_carga.sql and
-# sql/03_capa_semantica.sql against csv/ on first start, per `data/AGENTS.md`.
+# Disposable PostgreSQL that runs sql/01_esquema.sql, sql/02_carga.sql, sql/03_capa_semantica.sql
+# and sql/04_vistas_causa.sql against csv/ on first start, per `data/AGENTS.md`.
 services:
   db:
     image: postgres:16-alpine
@@ -15,6 +15,7 @@ services:
       - ./sql/01_esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro
       - ./sql/02_carga.sql:/docker-entrypoint-initdb.d/02_carga.sql:ro
       - ./sql/03_capa_semantica.sql:/docker-entrypoint-initdb.d/03_capa_semantica.sql:ro
+      - ./sql/04_vistas_causa.sql:/docker-entrypoint-initdb.d/04_vistas_causa.sql:ro
       - ./csv:/csv:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U centinela -d centinela"]

@@ -9,23 +9,61 @@ metricas:
     vista: v_margen_semanal_linea
     dimensiones: [semana, linea]
     umbral_alerta: "caída > 3 puntos vs. promedio de las 8 semanas previas, o margen bajo ref_margen_minimo_linea"
+    fuente_umbral: "kit; margen mínimo en OPE-POL-007 §4 (vista v_margen_minimo_linea)"
+    pesos_en_riesgo: "(max(promedio 8 semanas previas, margen_minimo_pct) - margen_pct) / 100 * ventas de la semana"
   saldo_vencido:
     descripcion: Valor de facturas abiertas con fecha de vencimiento anterior al corte
     vista: v_cartera_cliente
     umbral_alerta: "max_dias_vencido > 15 (política de crédito) o saldo_abierto > cupo_credito"
+    fuente_umbral: "FIN-POL-004 §3 y §4"
+    tramos: "FIN-POL-004 §4 por max_dias_vencido: tramo_1 de 1 a 15, tramo_2 de 16 a 30, tramo_3 de 31 a 60, tramo_4 más de 60"
+    pesos_en_riesgo: "saldo_vencido"
+  concentracion_vencida_pct:
+    descripcion: Participación del cliente en la cartera vencida total
+    formula: saldo_vencido del cliente / sum(saldo_vencido) de todos los clientes
+    vista: v_cartera_cliente
+    umbral_alerta: "> 10% de la cartera vencida total"
+    fuente_umbral: "FIN-POL-004 §5"
+    pesos_en_riesgo: "saldo_vencido"
   dias_pago_prom:
     descripcion: Días promedio entre factura y pago, por mes de factura
     vista: v_dias_pago_mensual
     umbral_alerta: "aumento > 50% frente al promedio histórico del cliente"
+    fuente_umbral: "FIN-POL-004 §5"
+    pesos_en_riesgo: "saldo_abierto del cliente en v_cartera_cliente"
   cobertura_dias:
     descripcion: Existencia / demanda promedio diaria de los últimos 30 días
     vista: v_cobertura_inventario
     umbral_alerta: "< 10 días en clase A (política de inventario); crítico < 5 días con pedidos pendientes"
+    fuente_umbral: "OPE-POL-007 §2; clase B < 7 días; clase C sin acción automática, no alerta"
+    pesos_en_riesgo: "demanda_prom_30d * (cobertura mínima de la clase - cobertura_dias) * precio_lista vigente en v_precio_sku"
+  variacion_costo_pct:
+    descripcion: Variación del costo unitario de un SKU frente a su costo anterior
+    vista: v_costo_sku
+    umbral_alerta: "> 5% sin un cambio de precio_lista en v_precio_sku dentro de 10 días hábiles"
+    fuente_umbral: "OPE-POL-007 §4"
+    pesos_en_riesgo: "(costo_unitario - costo_anterior) * unidades vendidas del SKU desde fecha_vigencia en v_ventas"
+  dias_retraso:
+    descripcion: Días entre la fecha esperada de una orden de compra y su recepción o el corte
+    vista: v_ordenes_compra
+    umbral_alerta: "> 0 en una orden no recibida"
+    fuente_umbral: "OPE-POL-007 §3"
+    pesos_en_riesgo: "cantidad * costo_unitario de la orden"
   descuento_en_exceso:
     descripcion: Descuento otorgado por encima del tope del segmento sin aprobación especial
     vista: v_descuentos_fuera_politica
     umbral_alerta: "cualquier línea; agrupar por vendedor y semana"
+    fuente_umbral: "COM-POL-002 §2 y §3; dos semanas consecutivas del mismo vendedor escala según §5"
+    pesos_en_riesgo: "sum(descuento_en_exceso)"
+  margen_bruto_negativo:
+    descripcion: Líneas de pedido vendidas por debajo del costo
+    vista: v_ventas
+    umbral_alerta: "margen_bruto < 0"
+    fuente_umbral: "COM-POL-002 §4; los datos no registran la aprobación escrita de Gerencia General"
+    pesos_en_riesgo: "-sum(margen_bruto)"
   veces_intervalo_habitual:
     descripcion: Días sin comprar / intervalo habitual entre pedidos del cliente
     vista: v_actividad_cliente
     umbral_alerta: "> 3 veces el intervalo habitual en clientes con 10 o más pedidos"
+    fuente_umbral: "kit"
+    pesos_en_riesgo: "valor_neto promedio por mes del cliente en v_ventas, últimos 6 meses hasta ultima_compra"
