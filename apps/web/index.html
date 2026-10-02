@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Centinela</title>
+    <script>
+      (function () {
+        var PALETTES = [
+          { name: 'light', polarity: 'light' },
+          { name: 'dark', polarity: 'dark' }
+        ];
+        var DEFAULT = 'light';
+        try {
+          var name = localStorage.getItem('arena-theme');
+          if (!name) {
+            var wants = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            for (var i = 0; i < PALETTES.length; i++) {
+              if (PALETTES[i].polarity === wants) { name = PALETTES[i].name; break; }
+            }
+          }
+          if (name && name !== DEFAULT && /^[a-z][a-z0-9-]*$/.test(name)) {
+            document.documentElement.classList.add('arena-' + name);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

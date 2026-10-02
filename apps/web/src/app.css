@@ -1,0 +1,10 @@
+html,
+body {
+  background: var(--fill-page);
+  color: var(--ink-body);
+  margin: 0;
+}
+
+.page-block {
+  padding-block: var(--sp-6);
+}
