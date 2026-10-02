@@ -1,9 +1,10 @@
 # apps/api: the API, the clock and the log
 
 This level is the only door into Centinela: the web, the jury and any script reach the agents
-through it. It holds no code yet; this page states the decisions the code is written against. The
-endpoints it must serve are [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its
-minimal API section.
+through it. It holds the skeleton the endpoints are built on: FastAPI, the API's own schema, the
+alert lifecycle and the `bitácora`, not yet wired to `packages/agents` or `packages/tools`. This
+page states the decisions the code is written against. The endpoints it must serve are
+[`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its minimal API section.
 
 ## Decisions
 
