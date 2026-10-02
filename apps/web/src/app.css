@@ -318,3 +318,77 @@ ol {
   position: relative;
   overflow-x: clip;
 }
+
+.shell--chat .shell__cuerpo {
+  padding-inline-end: min(calc(var(--sp-1) * 120), 92vw);
+}
+
+.chat__pie {
+  width: 100%;
+}
+
+.chat__enviar {
+  justify-content: flex-end;
+}
+
+.chat__sugerencias {
+  align-items: start;
+}
+
+.chat__conversacion {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.burbuja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  max-width: 92%;
+  line-height: var(--lh-body);
+}
+
+.burbuja--usuario {
+  align-self: end;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--fill-surface-sunken);
+  border: var(--bw-surface) solid var(--edge-surface);
+  border-radius: var(--r-surface);
+}
+
+.burbuja--centinela {
+  align-self: stretch;
+  max-width: 100%;
+}
+
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--sp-1) * 64)), 1fr));
+  gap: var(--rhythm-component);
+}
+
+.kpi {
+  gap: var(--sp-1);
+}
+
+.kpi__nombre {
+  font-weight: var(--fw-heading);
+  color: var(--ink-heading);
+}
+
+.responsables,
+.autonomia {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--sp-1) * 100)), 1fr));
+  gap: var(--rhythm-section) var(--rhythm-component);
+}
+
+.autonomia__titulo {
+  font-family: var(--ff-heading);
+  font-weight: var(--fw-heading);
+  font-size: var(--fs-md);
+  color: var(--ink-heading);
+}

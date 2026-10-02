@@ -47,6 +47,24 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   a one-pixel box, but a table lays out to its content anyway, and at phone width that box widened
   the page. Clipping the inline axis alone keeps the tooltip whole.
 
+- **The chat is a non-modal `ArenaSheet`, so it handles focus itself.** The sheet takes no focus
+  and traps none, and Escape reaches it only from inside. Opening moves focus to the question
+  field, and closing returns it to the control that opened the chat. On a desktop the shell gives
+  up the sheet's width at its inline end while the chat is open, so the alert stays readable
+  beside the answer. The sheet covers the end of the bar while it is open, because Arena places it
+  above fixed navigation.
+- **Enter sends a question and Shift + Enter breaks the line.** `ArenaTextarea` exposes no key
+  events, so the form around it listens for them. The conversation lasts as long as the app stays
+  open, because the chat is mounted once in the shell.
+- **The chat's send button is `secondary`.** The sheet stands beside a view that already has its
+  primary action, Approve in the detail, and one view shows one primary action.
+- **A Bitácora filter returns the reader to page 1.** `ArenaTable` returns to page 1 only when
+  the page falls out of range, and it does not slice rows, so the screen keeps the page, slices
+  ten rows and resets the page whenever a criterion changes.
+- **The settings screen has one save action for its three tabs.** A change in any tab is a draft
+  until "Guardar cambios", so the three tabs never save half a configuration. "Ejecuta" is
+  disabled in every autonomy group, and the API rejects it again with a 422.
+
 ## Commands
 
 Run from this directory, after `npm install`:

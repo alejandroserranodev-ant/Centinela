@@ -19,11 +19,8 @@ const formatoFechaCorta = new Intl.DateTimeFormat('es-CO', {
 const formatoMes = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric', timeZone: 'America/Bogota' });
 const formatoEjeMes = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'America/Bogota' });
 const formatoEjeDia = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' });
-const formatoFechaHora = new Intl.DateTimeFormat('es-CO', {
-  dateStyle: 'long',
-  timeStyle: 'short',
-  timeZone: 'America/Bogota',
-});
+const formatoDiaIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' });
+const formatoHora = new Intl.DateTimeFormat('es-CO', { timeStyle: 'short', timeZone: 'America/Bogota' });
 
 export function pesos(valor: number): string {
   return formatoPesos.format(valor);
@@ -77,8 +74,9 @@ export function ejeDia(dia: string): string {
   return formatoEjeDia.format(new Date(`${dia}T12:00:00-05:00`));
 }
 
-export function fechaHora(iso: string): string {
-  return formatoFechaHora.format(new Date(iso));
+export function fechaHoraCorta(iso: string): string {
+  const momento = new Date(iso);
+  return `${fechaCorta(formatoDiaIso.format(momento))}, ${formatoHora.format(momento)}`;
 }
 
 export function enUnidad(valor: number, unidad: UnidadCifra): string {

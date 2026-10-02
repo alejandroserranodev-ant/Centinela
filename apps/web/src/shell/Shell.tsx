@@ -15,6 +15,7 @@ import {
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSimulacion } from '../estado/Simulacion';
 import { DialogoConsulta } from '../comun/DialogoConsulta';
+import { Chat } from '../pantallas/Chat';
 import { PasoEnCurso } from './PasoEnCurso';
 import { Reloj } from './Reloj';
 
@@ -51,7 +52,7 @@ export function Shell() {
   };
 
   return (
-    <div className={movil ? 'arena-shell shell shell--movil' : 'arena-shell shell'}>
+    <div className={['arena-shell shell', movil ? 'shell--movil' : '', !movil && chat.abierto ? 'shell--chat' : ''].filter(Boolean).join(' ')}>
       <ArenaSkipLink label="Saltar al contenido" />
       <ArenaAppBar
         brand={
@@ -124,6 +125,7 @@ export function Shell() {
           />
         ))}
       </ArenaToastHost>
+      <Chat />
       <DialogoConsulta />
     </div>
   );
