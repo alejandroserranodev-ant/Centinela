@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en" class="arena-light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centinela identity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../intro/styles.css">
+<style>
+  :root.arena-light {
+    --color-base-100:#ffffff; --color-base-200:#f3f6f7; --color-base-300:#dfe6e9;
+    --color-base-content:#0f1b21;
+    --color-primary:#0e5a6b; --color-primary-content:#ffffff;
+    --color-secondary:#8f6000; --color-secondary-content:#ffffff;
+    --color-neutral:#eaf0f2; --color-neutral-content:#4d5f68;
+    --color-info:#1f5c8b; --color-info-content:#ffffff;
+    --color-success:#1f6b34; --color-success-content:#ffffff;
+    --color-warning:#9a4d00; --color-warning-content:#ffffff;
+    --color-error:#a51c1c; --color-error-content:#ffffff; --color-error-fill:#a51c1c;
+    --color-cat-1:#2a78d6; --color-cat-2:#eb6834; --color-cat-3:#1baf7a; --color-cat-4:#eda100;
+    --color-cat-5:#e87ba4; --color-cat-6:#008300; --color-cat-7:#4a3aa7; --color-cat-8:#e34948;
+    --font-display:'Inter',system-ui,sans-serif;
+    --font-body:'Inter',system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  .dark {
+    --color-base-100:#0f1619; --color-base-200:#152024; --color-base-300:#22323a;
+    --color-base-content:#e4ecef;
+    --color-primary:#5fb3c4; --color-primary-content:#06191e;
+    --color-secondary:#e0b45a; --color-secondary-content:#1f1503;
+    --color-neutral:#1a272c; --color-neutral-content:#9db0b8;
+    --color-info:#84b6f4; --color-info-content:#0a1725;
+    --color-success:#79cd93; --color-success-content:#08200f;
+    --color-warning:#f0a060; --color-warning-content:#241703;
+    --color-error:#f08a8a; --color-error-content:#2a0a0a; --color-error-fill:#d06e6e;
+    --color-cat-1:#3987e5; --color-cat-2:#d95926; --color-cat-3:#199e70; --color-cat-4:#c98500;
+    --color-cat-5:#d55181; --color-cat-6:#008300; --color-cat-7:#9085e9; --color-cat-8:#e66767;
+    background: var(--color-base-200); padding: var(--sp-4); border-radius: var(--r-sm);
+  }
+  body { margin: 0; background: var(--fill-page); color: var(--ink-body);
+         font-family: var(--font-body); padding: var(--sp-8) var(--sp-6); }
+  main { max-inline-size: var(--measure-prose); margin-inline: auto; }
+  h1, h2 { font-family: var(--ff-heading); color: var(--ink-heading);
+           letter-spacing: var(--track-heading); }
+  h1 { font-size: var(--fs-display); line-height: var(--lh-heading); margin-block: 0 var(--sp-2); }
+  h2 { font-size: var(--fs-xl); margin-block: var(--sp-10) var(--sp-2); }
+  p, li { line-height: var(--lh-prose); }
+  .note { color: var(--ink-muted); font-size: var(--fs-sm); }
+  .row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-block: var(--sp-4); }
+  .chip { inline-size: calc(var(--sp-1) * 22); }
+  .chip i { display: block; block-size: calc(var(--sp-1) * 14);
+            border: var(--bw-surface) solid var(--edge-surface);
+            border-radius: var(--r-surface); }
+  .chip span, .swatch { display: block; font-family: var(--ff-mono); font-size: var(--fs-xs);
+               color: var(--ink-muted); margin-block-start: var(--sp-1); }
+  .dark .chip span { color: var(--color-neutral-content); }
+  .box { inline-size: calc(var(--sp-1) * 26); block-size: calc(var(--sp-1) * 18);
+         background: var(--fill-surface-sunken);
+         border: var(--bw-surface) solid var(--edge-surface); }
+  table { border-collapse: collapse; inline-size: 100%; margin-block: var(--sp-4); }
+  th, td { text-align: start; padding: var(--sp-2);
+           border-block-end: var(--bw-separator) solid var(--edge-separator);
+           vertical-align: top; font-size: var(--fs-sm); }
+  th { color: var(--ink-muted); font-weight: var(--fw-heading); }
+  code { font-family: var(--ff-mono); font-size: var(--fs-xs); color: var(--ink-muted); }
+  .sample { border: var(--bw-surface) solid var(--edge-surface); border-radius: var(--r-sm);
+            padding: var(--sp-4); background: var(--color-base-100); }
+  .sample .money { font-family: var(--font-mono); font-size: var(--fs-xl); color: var(--ink-heading); }
+  .sample .label { font-family: var(--font-mono); text-transform: uppercase; font-size: var(--fs-xs);
+                   letter-spacing: 0.08em; color: var(--ink-muted); }
+  .sample .voice { display: inline-block; margin-block-start: var(--sp-3); padding: var(--sp-2) var(--sp-4);
+                   background: var(--color-primary); color: var(--color-primary-content);
+                   border-radius: var(--r-sm); font-weight: 500; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Centinela identity</h1>
+<p>
+  The appearance of Centinela, written down before any screen is built. Each section answers a
+  question Arena's style kernel asks. Once this page is approved, <code>arena.config.json</code>
+  and the style plugin under <code>design/centinela/</code> restate it in the form a build reads.
+</p>
+<p class="note">
+  Until <code>arena-to-prod</code> has run in <code>apps/web</code>, this page reads Arena's
+  reference sheet: the palette and the faces below are Centinela's, while the radius ladder is
+  still drawn from Arena's reference plugin.
+</p>
+
+<h2>The product</h2>
+<p>
+  A decision inbox, not a dashboard. The manager and the process leads of
+  <code>Distribuidora Andina S.A.S.</code> open it and find each problem already explained,
+  ordered by pesos at risk, with a proposal ready to approve, edit or reject. It is an
+  application somebody works in: a list of alerts set against a reading column, a pinned chat,
+  an audit log and a settings page. Every piece is furniture Arena ships. The two pieces drawn
+  by hand are the alert row and the chat message.
+</p>
+<p>
+  The register starts from Arena's measured <code>inbox</code> entry, because the screen is a
+  list read item by item against a reading column. Centinela departs from that entry in one
+  place, density, which the air section below states.
+</p>
+
+<h2>The palette</h2>
+<p>
+  Centinela's own brand. <strong>Light leads</strong>, because it is an office tool managers open
+  during the working day. <strong>Petrol blue is the voice</strong> and carries the one primary
+  action on a screen, "Aprobar". Amber is the distinction and the focus ring, never a second
+  primary. The dark palette is the same hues, re-stepped for a dark surface.
+</p>
+<div class="row">
+  <div class="chip"><i style="background: var(--color-base-100)"></i><span>base-100 #ffffff</span></div>
+  <div class="chip"><i style="background: var(--color-base-200)"></i><span>base-200 #f3f6f7</span></div>
+  <div class="chip"><i style="background: var(--color-base-300)"></i><span>base-300 #dfe6e9</span></div>
+  <div class="chip"><i style="background: var(--color-base-content)"></i><span>content #0f1b21</span></div>
+  <div class="chip"><i style="background: var(--color-primary)"></i><span>primary #0e5a6b</span></div>
+  <div class="chip"><i style="background: var(--color-secondary)"></i><span>secondary #8f6000</span></div>
+  <div class="chip"><i style="background: var(--color-neutral)"></i><span>neutral #eaf0f2</span></div>
+</div>
+<div class="row">
+  <div class="chip"><i style="background: var(--color-info)"></i><span>info #1f5c8b</span></div>
+  <div class="chip"><i style="background: var(--color-success)"></i><span>success #1f6b34</span></div>
+  <div class="chip"><i style="background: var(--color-warning)"></i><span>warning #9a4d00</span></div>
+  <div class="chip"><i style="background: var(--color-error)"></i><span>error #a51c1c</span></div>
+</div>
+<div class="row">
+  <div class="chip"><i style="background: var(--color-cat-1)"></i><span>cat-1</span></div>
+  <div class="chip"><i style="background: var(--color-cat-2)"></i><span>cat-2</span></div>
+  <div class="chip"><i style="background: var(--color-cat-3)"></i><span>cat-3</span></div>
+  <div class="chip"><i style="background: var(--color-cat-4)"></i><span>cat-4</span></div>
+  <div class="chip"><i style="background: var(--color-cat-5)"></i><span>cat-5</span></div>
+  <div class="chip"><i style="background: var(--color-cat-6)"></i><span>cat-6</span></div>
+  <div class="chip"><i style="background: var(--color-cat-7)"></i><span>cat-7</span></div>
+  <div class="chip"><i style="background: var(--color-cat-8)"></i><span>cat-8</span></div>
+</div>
+
+<div class="dark">
+  <div class="row">
+    <div class="chip"><i style="background: var(--color-base-100)"></i><span>base-100 #0f1619</span></div>
+    <div class="chip"><i style="background: var(--color-base-200)"></i><span>base-200 #152024</span></div>
+    <div class="chip"><i style="background: var(--color-base-300)"></i><span>base-300 #22323a</span></div>
+    <div class="chip"><i style="background: var(--color-base-content)"></i><span>content #e4ecef</span></div>
+    <div class="chip"><i style="background: var(--color-primary)"></i><span>primary #5fb3c4</span></div>
+    <div class="chip"><i style="background: var(--color-secondary)"></i><span>secondary #e0b45a</span></div>
+    <div class="chip"><i style="background: var(--color-neutral)"></i><span>neutral #1a272c</span></div>
+  </div>
+  <div class="row">
+    <div class="chip"><i style="background: var(--color-info)"></i><span>info</span></div>
+    <div class="chip"><i style="background: var(--color-success)"></i><span>success</span></div>
+    <div class="chip"><i style="background: var(--color-warning)"></i><span>warning</span></div>
+    <div class="chip"><i style="background: var(--color-error)"></i><span>error</span></div>
+    <div class="chip"><i style="background: var(--color-cat-1)"></i><span>cat-1</span></div>
+    <div class="chip"><i style="background: var(--color-cat-2)"></i><span>cat-2</span></div>
+    <div class="chip"><i style="background: var(--color-cat-3)"></i><span>cat-3</span></div>
+    <div class="chip"><i style="background: var(--color-cat-4)"></i><span>cat-4</span></div>
+  </div>
+</div>
+
+<p>
+  Measured, not eyeballed. Primary on white is 7.8:1, amber on <code>base-200</code> clears 4.5:1,
+  and in dark mode every text colour clears 6.8:1. The chart ramp passes the colorblind checks of
+  the <code>dataviz</code> validator in both modes. In light mode, three slots sit under 3:1 against
+  white, so every Centinela chart carries direct labels and a table view. The "how I got here"
+  view is that table. Status colours mean severity and are never series colours, and severity
+  always carries a label and an icon besides its colour.
+</p>
+
+<h2>The type</h2>
+<p>
+  Inter for headings and body, JetBrains Mono for figures, labels and SQL, all three served by
+  Google Fonts. The mono face carries every amount in pesos, so that columns of money line up,
+  and the queries behind "how I got here".
+</p>
+<div class="sample">
+  <div class="label">Margen · línea Hogar · confianza alta</div>
+  <div style="font-family: var(--ff-heading); font-weight: 600; font-size: var(--fs-xl); color: var(--ink-heading); margin-block: var(--sp-2)">El margen de la línea Hogar cayó 6 puntos en 3 semanas</div>
+  <div style="font-size: var(--fs-md)">El proveedor X subió el costo de 4 SKU y el precio de venta no se ajustó.</div>
+  <div class="money" style="margin-block-start: var(--sp-3)">$ 42.000.000 / mes recuperables</div>
+  <span class="voice">Aprobar</span>
+</div>
+
+<h2>The character</h2>
+<p>
+  <strong>Drawn.</strong> A hairline on every surface and between rows, corners almost square,
+  and no shadow except on the surfaces that float: a sheet, a dialog, the command palette. It
+  reads as a precise, auditable tool. A row is a line of text, not an object to pick up.
+</p>
+<div class="row">
+  <div><div class="box" style="border-radius: var(--r-xs, var(--r-sm))"></div><span class="swatch"><code>r-xs</code> marker, small control</span></div>
+  <div><div class="box" style="border-radius: var(--r-sm)"></div><span class="swatch"><code>r-sm</code> control, field, surface</span></div>
+  <div><div class="box" style="border-radius: var(--r-md)"></div><span class="swatch"><code>r-md</code> floating surface</span></div>
+</div>
+<table>
+  <tr><th>What it decides</th><th>The roles</th><th>Centinela's answer</th></tr>
+  <tr><td>how round it is</td><td><code>r-control</code>, <code>r-field</code>, <code>r-media</code>, <code>r-surface</code></td><td>the small step everywhere, the smallest for a marker, and the medium step only on a floating surface (as <code>inbox</code>)</td></tr>
+  <tr><td>whether an edge is drawn</td><td>every <code>bw-*</code></td><td>a hairline throughout, on the surface step (as <code>inbox</code>)</td></tr>
+  <tr><td>how loud type is</td><td><code>fw-heading</code>, <code>fw-eyebrow</code>, <code>fw-control</code></td><td>semibold headings, medium eyebrows and controls; weight marks an unread alert</td></tr>
+  <tr><td>whether small text shouts</td><td><code>tt-label</code>, <code>tt-eyebrow</code>, <code>track-label</code>, <code>track-eyebrow</code></td><td>labels and eyebrows in mono capitals with wide tracking (as <code>inbox</code>)</td></tr>
+  <tr><td>whether depth is real</td><td><code>shadow-surface-floating</code>, <code>shadow-surface-deep</code>, <code>shadow-control-raised</code></td><td>only the floating and deep surfaces carry a shadow; a control never does</td></tr>
+  <tr><td>how it answers a hand</td><td><code>press-scale</code>, <code>lift-control</code>, <code>dur-state</code>, <code>ease-state</code></td><td>no shrink and no lift, the fast duration, an out curve (as <code>inbox</code>)</td></tr>
+</table>
+
+<h2>The air</h2>
+<p>
+  <strong>Medium density in a wide column.</strong> This is the one departure from the
+  <code>inbox</code> entry, which declares <code>.arena-compact</code> on the document. Centinela
+  shows a handful of costly decisions rather than hundreds of messages, so each row gets room for
+  its amount, its severity and its confidence. It is also read on a phone.
+</p>
+<table>
+  <tr><th>What it decides</th><th>The roles</th><th>Centinela's answer</th></tr>
+  <tr><td>how tight to the hand</td><td><code>pad-control-x</code>, <code>pad-control-y</code>, <code>gap-inline</code>, <code>gap-items</code>, <code>gap-control</code></td><td>Arena's default steps, which are one step looser than <code>inbox</code></td></tr>
+  <tr><td>how wide it breathes</td><td><code>container-max</code>, <code>measure-prose</code>, <code>grid-min</code>, <code>gutter</code></td><td>a very wide container and a prose measure of 78 characters for the reading column (as <code>inbox</code>)</td></tr>
+  <tr><td>which density class</td><td><code>arena-compact</code>, <code>arena-comfortable</code>, or neither</td><td>neither</td></tr>
+</table>
+
+<h2>The media</h2>
+<p>
+  Centinela shows no photographs. The only pictures are charts, which take their own box. The
+  media roles keep the <code>inbox</code> answer, landscape three by two and filled, and nothing
+  on screen exercises them.
+</p>
+
+<h2>The page</h2>
+<p>
+  On a desktop, three zones fill the window. The navigation rail sits on the left (Bandeja,
+  Bitácora, Configuración), then the list of alerts ordered by pesos at risk, then the reading
+  column with the open alert, which stops at the prose measure. The chat opens as a side sheet
+  over the reading column. The app bar carries the simulated day and the "Avanzar un día"
+  control. On a phone the rail becomes a bottom bar, and the list and the alert stack as two
+  routes. The air between components is the group step inside a row and the component step
+  between blocks.
+</p>
+
+<h2>What this page does not settle</h2>
+<p>
+  The copy and the brand mark. <strong>Nobody outside the product has to find it</strong>: it
+  lives behind a login, so it carries no metadata beyond a page title. That is a decision, and
+  it is why <code>apps/web</code> is a single-page application.
+</p>
+
+</main>
+</body>
+</html>

@@ -35,4 +35,23 @@ describes the tree is a debt nobody filed: move it to one of the places above.
 
 ## Filed debts
 
-None.
+**The brief in the tree is incomplete, and the challenge page states more than it.**
+[`docs/challenge/hackathon-brief.pdf`](./docs/challenge/hackathon-brief.pdf) is the source, and
+three things in it do not hold up:
+
+- Its menu (page 2) lists sections 05 *Metodología y agenda*, 06 *Evaluación* ("Entregables ·
+  Criterios · Pruebas del jurado") and 07 *Comercialización*, and no page carries them. The
+  scoring criteria, the jury's tests and the demo script have no source in the tree, so every
+  priority set against them is a guess. The only scoring signal in the PDF is that a Streamlit
+  prototype "baja la nota de UX" (page 14).
+- [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md) names the five announced scenarios
+  (margin, `mora`, stock-out, discounts, a customer who leaves) and says the hidden one is revealed
+  at the close. The PDF says only "6 escenarios por descubrir: 5 anunciados y 1 oculto" (page 4),
+  and its section *Escenarios sembrados* is missing, so the list and the reveal rest on no page.
+- The challenge page calls the event "the Business AI School hackathon by On Business". The cover
+  reads "onbusiness AI School · Hackatón by Paseo · Octubre de 2026" (page 1).
+
+It costs a requirement that nobody can check against its source, and a missing section that may
+hold the criteria the jury scores. It is paid when the complete deck replaces the PDF and the
+challenge page is re-read against it. Re-derive it with
+`pdftotext -layout docs/challenge/hackathon-brief.pdf - | grep -n "Evaluación\|Criterios\|oculto\|Escenarios"`.

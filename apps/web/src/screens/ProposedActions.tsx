@@ -1,0 +1,141 @@
+import { useState } from 'react';
+import { ArenaButton, ArenaCard, ArenaKeyValue, ArenaRadio, ArenaRadioGroup } from '@dravensoft/arena-react';
+import { ApiError, decide } from '../api/client';
+import type { Action, ActionType, Alert, Decision } from '../api/types';
+import { Confidence } from '../common/Badges';
+import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
+import { useSimulation } from '../state/Simulation';
+import { formatFigure } from '../format';
+import { parameterName } from '../actionParameters';
+import { EditDialog } from './EditDialog';
+import { RejectDialog } from './RejectDialog';
+
+const TYPE: Record<ActionType, string> = {
+  email_draft: 'Borrador de correo',
+  task: 'Tarea',
+  purchase_order_draft: 'Borrador de orden de compra',
+  price_change_draft: 'Borrador de ajuste de precio',
+};
+
+const LEVEL: Record<Action['confidence']['level'], string> = { high: 'alta', medium: 'media', low: 'baja' };
+
+function actionSummary(action: Action): string {
+  const impact = action.impact
+    ? `${formatFigure(action.impact.figure)} ${action.impact.period === 'month' ? 'al mes' : 'una vez'}`
+    : 'Sin impacto en pesos estimado';
+  return `${TYPE[action.type]} · ${impact} · confianza ${LEVEL[action.confidence.level]}`;
+}
+
+export function ProposedActions({ alert }: { alert: Alert }) {
+  const { notify, changed } = useSimulation();
+  const [chosenId, setChosenId] = useState(alert.actions[0].id);
+  const [approving, setApproving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const chosen = alert.actions.find((a) => a.id === chosenId) ?? alert.actions[0];
+
+  const send = async (decision: Decision) => {
+    try {
+      const result = await decide(alert.id, decision);
+      if (decision.kind === 'reject') {
+        notify({ tone: 'neutral', title: 'Propuesta rechazada', message: 'El motivo quedó en la bitácora.' });
+      } else {
+        notify({
+          tone: 'success',
+          title: `Aprobada: ${chosen.title}`,
+          message: result.executedAction?.result,
+        });
+      }
+      setEditing(false);
+      setRejecting(false);
+      changed();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        notify({ tone: 'danger', title: 'Esta alerta ya se decidió', message: 'Recargamos su estado actual.' });
+        setEditing(false);
+        setRejecting(false);
+        changed();
+        return;
+      }
+      throw e;
+    }
+  };
+
+  const approve = async () => {
+    setApproving(true);
+    try {
+      await send({ kind: 'approve', actionId: chosen.id });
+    } catch {
+      notify({ tone: 'danger', title: 'No se pudo aprobar', message: 'Inténtalo de nuevo en unos segundos.' });
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  return (
+    <div className="arena-stack">
+      {alert.actions.length > 1 ? (
+        <ArenaRadioGroup ariaLabel="Acción a aprobar" value={chosen.id} onChange={setChosenId}>
+          {alert.actions.map((action) => (
+            <ArenaRadio key={action.id} value={action.id} label={action.title} hint={actionSummary(action)} />
+          ))}
+        </ArenaRadioGroup>
+      ) : null}
+      <ArenaCard eyebrow={TYPE[chosen.type]} title={chosen.title} headingLevel="h4" action={<Confidence level={chosen.confidence.level} />}>
+        <div className="arena-stack arena-stack--group">
+          <p>
+            <SentenceWithFigures text={chosen.description.text} figures={chosen.description.figures} />
+          </p>
+          <p>
+            <span className="eyebrow">Impacto estimado</span>{' '}
+            {chosen.impact ? (
+              <>
+                <LinkedFigure figure={chosen.impact.figure} /> {chosen.impact.period === 'month' ? 'al mes' : 'una sola vez'}
+              </>
+            ) : (
+              'sin impacto en pesos estimado'
+            )}
+          </p>
+          {chosen.confidence.assumptions.length > 0 ? (
+            <div>
+              <span className="eyebrow">Supone que</span>
+              <ul className="assumptions">
+                {chosen.confidence.assumptions.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <ArenaKeyValue
+            rows={Object.entries(chosen.parameters).map(([key, value]) => ({
+              term: parameterName(key),
+              value: String(value),
+              numeric: typeof value === 'number',
+            }))}
+          />
+        </div>
+      </ArenaCard>
+      <div className="arena-row arena-row--component decision">
+        <ArenaButton variant="primary" icon="ph-bold ph-check" loading={approving} onClick={approve}>
+          Aprobar
+        </ArenaButton>
+        <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
+          Editar
+        </ArenaButton>
+        <ArenaButton variant="danger" icon="ph-bold ph-x" onClick={() => setRejecting(true)}>
+          Rechazar
+        </ArenaButton>
+      </div>
+      <p className="text-muted">
+        Aprobar deja un borrador o una tarea: nada se envía ni se publica hasta que una persona lo haga.
+      </p>
+      <EditDialog
+        action={chosen}
+        open={editing}
+        onClose={() => setEditing(false)}
+        onApprove={(parameters) => send({ kind: 'edit', actionId: chosen.id, parameters })}
+      />
+      <RejectDialog open={rejecting} onClose={() => setRejecting(false)} onReject={(reason) => send({ kind: 'reject', reason })} />
+    </div>
+  );
+}

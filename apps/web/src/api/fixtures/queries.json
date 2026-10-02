@@ -1,0 +1,134 @@
+[
+  {
+    "id": "q-hogar-margin-series",
+    "source": "v_margen_semanal_linea",
+    "description": "Margen semanal de la línea Hogar en las últimas 11 semanas",
+    "sql": "SELECT semana, margen_pct\nFROM centinela.v_margen_semanal_linea\nWHERE linea = 'Hogar'\n  AND semana <= :dia_simulado - 7\nORDER BY semana DESC\nLIMIT 11;"
+  },
+  {
+    "id": "q-hogar-drop",
+    "source": "v_margen_semanal_linea",
+    "description": "Margen de la última semana de Hogar frente al promedio de las 8 semanas previas a la caída",
+    "sql": "WITH s AS (\n  SELECT semana, margen_pct,\n         row_number() OVER (ORDER BY semana DESC) AS n\n  FROM centinela.v_margen_semanal_linea\n  WHERE linea = 'Hogar' AND semana <= :dia_simulado - 7\n)\nSELECT (SELECT margen_pct FROM s WHERE n = 1) AS margen_actual,\n       (SELECT round(avg(margen_pct), 2) FROM s WHERE n BETWEEN 4 AND 11) AS margen_previo,\n       (SELECT round(avg(margen_pct), 2) FROM s WHERE n BETWEEN 4 AND 11)\n         - (SELECT margen_pct FROM s WHERE n = 1) AS caida_puntos;"
+  },
+  {
+    "id": "q-hogar-risk",
+    "source": "v_margen_semanal_linea",
+    "description": "Margen bruto que Hogar deja de ganar al mes si la caída se mantiene",
+    "sql": "SELECT round(avg(ventas) * 52 / 12 * :caida_puntos / 100) AS margen_perdido_mes\nFROM centinela.v_margen_semanal_linea\nWHERE linea = 'Hogar'\n  AND semana > :dia_simulado - 28\n  AND semana <= :dia_simulado - 7;"
+  },
+  {
+    "id": "q-hogar-sku-cost",
+    "source": "v_ventas",
+    "description": "Costo unitario semanal de los SKU de Hogar en las últimas 8 semanas",
+    "sql": "SELECT sku, producto, date_trunc('week', fecha)::date AS semana,\n       round(sum(costo_total) / sum(cantidad)) AS costo_unitario\nFROM centinela.v_ventas\nWHERE linea = 'Hogar'\n  AND fecha > :dia_simulado - 56\n  AND fecha <= :dia_simulado\nGROUP BY 1, 2, 3\nORDER BY sku, semana;"
+  },
+  {
+    "id": "q-hogar-recoverable",
+    "source": "v_ventas",
+    "description": "Margen que recupera al mes un alza del 3 % en los 4 SKU, a volumen constante",
+    "sql": "SELECT round(sum(valor_neto) * :alza_pct / 100 / 2) AS recuperable_mes\nFROM centinela.v_ventas\nWHERE sku IN (:skus)\n  AND fecha > :dia_simulado - 60\n  AND fecha <= :dia_simulado;"
+  },
+  {
+    "id": "q-hogar-renegotiate",
+    "source": "v_ventas",
+    "description": "Margen que se recupera al mes si el proveedor devuelve la mitad del alza de costo",
+    "sql": "WITH costo AS (\n  SELECT sku,\n         sum(costo_total) FILTER (WHERE fecha > :dia_simulado - 21) / nullif(sum(cantidad) FILTER (WHERE fecha > :dia_simulado - 21), 0) AS costo_nuevo,\n         sum(costo_total) FILTER (WHERE fecha <= :dia_simulado - 21) / nullif(sum(cantidad) FILTER (WHERE fecha <= :dia_simulado - 21), 0) AS costo_previo,\n         sum(cantidad) FILTER (WHERE fecha > :dia_simulado - 30) AS unidades_mes\n  FROM centinela.v_ventas\n  WHERE sku IN (:skus) AND fecha > :dia_simulado - 77 AND fecha <= :dia_simulado\n  GROUP BY sku\n)\nSELECT round(sum((costo_nuevo - costo_previo) / 2 * unidades_mes)) AS recuperable_mes\nFROM costo;"
+  },
+  {
+    "id": "q-overdue-a-balance",
+    "source": "v_cartera_cliente",
+    "description": "Saldo vencido, días de mora y plazo del cliente al día simulado",
+    "sql": "SELECT cliente_id, nombre, plazo_dias, cupo_credito,\n       saldo_abierto, saldo_vencido, max_dias_vencido\nFROM centinela.v_cartera_cliente\nWHERE cliente_id = :cliente_id;"
+  },
+  {
+    "id": "q-overdue-a-payment-days",
+    "source": "v_dias_pago_mensual",
+    "description": "Días promedio de pago del cliente por mes de factura",
+    "sql": "SELECT mes_factura, dias_pago_prom, facturas_pagadas\nFROM centinela.v_dias_pago_mensual\nWHERE cliente_id = :cliente_id\n  AND mes_factura <= :dia_simulado\nORDER BY mes_factura;"
+  },
+  {
+    "id": "q-stockout-coverage",
+    "source": "v_cobertura_inventario",
+    "description": "Existencia, demanda diaria y días de cobertura del SKU en la bodega",
+    "sql": "SELECT sku, nombre, clase_abc, bodega_id, existencia,\n       demanda_prom_30d, cobertura_dias, unidades_pendientes\nFROM centinela.v_cobertura_inventario\nWHERE sku = :sku AND bodega_id = :bodega_id;"
+  },
+  {
+    "id": "q-stockout-sales",
+    "source": "v_ventas",
+    "description": "Ventas que se pierden entre el agotamiento y la llegada de un pedido de reposición",
+    "sql": "SELECT round(sum(valor_neto) / 30 * :dias_sin_cobertura) AS ventas_en_riesgo\nFROM centinela.v_ventas\nWHERE sku = :sku\n  AND ciudad IN (:ciudades_bodega)\n  AND fecha > :dia_simulado - 30\n  AND fecha <= :dia_simulado;"
+  },
+  {
+    "id": "q-stockout-other-warehouse",
+    "source": "v_cobertura_inventario",
+    "description": "Unidades del mismo SKU que sobran en la otra bodega por encima de 30 días de cobertura",
+    "sql": "SELECT bodega_id, existencia, cobertura_dias,\n       greatest(0, round(existencia - 30 * demanda_prom_30d)) AS unidades_trasladables\nFROM centinela.v_cobertura_inventario\nWHERE sku = :sku AND bodega_id <> :bodega_id;"
+  },
+  {
+    "id": "q-no-evidence-days",
+    "source": "v_dias_pago_mensual",
+    "description": "Días promedio de pago del cliente: último mes frente a su promedio histórico",
+    "sql": "WITH m AS (\n  SELECT mes_factura, dias_pago_prom\n  FROM centinela.v_dias_pago_mensual\n  WHERE cliente_id = :cliente_id AND mes_factura <= :dia_simulado\n)\nSELECT (SELECT dias_pago_prom FROM m ORDER BY mes_factura DESC LIMIT 1) AS dias_ultimo_mes,\n       round(avg(dias_pago_prom), 1) AS dias_historico,\n       round(100 * ((SELECT dias_pago_prom FROM m ORDER BY mes_factura DESC LIMIT 1) / avg(dias_pago_prom) - 1), 1) AS aumento_pct\nFROM m;"
+  },
+  {
+    "id": "q-no-evidence-balance",
+    "source": "v_cartera_cliente",
+    "description": "Saldo abierto y vencido del cliente al día simulado",
+    "sql": "SELECT cliente_id, nombre, saldo_abierto, saldo_vencido, max_dias_vencido\nFROM centinela.v_cartera_cliente\nWHERE cliente_id = :cliente_id;"
+  },
+  {
+    "id": "q-no-evidence-activity",
+    "source": "v_actividad_cliente",
+    "description": "Frecuencia de compra del cliente frente a su intervalo habitual",
+    "sql": "SELECT cliente_id, pedidos, ultima_compra, intervalo_prom_dias,\n       dias_sin_comprar, veces_intervalo_habitual\nFROM centinela.v_actividad_cliente\nWHERE cliente_id = :cliente_id;"
+  },
+  {
+    "id": "q-discounts-lines",
+    "source": "v_descuentos_fuera_politica",
+    "description": "Líneas con descuento sobre el tope, sin aprobación especial, del vendedor en las últimas 2 semanas",
+    "sql": "SELECT count(*) AS lineas,\n       sum(descuento_en_exceso) AS descuento_en_exceso\nFROM centinela.v_descuentos_fuera_politica\nWHERE vendedor_id = :vendedor_id\n  AND fecha > :dia_simulado - 14\n  AND fecha <= :dia_simulado;"
+  },
+  {
+    "id": "q-discounts-points",
+    "source": "v_descuentos_fuera_politica",
+    "description": "Puntos promedio por encima del tope de descuento del segmento",
+    "sql": "SELECT round(avg(descuento_pct - tope_descuento_pct), 1) AS puntos_sobre_tope\nFROM centinela.v_descuentos_fuera_politica\nWHERE vendedor_id = :vendedor_id\n  AND fecha > :dia_simulado - 14\n  AND fecha <= :dia_simulado;"
+  },
+  {
+    "id": "q-discounts-month",
+    "source": "v_descuentos_fuera_politica",
+    "description": "Descuento en exceso del vendedor proyectado a un mes",
+    "sql": "SELECT round(sum(descuento_en_exceso) / 14 * 30) AS descuento_en_exceso_mes\nFROM centinela.v_descuentos_fuera_politica\nWHERE vendedor_id = :vendedor_id\n  AND fecha > :dia_simulado - 14\n  AND fecha <= :dia_simulado;"
+  },
+  {
+    "id": "q-chat-sku-customers",
+    "source": "v_ventas",
+    "description": "Clientes que compraron los 4 SKU de Hogar en los últimos 60 días",
+    "sql": "SELECT cliente_id, cliente, segmento, sum(valor_neto) AS ventas\nFROM centinela.v_ventas\nWHERE sku IN (:skus)\n  AND fecha > :dia_simulado - 60\n  AND fecha <= :dia_simulado\nGROUP BY 1, 2, 3\nORDER BY ventas DESC;"
+  },
+  {
+    "id": "q-chat-concentration",
+    "source": "v_ventas",
+    "description": "Participación de los 3 clientes que más compran los 4 SKU de Hogar",
+    "sql": "WITH c AS (\n  SELECT cliente_id, sum(valor_neto) AS ventas\n  FROM centinela.v_ventas\n  WHERE sku IN (:skus)\n    AND fecha > :dia_simulado - 60\n    AND fecha <= :dia_simulado\n  GROUP BY cliente_id\n)\nSELECT round(100 * sum(ventas) FILTER (WHERE r <= 3) / sum(ventas), 1) AS participacion_top3\nFROM (SELECT ventas, row_number() OVER (ORDER BY ventas DESC) AS r FROM c) t;"
+  },
+  {
+    "id": "q-summary-risk",
+    "source": "alertas",
+    "description": "Pesos en riesgo sumados sobre las alertas que esperan una decisión",
+    "sql": "SELECT coalesce(sum(pesos_en_riesgo), 0) AS dinero_en_riesgo\nFROM alertas\nWHERE estado = 'propuesta';"
+  },
+  {
+    "id": "q-summary-pending",
+    "source": "alertas",
+    "description": "Alertas que esperan una decisión",
+    "sql": "SELECT count(*) AS decisiones_pendientes\nFROM alertas\nWHERE estado = 'propuesta';"
+  },
+  {
+    "id": "q-summary-recoverable",
+    "source": "alertas",
+    "description": "Pesos recuperables al mes sumados sobre las alertas que esperan una decisión",
+    "sql": "SELECT coalesce(sum(recuperable_mes), 0) AS recuperable_mes\nFROM alertas\nWHERE estado = 'propuesta';"
+  }
+]

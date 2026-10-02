@@ -220,5 +220,5 @@ __marimo__/
 # Centinela
 .DS_Store
 node_modules/
-.next/
+apps/web/src/*.generated.css
 data/generator/csv/

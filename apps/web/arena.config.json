@@ -1,0 +1,90 @@
+{
+  "stylePlugins": ["./design/centinela"],
+  "palettes": [
+    {
+      "name": "light",
+      "default": true,
+      "polarity": "light",
+      "colors": {
+        "base-100": "#ffffff",
+        "base-200": "#f3f6f7",
+        "base-300": "#dfe6e9",
+        "base-content": "#0f1b21",
+        "primary": "#0e5a6b",
+        "primary-content": "#ffffff",
+        "secondary": "#8f6000",
+        "secondary-content": "#ffffff",
+        "neutral": "#eaf0f2",
+        "neutral-content": "#4d5f68",
+        "info": "#1f5c8b",
+        "info-content": "#ffffff",
+        "success": "#1f6b34",
+        "success-content": "#ffffff",
+        "warning": "#9a4d00",
+        "warning-content": "#ffffff",
+        "error": "#a51c1c",
+        "error-content": "#ffffff",
+        "error-fill": "#a51c1c",
+        "cat-1": "#2a78d6",
+        "cat-2": "#eb6834",
+        "cat-3": "#1baf7a",
+        "cat-4": "#eda100",
+        "cat-5": "#e87ba4",
+        "cat-6": "#008300",
+        "cat-7": "#4a3aa7",
+        "cat-8": "#e34948"
+      }
+    },
+    {
+      "name": "dark",
+      "polarity": "dark",
+      "colors": {
+        "base-100": "#0f1619",
+        "base-200": "#152024",
+        "base-300": "#22323a",
+        "base-content": "#e4ecef",
+        "primary": "#5fb3c4",
+        "primary-content": "#06191e",
+        "secondary": "#e0b45a",
+        "secondary-content": "#1f1503",
+        "neutral": "#1a272c",
+        "neutral-content": "#9db0b8",
+        "info": "#84b6f4",
+        "info-content": "#0a1725",
+        "success": "#79cd93",
+        "success-content": "#08200f",
+        "warning": "#f0a060",
+        "warning-content": "#241703",
+        "error": "#f08a8a",
+        "error-content": "#2a0a0a",
+        "error-fill": "#d06e6e",
+        "cat-1": "#3987e5",
+        "cat-2": "#d95926",
+        "cat-3": "#199e70",
+        "cat-4": "#c98500",
+        "cat-5": "#d55181",
+        "cat-6": "#008300",
+        "cat-7": "#9085e9",
+        "cat-8": "#e66767"
+      }
+    }
+  ],
+  "fonts": {
+    "display": {
+      "family": "Inter",
+      "src": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+      "fallback": ["Helvetica Neue", "Arial", "sans-serif"]
+    },
+    "body": {
+      "family": "Inter",
+      "src": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+      "fallback": ["Helvetica Neue", "Arial", "sans-serif"]
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "src": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap",
+      "fallback": ["ui-monospace", "monospace"]
+    }
+  },
+  "stylesheet": { "components": "auto" }
+}

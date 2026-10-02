@@ -21,6 +21,7 @@ Read the file.
 | Generator | Writes | Why its output carries no mark |
 |---|---|---|
 | `data/generator/generar_dataset.py` | one CSV per table into `data/generator/csv/` by default, or into `SALIDA` | CSV has no room for a banner, and the names must match the table names `data/sql/02_carga.sql` loads |
+| `arena-to-prod`, run by `npm run dev` and `npm run build` in `apps/web` | `apps/web/src/arena.generated.css` and `apps/web/src/icons.generated.css`, from `apps/web/arena.config.json` and `apps/web/design/centinela/` | none needed: the name says so, and git ignores both |
 
 Its default output directory is ignored by git. **Never point `SALIDA` at `data/csv/`**: that is the
 official evaluation dataset, written by the kit and by no generator in this tree. How to run it is
