@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Centinela
+.DS_Store
+node_modules/
+.next/
+data/generator/csv/
