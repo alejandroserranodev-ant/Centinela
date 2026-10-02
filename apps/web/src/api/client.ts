@@ -1,6 +1,7 @@
 import { cifraEnTexto, fecha } from '../formato';
 import alertasJson from './fixtures/alertas.json';
 import chatJson from './fixtures/chat.json';
+import configuracionJson from './fixtures/configuracion.json';
 import consultasJson from './fixtures/consultas.json';
 import relojJson from './fixtures/reloj.json';
 import type {
@@ -9,6 +10,7 @@ import type {
   Agente,
   Alerta,
   Cifra,
+  Configuracion,
   Consulta,
   Decision,
   EstadoSimulacion,
@@ -22,6 +24,7 @@ import type {
   PasoAgente,
   PreguntaChat,
   PuntoSerie,
+  ResumenBandeja,
   TipoAccion,
   Usuario,
 } from './types';
@@ -74,6 +77,7 @@ const reloj = relojJson as RelojFixture;
 const fixtures = (alertasJson as unknown as AlertaFixture[]).map(resolverAlerta);
 const consultas = new Map((consultasJson as Consulta[]).map((c) => [c.id, c]));
 const respuestasChat = chatJson as unknown as ChatFixture;
+let configuracionVigente = configuracionJson as Configuracion;
 
 let diaSimulado = reloj.diaInicial;
 const alertas = new Map<string, Alerta>();
@@ -213,6 +217,35 @@ export async function* chat({ pregunta, alertaId }: PreguntaChat): AsyncGenerato
     ...(respuesta.serie ? { serie: structuredClone(respuesta.serie) } : {}),
   };
   yield { evento: 'fin', datos: mensaje };
+}
+
+export async function resumenBandeja(): Promise<ResumenBandeja> {
+  const pendientes = [...alertas.values()].filter((a) => a.estado === 'propuesta');
+  return {
+    dineroEnRiesgo: {
+      valor: pendientes.reduce((suma, a) => suma + a.pesosEnRiesgo.valor, 0),
+      unidad: 'COP',
+      consultaId: 'c-resumen-riesgo',
+    },
+    decisionesPendientes: { valor: pendientes.length, unidad: 'unidades', consultaId: 'c-resumen-pendientes' },
+    recuperableMes: {
+      valor: pendientes.reduce((suma, a) => suma + (a.recuperableMes?.valor ?? 0), 0),
+      unidad: 'COP',
+      consultaId: 'c-resumen-recuperable',
+    },
+  };
+}
+
+export async function configuracion(): Promise<Configuracion> {
+  return structuredClone(configuracionVigente);
+}
+
+export async function guardarConfiguracion(nueva: Configuracion): Promise<Configuracion> {
+  if (Object.values(nueva.autonomia).some((nivel) => nivel === 'ejecuta')) {
+    throw new ErrorApi(422, 'Ninguna acción puede ejecutarse sola durante el piloto: el máximo es Propone');
+  }
+  configuracionVigente = structuredClone(nueva);
+  return structuredClone(configuracionVigente);
 }
 
 export async function bitacora(filtro: FiltroBitacora = {}): Promise<EventoBitacora[]> {

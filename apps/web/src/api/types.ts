@@ -21,9 +21,11 @@ export type VistaSemantica =
   | 'v_descuentos_fuera_politica'
   | 'v_actividad_cliente';
 
+export type FuenteConsulta = VistaSemantica | 'alertas';
+
 export interface Consulta {
   id: string;
-  vista: VistaSemantica;
+  vista: FuenteConsulta;
   sql: string;
   descripcion: string;
 }
@@ -179,4 +181,34 @@ export interface FiltroBitacora {
 export interface EstadoSimulacion {
   diaSimulado: string;
   usuario: Usuario;
+}
+
+export interface ResumenBandeja {
+  dineroEnRiesgo: Cifra;
+  decisionesPendientes: Cifra;
+  recuperableMes: Cifra;
+}
+
+export type NivelAutonomia = 'informa' | 'propone' | 'ejecuta';
+
+export interface Umbral {
+  valor: number;
+  etiqueta: string;
+}
+
+export interface MetricaVigilada {
+  metrica: Metrica;
+  nombre: string;
+  descripcion: string;
+  vista: VistaSemantica;
+  regla: string;
+  umbral: Umbral;
+  vigilada: boolean;
+  responsable: string;
+}
+
+export interface Configuracion {
+  metricas: MetricaVigilada[];
+  responsables: string[];
+  autonomia: Record<TipoAccion, NivelAutonomia>;
 }

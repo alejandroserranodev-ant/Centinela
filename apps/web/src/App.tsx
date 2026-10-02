@@ -1,15 +1,18 @@
-import { ArenaMain, ArenaPageHead } from '@dravensoft/arena-react';
+import { Route, Routes } from 'react-router-dom';
+import { SimulacionProvider } from './estado/Simulacion';
+import { Bandeja } from './pantallas/Bandeja';
+import { Shell } from './shell/Shell';
 
 export function App() {
   return (
-    <div className="arena-shell">
-      <div className="arena-shell__main">
-        <ArenaMain>
-          <div className="arena-band page-block">
-            <ArenaPageHead title="Bandeja de decisiones" subtitle="Maqueta en construcción" />
-          </div>
-        </ArenaMain>
-      </div>
-    </div>
+    <SimulacionProvider>
+      <Routes>
+        <Route element={<Shell />}>
+          <Route index element={<Bandeja />} />
+          <Route path="alertas/:id" element={<Bandeja />} />
+          <Route path="*" element={<Bandeja />} />
+        </Route>
+      </Routes>
+    </SimulacionProvider>
   );
 }

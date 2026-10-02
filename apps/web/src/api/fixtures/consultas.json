@@ -112,5 +112,23 @@
     "vista": "v_ventas",
     "descripcion": "Participación de los 3 clientes que más compran los 4 SKU de Hogar",
     "sql": "WITH c AS (\n  SELECT cliente_id, sum(valor_neto) AS ventas\n  FROM centinela.v_ventas\n  WHERE sku IN (:skus)\n    AND fecha > :dia_simulado - 60\n    AND fecha <= :dia_simulado\n  GROUP BY cliente_id\n)\nSELECT round(100 * sum(ventas) FILTER (WHERE r <= 3) / sum(ventas), 1) AS participacion_top3\nFROM (SELECT ventas, row_number() OVER (ORDER BY ventas DESC) AS r FROM c) t;"
+  },
+  {
+    "id": "c-resumen-riesgo",
+    "vista": "alertas",
+    "descripcion": "Pesos en riesgo sumados sobre las alertas que esperan una decisión",
+    "sql": "SELECT coalesce(sum(pesos_en_riesgo), 0) AS dinero_en_riesgo\nFROM alertas\nWHERE estado = 'propuesta';"
+  },
+  {
+    "id": "c-resumen-pendientes",
+    "vista": "alertas",
+    "descripcion": "Alertas que esperan una decisión",
+    "sql": "SELECT count(*) AS decisiones_pendientes\nFROM alertas\nWHERE estado = 'propuesta';"
+  },
+  {
+    "id": "c-resumen-recuperable",
+    "vista": "alertas",
+    "descripcion": "Pesos recuperables al mes sumados sobre las alertas que esperan una decisión",
+    "sql": "SELECT coalesce(sum(recuperable_mes), 0) AS recuperable_mes\nFROM alertas\nWHERE estado = 'propuesta';"
   }
 ]

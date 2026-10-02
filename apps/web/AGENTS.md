@@ -34,6 +34,18 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
   figure cites an example query against a real `v_*` view, so "how I got here" has something to
   show; the queries are not run.
+- **The screen computes no figure.** The inbox totals (money at risk today, decisions pending,
+  recoverable per month) are sums over alerts rather than a `v_*` view, so the API computes them
+  and sends each as a `Cifra` whose query reads the alerts table, which is why `Consulta.vista`
+  also takes `alertas`. A sum taken on screen would be a figure with no query behind it.
+- **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
+  4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
+  notices covers the reading column. A danger notice still stays until it is closed, by Arena's
+  rule `arenaToastDelay`, which `src/estado/Simulacion.tsx:useAvisos()` applies with the shorter
+  interval.
+- **Each chart sits in a box that clips sideways.** `ArenaLineChart` hides its accessible table in
+  a one-pixel box, but a table lays out to its content anyway, and at phone width that box widened
+  the page. Clipping the inline axis alone keeps the tooltip whole.
 
 ## Commands
 

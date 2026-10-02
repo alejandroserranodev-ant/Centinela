@@ -1,4 +1,4 @@
-import type { Cifra } from './api/types';
+import type { Cifra, UnidadCifra } from './api/types';
 
 const formatoPesos = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const formatoPesosCompactos = new Intl.NumberFormat('es-CO', {
@@ -10,6 +10,15 @@ const formatoPesosCompactos = new Intl.NumberFormat('es-CO', {
 const formatoNumero = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
 const formatoPorcentaje = new Intl.NumberFormat('es-CO', { style: 'percent', maximumFractionDigits: 1 });
 const formatoFecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeZone: 'America/Bogota' });
+const formatoFechaCorta = new Intl.DateTimeFormat('es-CO', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'America/Bogota',
+});
+const formatoMes = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric', timeZone: 'America/Bogota' });
+const formatoEjeMes = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'America/Bogota' });
+const formatoEjeDia = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' });
 const formatoFechaHora = new Intl.DateTimeFormat('es-CO', {
   dateStyle: 'long',
   timeStyle: 'short',
@@ -48,23 +57,47 @@ export function fecha(dia: string): string {
   return formatoFecha.format(new Date(`${dia}T12:00:00-05:00`));
 }
 
+export function fechaCorta(dia: string): string {
+  return formatoFechaCorta
+    .formatToParts(new Date(`${dia}T12:00:00-05:00`))
+    .filter((parte) => parte.type !== 'literal')
+    .map((parte) => parte.value.replace(/\.$/, ''))
+    .join(' ');
+}
+
+export function mes(dia: string): string {
+  return formatoMes.format(new Date(`${dia}T12:00:00-05:00`));
+}
+
+export function ejeMes(dia: string): string {
+  return formatoEjeMes.format(new Date(`${dia}T12:00:00-05:00`));
+}
+
+export function ejeDia(dia: string): string {
+  return formatoEjeDia.format(new Date(`${dia}T12:00:00-05:00`));
+}
+
 export function fechaHora(iso: string): string {
   return formatoFechaHora.format(new Date(iso));
 }
 
-export function cifra(c: Cifra): string {
-  switch (c.unidad) {
+export function enUnidad(valor: number, unidad: UnidadCifra): string {
+  switch (unidad) {
     case 'COP':
-      return pesos(c.valor);
+      return pesos(valor);
     case 'porcentaje':
-      return porcentaje(c.valor);
+      return porcentaje(valor);
     case 'puntos':
-      return puntos(c.valor);
+      return puntos(valor);
     case 'dias':
-      return dias(c.valor);
+      return dias(valor);
     case 'unidades':
-      return unidades(c.valor);
+      return unidades(valor);
   }
+}
+
+export function cifra(c: Cifra): string {
+  return enUnidad(c.valor, c.unidad);
 }
 
 export function cifraEnTexto(c: Cifra): string {

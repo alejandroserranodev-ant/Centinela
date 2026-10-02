@@ -5,6 +5,316 @@ body {
   margin: 0;
 }
 
-.page-block {
-  padding-block: var(--sp-6);
+p,
+h2,
+ul,
+ol {
+  margin: 0;
+}
+
+.pagina {
+  padding-block: var(--sp-6) var(--sp-10);
+}
+
+.texto-tenue {
+  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
+  font-size: var(--fs-sm);
+}
+
+.rotulo {
+  font-family: var(--ff-label);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
+}
+
+.marca {
+  font-family: var(--ff-heading);
+  font-weight: var(--fw-heading);
+  font-size: var(--fs-lg);
+  color: var(--ink-heading);
+  text-decoration: none;
+  letter-spacing: var(--tracking-tight);
+}
+
+.barra__acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.reloj {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.reloj__dia {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--lh-snug);
+}
+
+.reloj__boton {
+  flex-shrink: 0;
+}
+
+.reloj__dia time {
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+  color: var(--ink-heading);
+}
+
+.paso-en-curso {
+  background: var(--fill-surface);
+  border-bottom: var(--bw-separator) solid var(--edge-separator);
+}
+
+.paso-en-curso__cuerpo {
+  padding-block: var(--sp-3);
+}
+
+.shell__cuerpo {
+  display: grid;
+  grid-template-columns: var(--layout-sidebar) minmax(0, 1fr);
+  align-items: start;
+}
+
+.shell--movil .shell__cuerpo {
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: calc(var(--layout-bar) + var(--pad-safe-bottom));
+}
+
+.shell__riel {
+  position: sticky;
+  top: var(--layout-bar);
+  padding: var(--sp-4) var(--sp-3);
+  border-right: var(--bw-separator) solid var(--edge-separator);
+  min-height: calc(100vh - var(--layout-bar));
+  box-sizing: border-box;
+}
+
+.totales {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--sp-1) * 60)), 1fr));
+  gap: var(--rhythm-component);
+}
+
+.totales-compactos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  background: var(--fill-surface);
+  border: var(--bw-surface) solid var(--edge-surface);
+  border-radius: var(--r-surface);
+}
+
+.totales-compactos > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+}
+
+.totales-compactos > div + div {
+  border-left: var(--bw-separator) solid var(--edge-separator);
+}
+
+.totales-compactos dd {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.enlace,
+.cifra {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.enlace {
+  align-self: start;
+  font-size: var(--fs-sm);
+  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
+}
+
+.cifra {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-heading);
+  color: var(--ink-heading);
+  text-decoration-style: dotted;
+}
+
+.enlace:hover,
+.cifra:hover {
+  text-decoration-color: currentColor;
+}
+
+.enlace:focus-visible,
+.cifra:focus-visible,
+.fila:focus-visible,
+.plegable > summary:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--r-control-sm);
+}
+
+.bandeja {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--rhythm-section);
+  align-items: start;
+}
+
+.bandeja--lectura {
+  grid-template-columns: minmax(calc(var(--sp-1) * 80), 2fr) minmax(0, 3fr);
+}
+
+.bandeja__columna {
+  position: sticky;
+  top: calc(var(--layout-bar) + var(--sp-4));
+  max-height: calc(100vh - var(--layout-bar) - var(--sp-8));
+  overflow-y: auto;
+  padding: var(--sp-6);
+  background: var(--fill-surface);
+  border: var(--bw-surface) solid var(--edge-surface);
+  border-radius: var(--r-surface);
+}
+
+.lista-alertas {
+  list-style: none;
+  padding: 0;
+  border-top: var(--bw-separator) solid var(--edge-separator);
+}
+
+.lista-alertas > li {
+  border-bottom: var(--bw-separator) solid var(--edge-separator);
+}
+
+.fila {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-3);
+  color: var(--ink-body);
+  text-decoration: none;
+  border-left: var(--bw-strong) solid transparent;
+}
+
+.fila:hover {
+  background: var(--fill-hover);
+}
+
+.fila[aria-current='page'] {
+  background: var(--fill-hover);
+  border-left-color: var(--crimson);
+}
+
+.fila__cabeza {
+  flex-wrap: wrap;
+}
+
+.fila__titulo {
+  font-weight: var(--fw-heading);
+  color: var(--ink-heading);
+  line-height: var(--lh-snug);
+}
+
+.fila__cifras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.detalle__etiquetas {
+  flex-wrap: wrap;
+}
+
+.detalle__titulo {
+  font-family: var(--ff-heading);
+  font-weight: var(--fw-heading);
+  font-size: var(--step-title-section);
+  line-height: var(--lh-heading);
+  color: var(--ink-heading);
+}
+
+.detalle__dinero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-6);
+}
+
+.detalle__causa {
+  font-size: var(--fs-lg);
+  line-height: var(--lh-body);
+}
+
+.en-analisis {
+  align-items: center;
+}
+
+.evidencias,
+.consultas,
+.supuestos {
+  padding-left: var(--sp-5);
+}
+
+.evidencias {
+  list-style: none;
+  padding-left: 0;
+}
+
+.decision {
+  flex-wrap: wrap;
+}
+
+.plegable > summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-quiet), transparent);
+  padding-block: var(--sp-1);
+}
+
+.plegable[open] > summary {
+  margin-bottom: var(--sp-3);
+}
+
+.consulta__descripcion {
+  color: var(--ink-heading);
+}
+
+.consulta code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+
+.consulta__sql {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--fill-surface-sunken);
+  border: var(--bw-surface) solid var(--edge-surface);
+  border-radius: var(--r-field);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.grafico {
+  position: relative;
+  overflow-x: clip;
 }
