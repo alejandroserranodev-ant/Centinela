@@ -10,8 +10,8 @@ approval); the **`bitácora`** is the append-only log of every decision. The cha
 [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo of two apps, two packages and their inputs: `apps/web`, `apps/api`,
-`packages/agents`, `packages/tools`, `data` and `evals`. No part holds code yet; each page states
-the decisions its code is written against.
+`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold; the other
+parts hold no code yet. Each page states the decisions its code is written against.
 
 **This file routes. Read only what your task needs.**
 
@@ -58,10 +58,10 @@ on the page of the level that owns it.
 
 ## Commands
 
-No manifest exists yet, so this tree declares no command. The first part that gets one names its
-commands on its own page, spelled as its manifest declares them, and this section then states the
-first step on a fresh clone. Until then, the only runnable steps are the database setup and the
-generator in [`data/AGENTS.md`](./data/AGENTS.md).
+There is no root manifest. Each part that has one names its commands on its own page, spelled as
+its manifest declares them. On a fresh clone, the first step is `npm install` in `apps/web`, whose
+commands are in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md). The database setup and the generator
+are in [`data/AGENTS.md`](./data/AGENTS.md).
 
 ## Rules every change follows
 

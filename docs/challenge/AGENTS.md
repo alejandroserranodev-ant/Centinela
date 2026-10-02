@@ -61,7 +61,7 @@ with a proposal ready to approve.**
 
 | Layer | Choice in this repository | Alternatives the brief accepts |
 |---|---|---|
-| frontend | Next.js + React, built on Arena React | Streamlit for a prototype only, which lowers the UX score |
+| frontend | Vite + React single-page application, built on Arena React | Next.js, which the brief recommends; Streamlit for a prototype only, which lowers the UX score |
 | API | Python + FastAPI + Pydantic, REST + SSE streaming | Node.js + Hono or NestJS |
 | orchestration | LangGraph, for state and the pause for human approval | Claude Agent SDK, OpenAI Agents SDK, ADK, CrewAI |
 | tools | MCP servers: read-only SQL, policies, actions | the model's native function calling |

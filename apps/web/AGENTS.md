@@ -1,17 +1,43 @@
 # apps/web: the decision inbox
 
-This level is Centinela's interface: a **decision inbox, not a dashboard**. It holds no code yet;
-this page states the decisions the code is written against. Which screens exist and what each
-shows is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its screens section.
+This level is Centinela's interface: a **decision inbox, not a dashboard**. It holds the scaffold
+the screens are built on and the skin they wear. Which screens exist and what each shows is
+[`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its screens section.
 
 ## Decisions
 
-- **Next.js with React, built on Arena React.** Arena is Dravensoft's design system; Centinela
-  declares its own skin in an `arena.config.json` and answers Arena's style roles with its own
-  style plugin, instead of styling components by hand. Load the `arena:design` skill before building
-  or changing a screen. Charts follow the `dataviz` skill.
+- **A Vite + React single-page application, built on Arena React**, where the brief recommends
+  Next.js. The backend is Python, so Next.js would add a second server to the stack. The tool
+  lives behind a login and nobody outside it has to find it, so server rendering and metadata buy
+  nothing. A single-page application is the simplest thing that serves the inbox. React stays on
+  18 because it is the version Arena's own suites exercise.
+- **Arena is Dravensoft's design system, and Centinela wears its own skin.** The palettes and the
+  fonts are in `arena.config.json`. The style plugin is `design/centinela/plugin.tokens.json`,
+  which answers every role Arena's kernel asks. It is Arena's `inbox` register at medium density
+  rather than compact, because the inbox holds a handful of costly decisions rather than hundreds
+  of messages, and it is read on a phone. Components are never styled by hand. Load the
+  `arena:design` skill before building or changing a screen. Charts follow the `dataviz` skill.
+- **`design/identity.html` is the approved appearance**: palette, faces, character, air and page
+  shape, each with its reason. A change to the config or the plugin starts there and is approved
+  there. Serve it over HTTP, because opened from `file://` its stylesheet does not load.
 - **Agent progress arrives by SSE** from the API, so the screen shows the step in course while the
   agents work.
+
+## Commands
+
+Run from this directory, after `npm install`:
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | regenerates Arena's stylesheets, then serves the app with hot reload |
+| `npm run build` | regenerates the stylesheets, typechecks, and builds into `dist/` |
+| `npm run typecheck` | typechecks only |
+| `npm run arena:audit` | regenerates the stylesheets and fails on a rule of Arena's language broken in `src/` |
+
+`arena-to-prod` writes the stylesheets `src/main.tsx` imports; [`../../GENERATED.md`](../../GENERATED.md)
+names them. Its contrast and chart-ramp warnings are reported, not failed: the light palette's
+ramp has three slots under 3:1 against white, which is why every chart carries direct labels and
+a table view.
 
 ## Rules of this level
 
@@ -22,8 +48,11 @@ shows is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its
   agent, model or SQL vocabulary reaches a manager's screen.
 - **Reject asks for a reason**, and the reason is sent with the decision.
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.
+- **Arena's rules hold in every source file**: tokens only, no class of ours on an Arena
+  component, one primary action per view, danger as outline. `npm run arena:audit` holds the ones
+  source text can show; the `arena:design` skill states the rest.
 
 ## Verified by a person
 
 Until a gate exists: open each screen at phone width, walk it by keyboard only, and check that one
-figure per screen traces back to its query.
+figure per screen traces back to its query. Do it in both themes.
