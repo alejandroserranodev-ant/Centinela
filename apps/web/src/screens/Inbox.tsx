@@ -120,7 +120,11 @@ export function Inbox() {
           <Total
             label="Recuperable al mes"
             value={formatPesos(summary.recoverablePerMonth.value)}
-            sub="si apruebas lo propuesto"
+            sub={
+              summary.recoverablePerMonth.value === 0
+                ? 'ninguna propuesta pendiente estima una recuperación mensual'
+                : 'si apruebas lo propuesto'
+            }
             figure={summary.recoverablePerMonth}
           />
         </div>

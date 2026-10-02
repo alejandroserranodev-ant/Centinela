@@ -9,6 +9,15 @@ interface Props {
   selected?: string;
 }
 
+function proposalLine(alert: Alert): string | null {
+  if (alert.status === 'proposed') {
+    const [first, ...others] = alert.actions;
+    return others.length === 0 ? `Propuesta: ${first.title}` : `Propuesta: ${first.title} y ${others.length} más`;
+  }
+  const executed = alert.actions.find((a) => a.id === alert.executedAction?.actionId);
+  return executed ? `Aprobada: ${executed.title}` : null;
+}
+
 export function AlertList({ alerts, selected }: Props) {
   const list = useRef<HTMLUListElement>(null);
   const focusable = alerts.some((a) => a.id === selected) ? selected : alerts[0]?.id;
@@ -48,6 +57,7 @@ export function AlertList({ alerts, selected }: Props) {
               </time>
             </span>
             <span className="alert-row__title">{alert.title.text}</span>
+            {proposalLine(alert) ? <span className="alert-row__proposal">{proposalLine(alert)}</span> : null}
             <span className="alert-row__figures">
               <span>
                 <span className="eyebrow">En riesgo</span> <span className="arena-num">{formatPesos(alert.pesosAtRisk.value)}</span>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArenaButton, ArenaDialog, ArenaInput } from '@dravensoft/arena-react';
 import { ApiError } from '../api/client';
 import type { Action } from '../api/types';
-import { parameterName } from './actionParameters';
+import { parameterName } from '../actionParameters';
 
 interface Props {
   action: Action;

@@ -6,7 +6,7 @@ import { Confidence } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { useSimulation } from '../state/Simulation';
 import { formatFigure } from '../format';
-import { parameterName } from './actionParameters';
+import { parameterName } from '../actionParameters';
 import { EditDialog } from './EditDialog';
 import { RejectDialog } from './RejectDialog';
 

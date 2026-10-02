@@ -71,7 +71,11 @@ export function formatMonthAxis(day: string): string {
 }
 
 export function formatDayAxis(day: string): string {
-  return dayAxisFormat.format(new Date(`${day}T12:00:00-05:00`));
+  return dayAxisFormat
+    .formatToParts(new Date(`${day}T12:00:00-05:00`))
+    .filter((part) => part.type !== 'literal')
+    .map((part) => part.value.replace(/\.$/, ''))
+    .join(' ');
 }
 
 export function formatShortDateTime(iso: string): string {

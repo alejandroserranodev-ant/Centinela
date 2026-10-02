@@ -143,7 +143,7 @@ export function AlertDetail({ id }: { id: string }) {
         </div>
       ) : (
         <>
-          <ArenaSection title="Qué pasó" headingLevel="h3">
+          <ArenaSection title="Por qué" headingLevel="h3">
             {alert.cause.kind === 'identified' ? (
               <div className="arena-stack arena-stack--group">
                 <p className="detail__cause">

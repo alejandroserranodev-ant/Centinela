@@ -231,6 +231,11 @@ ol {
   line-height: var(--lh-snug);
 }
 
+.alert-row__proposal {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+}
+
 .alert-row__figures {
   display: flex;
   flex-wrap: wrap;
@@ -249,6 +254,11 @@ ol {
   font-size: var(--step-title-section);
   line-height: var(--lh-heading);
   color: var(--ink-heading);
+}
+
+.detail__title .figure-link {
+  font-family: inherit;
+  font-variant-numeric: normal;
 }
 
 .detail__money {

@@ -139,7 +139,7 @@
           "period": "once"
         },
         "confidence": { "level": "high", "assumptions": ["El proveedor entrega en su plazo habitual"] },
-        "parameters": { "units": 4500, "warehouse": "BOD-BOG" }
+        "parameters": { "units": 4500, "warehouse": "Bogotá" }
       },
       {
         "id": "stockout-transfer",
@@ -151,7 +151,7 @@
         },
         "impact": null,
         "confidence": { "level": "medium", "assumptions": ["El traslado llega antes que la orden de compra"] },
-        "parameters": { "units": 1200, "origin": "BOD-MDE", "destination": "BOD-BOG" }
+        "parameters": { "units": 1200, "origin": "Medellín", "destination": "Bogotá" }
       }
     ],
     "script": {

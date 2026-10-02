@@ -1,3 +1,4 @@
+import { parameterName } from '../actionParameters';
 import { formatDate, formatFigureInText } from '../format';
 import alertsJson from './fixtures/alerts.json';
 import chatJson from './fixtures/chat.json';
@@ -320,7 +321,7 @@ function describeApproval(action: Action, decision: Decision): string {
 
 function describeParameters(parameters: Record<string, string | number>): string {
   return Object.entries(parameters)
-    .map(([key, value]) => `${key} = ${value}`)
+    .map(([key, value]) => `${parameterName(key)}: ${value}`)
     .join(', ');
 }
 

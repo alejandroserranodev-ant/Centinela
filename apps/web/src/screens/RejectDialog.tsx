@@ -55,7 +55,7 @@ export function RejectDialog({ open, onClose, onReject }: Props) {
       }
     >
       <div className="arena-stack arena-stack--group">
-        <p>El motivo queda en la bitácora junto a tu nombre y sirve para ajustar las próximas propuestas.</p>
+        <p>El motivo queda en la bitácora junto a tu nombre.</p>
         <ArenaTextarea
           label="Motivo del rechazo"
           required

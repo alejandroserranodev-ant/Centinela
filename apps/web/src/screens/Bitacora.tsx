@@ -34,8 +34,8 @@ const STAGE: Record<Agent, string> = {
 };
 
 const COLUMNS: ArenaTableColumn[] = [
-  { header: 'Registrado', width: 'calc(var(--sp-1) * 32)' },
-  { header: 'Día simulado', mono: true, width: 'calc(var(--sp-1) * 28)' },
+  { header: 'Registrado (hora real)', width: 'calc(var(--sp-1) * 32)' },
+  { header: 'Día de la operación', mono: true, width: 'calc(var(--sp-1) * 28)' },
   { header: 'Alerta' },
   { header: 'Evento' },
   { header: 'Quién' },
