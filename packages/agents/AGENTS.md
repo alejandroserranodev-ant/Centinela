@@ -64,15 +64,17 @@ falls outside them, the answer says so.
 
 ### `Vigía` detects
 
-- **Input:** the simulated day.
+- **Input:** the simulated day, and the metric, entity and severity of every earlier alert.
 - **Tools:** read-only SQL over the views `metricas.yaml` names, filtered by the simulated day.
   No policy search: its thresholds are already in `metricas.yaml`.
 - **Output:** a detected alert: metric, entity, simulated day, the triggering figure with its
   `queryId`, the broken rule with its `fuente_umbral`, severity, the `tramo` when the metric
   defines `tramos`, and pesos at risk with its `queryId`.
 - **Ceiling:** it fires only on a threshold in `metricas.yaml`, evaluated on the simulated day.
-  Pesos at risk follow the metric's `pesos_en_riesgo`, computed in SQL. One open alert per metric
-  and entity; it raises again only when severity rises a tier.
+  Pesos at risk follow the metric's `pesos_en_riesgo`, computed in SQL. One alert per metric and
+  entity, whatever state the earlier one is in; it raises again only when severity rises a tier
+  above the highest earlier alert, because a rejected or executed alert whose rule still breaks
+  would otherwise return every simulated day.
 - **Never:** explains, proposes, reads a policy.
 
 ### `Analista` explains, and answers the chat
@@ -95,7 +97,8 @@ falls outside them, the answer says so.
 ### `Estratega` proposes
 
 - **Input:** the alert, its `Cause`, and the rejection reasons kept for its metric. On
-  `no_evidence` it proposes one `task` for a manual review and nothing else.
+  `no_evidence`, or when the orchestrator marks `revision_manual`, it proposes one `task` for a
+  manual review and nothing else; that branch is code and calls no model.
 - **Tools:** read-only SQL, policy search, and the impact calculator in `packages/tools`.
 - **Output:** one to three `Action`s with `impact` and `confidence`.
 - **Ceiling:** every action is a row of `skills/estratega/acciones.md` for the metric, and
@@ -115,12 +118,182 @@ falls outside them, the answer says so.
   figures it is given and the tone `FIN-POL-004` §6 sets: courteous, written, copied to the seller.
 - **Never:** chooses between actions, recomputes, adds a recipient, runs without a recorded decision.
 
-### The orchestrator
+### The orchestrator routes
 
-- **Owns the transitions** up to `propuesta`, merges alerts `Analista` marks as one cause, and holds
-  the interrupt before `Ejecutor`.
-- **Classifies a rejection reason** as about the cause, kept for `Analista`, or about the proposal,
-  kept for `Estratega`, so each agent learns only from its own mistakes.
+It is the only part that knows which step an alert is in, and it decides who goes next. It is code,
+except one step that classifies a rejection reason. How it routes is the next section.
+
+- **Input:** from `apps/api`, one of three: the simulated day with the metric, entity, severity and
+  state of every earlier alert; a recorded decision (the `Decision`, its id, the role that made it
+  and when) to resume one alert; or a `ChatQuestion` with its anchored `Alert`, if any. With the
+  first two, the rejection reasons `apps/api` keeps for the alert's metric.
+- **Tools: none.** Each step that might want one reads its input instead: the order reads
+  `pesosAtRisk`, which `Vigía` computed in SQL; the check on `same_cause_as` reads the earlier
+  alerts `apps/api` hands in; the classifier reads the reason, the `Cause` sentence and the action
+  titles. No step needs a query, a policy or an action, so the graph gives it no tool.
+- **Output:** the state of each alert's graph; an `AgentStep` when an agent's node starts and when
+  it ends, with a Spanish `description`, never for its own steps, because `Agent` names the four
+  agents only; and, to `apps/api`, the transitions it proposes, the log events, the target of a
+  rejection reason, and the cost of each alert.
+- **Ceiling:** it moves an alert only along an edge of the graph below, and passes each agent's
+  output on unchanged. The only text a person reads that it writes is the fallback of a failed step,
+  fixed in this section. It names an alert by metric, entity and simulated day, so a day run twice
+  proposes the same ids and `apps/api` refuses the second.
+- **Never:** detects, explains, proposes, executes, computes a figure, opens a database connection,
+  persists the lifecycle, or resumes an alert past the interrupt without a recorded decision.
+
+## The orchestrator's graph
+
+### Two runs
+
+**The day run is code and keeps no checkpoint.** Advancing the clock hands it the simulated day:
+it runs `Vigía`'s detection against the earlier alerts, orders the detected alerts, and runs the
+alert graph of each one **in series**, in that order.
+
+**The alert graph is LangGraph, one thread per alert, the alert id as the thread id.** Its host
+injects the checkpointer, because an agent never opens a database connection; where the checkpoint
+is stored is `apps/api`'s. The checkpoint is working state, never the lifecycle record.
+
+### Nodes and edges
+
+| From | To | When | Proposes to `apps/api` |
+|---|---|---|---|
+| start | `titular` (`Vigía`, the title) | always | `nueva` |
+| `titular` | `analizar` (`Analista`) | always; if the title step fails, the title is the metric's `descripcion` in `metricas.yaml` followed by the entity | `en análisis` |
+| `analizar` | `unir` | `same_cause_as` names an earlier alert in `nueva`, `en análisis` or `propuesta` that is not this one | none |
+| `analizar` | `proponer` (`Estratega`) | otherwise; a `same_cause_as` that fails the check above is dropped and logged | none |
+| `analizar` | `revision_manual` | the step fails: the `Cause` is `no_evidence`, `reason` is the fallback for the failure, `queriesReviewed` the queries run so far | none |
+| `unir` | end | always: this alert takes `merged_into`, the target adds this id to `merged_alerts` | `unida` |
+| `proponer` | `analizar` | the output is `insufficient_cause` and `analyst_returns` is 0: it becomes 1, and `Analista` receives the cause as `causa_insuficiente` | none; the alert is still `en análisis` |
+| `proponer` | `revision_manual` | the output is `insufficient_cause` and `analyst_returns` is 1, or the step fails | none |
+| `proponer` | `esperar_decision` | otherwise: one to three `Action`s whose `type` appears in the metric's rows of `skills/estratega/acciones.md` | `propuesta` |
+| `revision_manual` (`Estratega`'s manual review, code) | `esperar_decision` | always: one `task`, `impact: null` | `propuesta` |
+| `esperar_decision` (the interrupt before `Ejecutor`) | `esperar_decision` | a resume without a recorded decision id: refused, and the refusal returns to `apps/api` | none |
+| `esperar_decision` | `ejecutar` (`Ejecutor`) | `approve`; or `edit`, whose `parameters` replace the action's | none; `apps/api` recorded `aprobada` |
+| `esperar_decision` | `clasificar_rechazo` | `reject` | none; `apps/api` recorded `rechazada` |
+| `clasificar_rechazo` | end | always: the target goes to `apps/api`; if the step fails, the target is `ninguno` | none |
+| `ejecutar` | end | `Ejecutor` returns an `ExecutedAction` | `ejecutada` |
+| `ejecutar` | end | the step fails: the alert stays `aprobada` and the failure is logged; `apps/api` may resume it again, because actions are idempotent | none |
+
+**A transition `apps/api` refuses ends that alert's run**, because the record wins over the
+checkpoint. **A decision never expires**: no policy states a deadline, so the interrupt waits.
+
+**The loop to `Analista` is capped at one return**, because each pass is a thinking run on the one
+loaded model, and a cause that fails `Estratega` twice is one the data does not support with a
+listed action, which is the case manual review exists for.
+
+**A step fails** when its model call fails twice: the call is retried once on a timeout, on a
+connection error, or on an output its schema refuses. A step also fails when the alert reaches its
+token cap, checked after each call; every model step left on that alert then takes its fallback.
+The timeout per call and the token cap are settings of the graph, sized to the machine that runs
+Ollama, as the model is. The fallback `reason` of `analizar` is one of these, by failure:
+
+| Failure | `reason` |
+|---|---|
+| timeout | "El análisis no terminó: se agotó el tiempo de respuesta del modelo." |
+| token cap | "El análisis no terminó: la alerta alcanzó su tope de tokens." |
+| refused schema or error | "El análisis no terminó: el modelo no devolvió una respuesta válida." |
+
+### The state of an alert
+
+| Field | Written by | Read by |
+|---|---|---|
+| `alert_id`, `simulated_day` | orchestrator | every node, `apps/api` |
+| `detection`: metric, entity, `cifra`, `regla`, `fuente_umbral`, severity, `tramo`, `pesos_en_riesgo` | `Vigía` | `Analista`, `Estratega`, orchestrator (order), `apps/api` |
+| `title` | `Vigía` | `apps/api` |
+| `cause_rejections` | orchestrator, from its input | `Analista` only |
+| `proposal_rejections` | orchestrator, from its input | `Estratega` only |
+| `cause`, with its `confidence` | `Analista`, or the fallback of `analizar` | `Estratega`, orchestrator (`kind`), `apps/api` |
+| `same_cause_as` | `Analista` | orchestrator |
+| `analyst_returns` | orchestrator | orchestrator |
+| `insufficient_cause` | `Estratega` | orchestrator, `Analista` |
+| `actions` | `Estratega` | `apps/api`; `Ejecutor` receives the approved one only |
+| `decision` | `apps/api`, on resume | orchestrator, `Ejecutor` |
+| `rejection_target` | orchestrator | `apps/api` |
+| `executed_action` | `Ejecutor` | `apps/api` |
+| `merged_into`, `merged_alerts` | orchestrator | `apps/api` |
+| `queries` | each agent, from its tool calls | `apps/api` |
+| `cost`: prompt tokens, output tokens and model calls, per agent | orchestrator | `apps/api` |
+| `failures`: step, `timeout`, `token_cap`, `schema` or `error`, attempts | orchestrator | `apps/api` |
+| `status`: the last state `apps/api` accepted | orchestrator | orchestrator |
+
+Each output reaches `apps/api` as a log event, typed as `LogEventType` declares:
+
+| Output | `type` | Actor |
+|---|---|---|
+| a detected alert | `alert` | `vigia` |
+| a `Cause`: each `Evidence`, or its `no_evidence`, fallback included | `evidence` | `analista` |
+| a merge, naming the alert that remains | `alert` | `analista` |
+| the `Actions`, manual review included | `proposal` | `estratega` |
+| an executed draft, then its result or its failure | `action`, `result` | `ejecutor` |
+
+The target of a rejection reason joins the `decision` event `apps/api` writes for the person.
+
+### Proposing a transition, not owning it
+
+**The orchestrator proposes each transition an agent causes, and persists none.** Which
+transition comes from where, who validates it and why, is the lifecycle on
+[`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md).
+
+### Routing
+
+- **The chat always goes to `Analista`, in chat mode, with no classifier**, because the chat belongs
+  to `Analista`. The anchored alert comes from `apps/api` with the question, so `Analista` can
+  quote its `actions`. A chat run touches no alert's state and proposes no transition.
+- **A rejection reason goes to the classifier** in `skills/orquestador/`, the only step of the
+  orchestrator that calls the model, thinking off. Its target decides who reads the reason on the
+  next run of the same metric:
+
+  | Target | Read by |
+  |---|---|
+  | `causa` | `Analista` |
+  | `propuesta` | `Estratega` |
+  | `ambos` | `Analista` and `Estratega` |
+  | `ninguno` | no agent; it stays in the `bitácora` |
+
+  `apps/api` keeps the reason with its target, metric and entity, and hands the kept reasons in
+  with each run; the orchestrator places each in `cause_rejections` or `proposal_rejections`, so
+  each agent learns only from its own mistakes.
+
+### Order
+
+**The alerts of one day run in series, by `pesosAtRisk` from the largest**, ties broken by severity
+from `critical` down, then by alert id. In series, because one model is loaded and parallel
+requests share its memory and compute, so running alerts side by side buys no speed on this
+machine. By pesos, because the largest exposure reaches the inbox first, and because a merge then
+keeps the alert analysed first, which is the larger. A chat question does not wait for the day run, only for the
+model call in course.
+
+### Cost and trace
+
+**After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
+call to the alert's `cost`, under the agent that made it.** A chat answer carries its own cost,
+with its anchored alert. `apps/api` persists both.
+
+**Each alert is one Langfuse trace, its id the alert id**, opened when the day run hands the
+detection to the alert graph; the resume after a decision adds its spans to the same trace. The
+detection of a day is a trace of its own, and so is each chat question.
+
+### What is the orchestrator's, and what is not
+
+| Concern | Owner |
+|---|---|
+| detecting, and skipping an alert an earlier one covers | `Vigía`, against the earlier alerts `apps/api` hands in |
+| the order of the day's alerts | orchestrator |
+| the title, the cause, the proposal, the draft | `Vigía`, `Analista`, `Estratega`, `Ejecutor` |
+| marking two alerts as one cause | `Analista` |
+| merging them | orchestrator |
+| the manual review `task` | `Estratega`, in code |
+| the interrupt before `Ejecutor` | orchestrator |
+| checking that a decision's role may approve and that an edit keeps the action's keys | `apps/api` |
+| resuming an alert | `apps/api` calls; the orchestrator refuses a resume with no recorded decision |
+| classifying a rejection reason | orchestrator |
+| keeping rejection reasons | `apps/api` |
+| proposing a transition | orchestrator, or `apps/api` for a person's decision |
+| validating and persisting a transition, the `bitácora` | `apps/api` |
+| idempotency of an action, masking personal data | `packages/tools` |
+| counting cost, opening the trace | orchestrator |
+| persisting cost, storing the checkpoint, streaming `AgentStep` | `apps/api` |
 
 ## Coverage: every rule has one owner per step
 

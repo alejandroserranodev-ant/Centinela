@@ -22,6 +22,7 @@ export const STATUS: Record<AlertStatus, string> = {
   approved: 'Aprobada',
   rejected: 'Rechazada',
   executed: 'Ejecutada',
+  merged: 'Unida',
 };
 
 export function Severity({ level }: { level: SeverityLevel }) {

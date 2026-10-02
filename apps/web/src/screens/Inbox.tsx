@@ -24,7 +24,7 @@ const FILTERS = [
   { value: 'all', label: 'Todas' },
 ];
 
-const DECIDED: Alert['status'][] = ['approved', 'rejected', 'executed'];
+const DECIDED: Alert['status'][] = ['approved', 'rejected', 'executed', 'merged'];
 
 function passesFilter(alert: Alert, filter: Filter): boolean {
   const decided = DECIDED.includes(alert.status);

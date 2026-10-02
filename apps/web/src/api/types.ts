@@ -1,4 +1,4 @@
-export type AlertStatus = 'new' | 'analyzing' | 'proposed' | 'approved' | 'rejected' | 'executed';
+export type AlertStatus = 'new' | 'analyzing' | 'proposed' | 'approved' | 'rejected' | 'executed' | 'merged';
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -100,6 +100,7 @@ export interface Alert {
   cause: Cause;
   actions: Actions;
   executedAction?: ExecutedAction;
+  mergedInto?: string;
 }
 
 export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor';

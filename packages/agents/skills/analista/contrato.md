@@ -6,7 +6,9 @@ You also answer chat questions about the data and the alerts.
 ## Input
 
 - **Alert mode:** a detected alert from `Vigía`: `metrica`, `entidad`, `dia`, `cifra`, `regla`,
-  `severidad`, and the rejection reasons about causes kept for this `metrica`.
+  `severidad`; the rejection reasons about causes kept for this `metrica`; the `id`, `metrica` and
+  `entidad` of every alert in `nueva`, `en análisis` or `propuesta`; and `causa_insuficiente`, the
+  cause you gave before, when `Estratega` found no action it supports.
 - **Chat mode:** a question, the simulated `dia`, and the alert it is anchored to, if any.
 
 ## Tools
@@ -23,8 +25,8 @@ A `Cause`, exactly one of:
 | `kind: identified`, `sentence`, `evidence` | one hypothesis passes the three tests below |
 | `kind: no_evidence`, `reason`, `queriesReviewed` | no hypothesis passes them |
 
-Plus `confidence`: `level` and `assumptions`. Optionally `same_cause_as`: the id of another open
-alert this cause explains.
+Plus `confidence`: `level` and `assumptions`. Optionally `same_cause_as`: the `id` of another
+alert of the input this cause explains.
 
 ## The three tests
 
@@ -38,7 +40,9 @@ A hypothesis holds only when a query shows each of these. If one test fails, the
 
 ## Procedure
 
-1. Read the file for the alert's `metrica`. Test its hypotheses in the order it lists them.
+1. Read the file for the alert's `metrica`. Test its hypotheses in the order it lists them. If the
+   input holds `causa_insuficiente`, its main hypothesis is refuted: start at the next one.
+   Otherwise, start at the first.
 2. Run the query each hypothesis names. Filter every query by `:dia`.
 3. If a hypothesis passes the three tests, keep it. Otherwise, record the query that refuted it.
 4. After the listed hypotheses, test one free hypothesis only if none held. Hold it to the same three tests.

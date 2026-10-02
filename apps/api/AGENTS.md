@@ -10,8 +10,34 @@ minimal API section.
 - **Python, FastAPI and Pydantic**, REST plus SSE streaming for the chat and for agent progress.
 - **The API owns the simulated clock.** Advancing it moves the simulated day that replaces
   `fecha_corte()` (see [`../../data/AGENTS.md`](../../data/AGENTS.md), its clock section).
-- **The API owns the alert lifecycle and persists it**: `nueva` → `en análisis` → `propuesta` →
-  `aprobada` or `rechazada` → `ejecutada`. A transition the lifecycle does not list is refused.
+- **The API owns the alert lifecycle: it validates every transition and persists it**, and
+  refuses one the lifecycle does not list. The orchestrator proposes the transitions an agent
+  causes, because it is the only part that sees an agent finish; the API proposes the ones a
+  person causes. The record is the API's, because it is the only part with storage and the only
+  door. How the orchestrator reaches each proposal is
+  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md), its graph section.
+
+  | Transition | Proposed by |
+  |---|---|
+  | → `nueva` | the orchestrator, when `Vigía` detects |
+  | `nueva` → `en análisis` | the orchestrator, when the title is written |
+  | `en análisis` → `propuesta` | the orchestrator, when `Estratega` proposes |
+  | `en análisis` → `unida` | the orchestrator, when it merges the alert into another |
+  | `propuesta` → `aprobada` or `rechazada` | the API, from a person's decision |
+  | `aprobada` → `ejecutada` | the orchestrator, when `Ejecutor` returns its result |
+
+- **`unida` is a state the brief's lifecycle does not have.** An alert whose cause `Analista` finds
+  already explains another alert ends there, pointing to the alert that remains, because the brief
+  asks that one cause raise one alert and its lifecycle has no end for the second. `rechazada`
+  would claim a decision no person made. `unida` is final, and the alert leaves the inbox.
+- **The API hands each run what the orchestrator cannot read**: the metric, entity, severity and
+  state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps
+  each reason with the target the orchestrator classified it to, the metric and the entity.
+- **The API checks a decision before it resumes an alert**: the role may make it, a rejection
+  carries a reason, and an edit keeps the keys of the action's `parameters`, adding none and
+  dropping none, because `Ejecutor` passes them unchanged.
+- **The API stores the graph's checkpoints in its own schema** and injects the checkpointer into
+  the graph, because no agent opens a database connection.
 - **The API owns the `bitácora`**, which is append-only: alert, evidence, proposal, decision,
   action and result, each with who and when. Nothing updates or deletes a row of it.
 - **Roles decide who may approve.** Full enterprise authentication is out of scope; roles are not.
@@ -22,5 +48,7 @@ minimal API section.
   recorded decision from a role allowed to make it. *No gate holds this.*
 - **The API's state lives in its own schema**: alerts, decisions and the log, never in the
   dataset's `centinela` schema.
-- **An alert carries its cost**: tokens and model calls are recorded per alert.
-- **Timeouts and retries are explicit**, and "not enough evidence" is a valid response, not an error.
+- **An alert carries its cost**: the API persists the tokens and model calls the orchestrator
+  counts per alert, and per chat answer.
+- **Timeouts and retries are explicit**, as the orchestrator's graph states them, and "not enough
+  evidence" is a valid response, not an error.

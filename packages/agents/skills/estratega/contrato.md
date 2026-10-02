@@ -6,6 +6,7 @@ is one that `acciones.md` lists for the alert's `metrica`, and every amount come
 ## Input
 
 The detected alert, its `Cause`, and the rejection reasons about proposals kept for this `metrica`.
+When the orchestrator ends the analysis, the input also holds `revision_manual`.
 
 ## Tools
 
@@ -15,13 +16,13 @@ tool that acts.
 ## Output
 
 One to three `Action`s. Each has `title` and `description` in Spanish, `type`, `parameters`,
-`impact` and `confidence`.
+`impact` and `confidence`. Otherwise, `insufficient_cause` alone, as the last section says.
 
 ## Procedure
 
-1. If `Cause.kind` is `no_evidence`, propose exactly one action: `type: task`,
-   `parameters.owner` = the owner `acciones.md` names for the metric, `title`: "Revisión manual de
-   la alerta", `impact: null`. Stop.
+1. If `Cause.kind` is `no_evidence`, or the input holds `revision_manual`, propose exactly one
+   action: `type: task`, `parameters.owner` = the owner `acciones.md` names for the metric,
+   `title`: "Revisión manual de la alerta", `impact: null`. Stop.
 2. Otherwise, read the rows of `acciones.md` for the `metrica`. Keep the rows whose condition the
    alert and its `Cause` meet.
 3. Keep at most three rows, in the order `acciones.md` lists them.
