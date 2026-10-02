@@ -1,10 +1,10 @@
-export type EstadoAlerta = 'nueva' | 'en_analisis' | 'propuesta' | 'aprobada' | 'rechazada' | 'ejecutada';
+export type AlertStatus = 'new' | 'analyzing' | 'proposed' | 'approved' | 'rejected' | 'executed';
 
-export type Severidad = 'critica' | 'alta' | 'media' | 'baja';
+export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
-export type NivelConfianza = 'alta' | 'media' | 'baja';
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
-export type Metrica =
+export type Metric =
   | 'margen_pct'
   | 'saldo_vencido'
   | 'dias_pago_prom'
@@ -12,7 +12,7 @@ export type Metrica =
   | 'descuento_en_exceso'
   | 'veces_intervalo_habitual';
 
-export type VistaSemantica =
+export type SemanticView =
   | 'v_ventas'
   | 'v_margen_semanal_linea'
   | 'v_cartera_cliente'
@@ -21,194 +21,194 @@ export type VistaSemantica =
   | 'v_descuentos_fuera_politica'
   | 'v_actividad_cliente';
 
-export type FuenteConsulta = VistaSemantica | 'alertas';
+export type QuerySource = SemanticView | 'alertas';
 
-export interface Consulta {
+export interface Query {
   id: string;
-  vista: FuenteConsulta;
+  source: QuerySource;
   sql: string;
-  descripcion: string;
+  description: string;
 }
 
-export type UnidadCifra = 'COP' | 'puntos' | 'porcentaje' | 'dias' | 'unidades';
+export type FigureUnit = 'COP' | 'points' | 'percent' | 'days' | 'units';
 
-export interface Cifra {
-  valor: number;
-  unidad: UnidadCifra;
-  consultaId: string;
+export interface Figure {
+  value: number;
+  unit: FigureUnit;
+  queryId: string;
 }
 
-export interface Frase {
-  texto: string;
-  cifras: Cifra[];
+export interface Sentence {
+  text: string;
+  figures: Figure[];
 }
 
-export interface Confianza {
-  nivel: NivelConfianza;
-  supuestos: string[];
+export interface Confidence {
+  level: ConfidenceLevel;
+  assumptions: string[];
 }
 
-export interface PuntoSerie {
-  fecha: string;
-  valor: number;
+export interface SeriesPoint {
+  date: string;
+  value: number;
 }
 
-export interface Evidencia {
-  afirmacion: Frase;
-  consultaId: string;
-  serie?: PuntoSerie[];
+export interface Evidence {
+  claim: Sentence;
+  queryId: string;
+  series?: SeriesPoint[];
 }
 
-export type Causa =
-  | { tipo: 'identificada'; frase: Frase; evidencia: Evidencia[] }
-  | { tipo: 'sin_evidencia'; motivo: string; consultasRevisadas: string[] };
+export type Cause =
+  | { kind: 'identified'; sentence: Sentence; evidence: Evidence[] }
+  | { kind: 'no_evidence'; reason: string; queriesReviewed: string[] };
 
-export type TipoAccion = 'borrador_correo' | 'tarea' | 'borrador_orden_compra' | 'borrador_ajuste_precio';
+export type ActionType = 'email_draft' | 'task' | 'purchase_order_draft' | 'price_change_draft';
 
-export interface Impacto {
-  cifra: Cifra;
-  periodo: 'mes' | 'unico';
+export interface Impact {
+  figure: Figure;
+  period: 'month' | 'once';
 }
 
-export interface Accion {
+export interface Action {
   id: string;
-  titulo: string;
-  descripcion: Frase;
-  tipo: TipoAccion;
-  impacto: Impacto | null;
-  confianza: Confianza;
-  parametros: Record<string, string | number>;
+  title: string;
+  description: Sentence;
+  type: ActionType;
+  impact: Impact | null;
+  confidence: Confidence;
+  parameters: Record<string, string | number>;
 }
 
-export type Acciones = [Accion] | [Accion, Accion] | [Accion, Accion, Accion];
+export type Actions = [Action] | [Action, Action] | [Action, Action, Action];
 
-export interface AccionEjecutada {
-  accionId: string;
-  resultado: string;
+export interface ExecutedAction {
+  actionId: string;
+  result: string;
 }
 
-export interface Alerta {
+export interface Alert {
   id: string;
-  estado: EstadoAlerta;
-  severidad: Severidad;
-  metrica: Metrica;
-  titulo: Frase;
-  pesosEnRiesgo: Cifra;
-  recuperableMes: Cifra | null;
-  confianza: Confianza;
-  fechaSimulada: string;
-  causa: Causa;
-  acciones: Acciones;
-  accionEjecutada?: AccionEjecutada;
+  status: AlertStatus;
+  severity: Severity;
+  metric: Metric;
+  title: Sentence;
+  pesosAtRisk: Figure;
+  recoverablePerMonth: Figure | null;
+  confidence: Confidence;
+  simulatedDate: string;
+  cause: Cause;
+  actions: Actions;
+  executedAction?: ExecutedAction;
 }
 
-export type Agente = 'vigia' | 'analista' | 'estratega' | 'ejecutor';
+export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor';
 
-export interface PasoAgente {
-  alertaId: string | null;
-  agente: Agente;
-  estado: 'en_curso' | 'hecho';
-  descripcion: string;
-  inicio: string;
-  fin?: string;
+export interface AgentStep {
+  alertId: string | null;
+  agent: Agent;
+  status: 'running' | 'done';
+  description: string;
+  start: string;
+  end?: string;
 }
 
-export interface Usuario {
-  nombre: string;
-  rol: string;
+export interface User {
+  name: string;
+  role: string;
 }
 
-export type Actor = { tipo: 'agente'; agente: Agente } | ({ tipo: 'persona' } & Usuario);
+export type Actor = { kind: 'agent'; agent: Agent } | ({ kind: 'person' } & User);
 
-export type TipoEventoBitacora = 'alerta' | 'evidencia' | 'propuesta' | 'decision' | 'accion' | 'resultado';
+export type LogEventType = 'alert' | 'evidence' | 'proposal' | 'decision' | 'action' | 'result';
 
-export interface EventoBitacora {
+export interface LogEvent {
   id: string;
-  fecha: string;
-  diaSimulado: string;
-  alertaId: string;
-  tipo: TipoEventoBitacora;
+  date: string;
+  simulatedDay: string;
+  alertId: string;
+  type: LogEventType;
   actor: Actor;
-  detalle: string;
-  consultaId?: string;
+  detail: string;
+  queryId?: string;
 }
 
-export interface MensajeChat {
+export interface ChatMessage {
   id: string;
-  rol: 'usuario' | 'centinela';
-  texto: string;
-  cifras: Cifra[];
-  alertaId?: string;
-  serie?: PuntoSerie[];
-  evidenciaSuficiente: boolean;
-  fecha: string;
+  role: 'user' | 'centinela';
+  text: string;
+  figures: Figure[];
+  alertId?: string;
+  series?: SeriesPoint[];
+  enoughEvidence: boolean;
+  date: string;
 }
 
-export interface EventoSSE<E extends string, D> {
-  evento: E;
-  datos: D;
+export interface SseEvent<E extends string, D> {
+  event: E;
+  data: D;
 }
 
-export type EventoAvance =
-  | EventoSSE<'paso', PasoAgente>
-  | EventoSSE<'alerta', Alerta>
-  | EventoSSE<'fin', { diaSimulado: string; alertasNuevas: string[] }>;
+export type AdvanceEvent =
+  | SseEvent<'step', AgentStep>
+  | SseEvent<'alert', Alert>
+  | SseEvent<'end', { simulatedDay: string; newAlerts: string[] }>;
 
-export type EventoChat =
-  | EventoSSE<'paso', PasoAgente>
-  | EventoSSE<'fragmento', { texto: string }>
-  | EventoSSE<'fin', MensajeChat>;
+export type ChatEvent =
+  | SseEvent<'step', AgentStep>
+  | SseEvent<'chunk', { text: string }>
+  | SseEvent<'end', ChatMessage>;
 
 export type Decision =
-  | { tipo: 'aprobar'; accionId: string }
-  | { tipo: 'editar'; accionId: string; parametros: Record<string, string | number> }
-  | { tipo: 'rechazar'; motivo: string };
+  | { kind: 'approve'; actionId: string }
+  | { kind: 'edit'; actionId: string; parameters: Record<string, string | number> }
+  | { kind: 'reject'; reason: string };
 
-export interface PreguntaChat {
-  pregunta: string;
-  alertaId?: string;
+export interface ChatQuestion {
+  question: string;
+  alertId?: string;
 }
 
-export interface FiltroAlertas {
-  estado?: EstadoAlerta;
+export interface AlertFilter {
+  status?: AlertStatus;
 }
 
-export interface FiltroBitacora {
-  alertaId?: string;
-  tipo?: TipoEventoBitacora;
+export interface LogFilter {
+  alertId?: string;
+  type?: LogEventType;
 }
 
-export interface EstadoSimulacion {
-  diaSimulado: string;
-  usuario: Usuario;
+export interface SimulationState {
+  simulatedDay: string;
+  user: User;
 }
 
-export interface ResumenBandeja {
-  dineroEnRiesgo: Cifra;
-  decisionesPendientes: Cifra;
-  recuperableMes: Cifra;
+export interface InboxSummary {
+  moneyAtRisk: Figure;
+  pendingDecisions: Figure;
+  recoverablePerMonth: Figure;
 }
 
-export type NivelAutonomia = 'informa' | 'propone' | 'ejecuta';
+export type AutonomyLevel = 'inform' | 'propose' | 'execute';
 
-export interface Umbral {
-  valor: number;
-  etiqueta: string;
+export interface Threshold {
+  value: number;
+  label: string;
 }
 
-export interface MetricaVigilada {
-  metrica: Metrica;
-  nombre: string;
-  descripcion: string;
-  vista: VistaSemantica;
-  regla: string;
-  umbral: Umbral;
-  vigilada: boolean;
-  responsable: string;
+export interface WatchedMetric {
+  metric: Metric;
+  name: string;
+  description: string;
+  view: SemanticView;
+  rule: string;
+  threshold: Threshold;
+  watched: boolean;
+  owner: string;
 }
 
-export interface Configuracion {
-  metricas: MetricaVigilada[];
-  responsables: string[];
-  autonomia: Record<TipoAccion, NivelAutonomia>;
+export interface Settings {
+  metrics: WatchedMetric[];
+  owners: string[];
+  autonomy: Record<ActionType, AutonomyLevel>;
 }

@@ -7,7 +7,7 @@ import './arena.generated.css';
 import './app.css';
 import { App } from './App';
 
-const PALABRAS = {
+const LOCALE_STRINGS = {
   locale: 'es-CO',
   paginationPrevious: 'Anterior',
   paginationNext: 'Siguiente',
@@ -37,7 +37,7 @@ initArenaTheme({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ArenaLocaleProvider value={PALABRAS}>
+    <ArenaLocaleProvider value={LOCALE_STRINGS}>
       <BrowserRouter>
         <App />
       </BrowserRouter>

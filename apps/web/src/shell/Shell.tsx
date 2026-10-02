@@ -13,82 +13,82 @@ import {
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useSimulacion } from '../estado/Simulacion';
-import { DialogoConsulta } from '../comun/DialogoConsulta';
-import { Chat } from '../pantallas/Chat';
-import { PasoEnCurso } from './PasoEnCurso';
-import { Reloj } from './Reloj';
+import { useSimulation } from '../state/Simulation';
+import { QueryDialog } from '../common/QueryDialog';
+import { Chat } from '../screens/Chat';
+import { Clock } from './Clock';
+import { CurrentStep } from './CurrentStep';
 
-const DESTINOS = [
-  { id: 'bandeja', etiqueta: 'Bandeja', icono: 'ph-bold ph-tray', ruta: '/' },
-  { id: 'bitacora', etiqueta: 'Bitácora', icono: 'ph-bold ph-scroll', ruta: '/bitacora' },
-  { id: 'configuracion', etiqueta: 'Configuración', icono: 'ph-bold ph-sliders-horizontal', ruta: '/configuracion' },
+const DESTINATIONS = [
+  { id: 'inbox', label: 'Bandeja', icon: 'ph-bold ph-tray', path: '/' },
+  { id: 'bitacora', label: 'Bitácora', icon: 'ph-bold ph-scroll', path: '/bitacora' },
+  { id: 'settings', label: 'Configuración', icon: 'ph-bold ph-sliders-horizontal', path: '/configuracion' },
 ];
 
-function destinoActivo(ruta: string): string {
-  if (ruta.startsWith('/bitacora')) {
+function activeDestination(path: string): string {
+  if (path.startsWith('/bitacora')) {
     return 'bitacora';
   }
-  if (ruta.startsWith('/configuracion')) {
-    return 'configuracion';
+  if (path.startsWith('/configuracion')) {
+    return 'settings';
   }
-  return 'bandeja';
+  return 'inbox';
 }
 
 export function Shell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const movil = useArenaViewportBelow('lg');
-  const [tema, fijarTema] = useArenaTheme();
-  const { avisos, accionDeAviso, abrirChat, chat } = useSimulacion();
-  const activo = destinoActivo(pathname);
-  const ir = (id: string) => {
-    const destino = DESTINOS.find((d) => d.id === id);
-    if (destino) {
-      navigate(destino.ruta);
-    } else if (id === 'preguntar') {
-      abrirChat();
+  const mobile = useArenaViewportBelow('lg');
+  const [theme, setTheme] = useArenaTheme();
+  const { toasts, toastAction, openChat, chat } = useSimulation();
+  const active = activeDestination(pathname);
+  const go = (id: string) => {
+    const destination = DESTINATIONS.find((d) => d.id === id);
+    if (destination) {
+      navigate(destination.path);
+    } else if (id === 'ask') {
+      openChat();
     }
   };
 
   return (
-    <div className={['arena-shell shell', movil ? 'shell--movil' : '', !movil && chat.abierto ? 'shell--chat' : ''].filter(Boolean).join(' ')}>
+    <div className={['arena-shell shell', mobile ? 'shell--mobile' : '', !mobile && chat.open ? 'shell--chat' : ''].filter(Boolean).join(' ')}>
       <ArenaSkipLink label="Saltar al contenido" />
       <ArenaAppBar
         brand={
-          <Link to="/" className="marca">
+          <Link to="/" className="brand">
             Centinela
           </Link>
         }
         actions={
-          <div className="barra__acciones">
-            <Reloj />
-            {movil ? null : (
+          <div className="bar__actions">
+            <Clock />
+            {mobile ? null : (
               <ArenaIconButton
                 icon="ph-bold ph-chat-circle-text"
                 label="Preguntar"
                 showLabel
-                pressed={chat.abierto}
-                onClick={() => abrirChat()}
+                pressed={chat.open}
+                onClick={() => openChat()}
               />
             )}
             <ArenaIconButton
               icon="ph-bold ph-moon"
               label="Tema oscuro"
-              size={movil ? 'sm' : 'md'}
-              pressed={tema === 'dark'}
-              onClick={() => fijarTema(tema === 'dark' ? 'light' : 'dark')}
+              size={mobile ? 'sm' : 'md'}
+              pressed={theme === 'dark'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             />
           </div>
         }
       />
-      <PasoEnCurso />
-      <div className="arena-shell__main shell__cuerpo">
-        {movil ? null : (
-          <div className="shell__riel">
-            <ArenaSideNav ariaLabel="Secciones" active={activo} onNav={ir}>
-              {DESTINOS.map((d) => (
-                <ArenaSideNavItem key={d.id} id={d.id} label={d.etiqueta} icon={d.icono} href={d.ruta} />
+      <CurrentStep />
+      <div className="arena-shell__main shell__body">
+        {mobile ? null : (
+          <div className="shell__rail">
+            <ArenaSideNav ariaLabel="Secciones" active={active} onNav={go}>
+              {DESTINATIONS.map((d) => (
+                <ArenaSideNavItem key={d.id} id={d.id} label={d.label} icon={d.icon} href={d.path} />
               ))}
             </ArenaSideNav>
           </div>
@@ -97,18 +97,16 @@ export function Shell() {
           <Outlet />
         </ArenaMain>
       </div>
-      {movil ? (
-        <ArenaBottomNav ariaLabel="Secciones" active={chat.abierto ? 'preguntar' : activo} onNav={ir}>
+      {mobile ? (
+        <ArenaBottomNav ariaLabel="Secciones" active={chat.open ? 'ask' : active} onNav={go}>
           {[
-            ...DESTINOS.map((d) => (
-              <ArenaBottomNavItem key={d.id} id={d.id} label={d.etiqueta} icon={d.icono} href={d.ruta} />
-            )),
-            <ArenaBottomNavItem key="preguntar" id="preguntar" label="Preguntar" icon="ph-bold ph-chat-circle-text" />,
+            ...DESTINATIONS.map((d) => <ArenaBottomNavItem key={d.id} id={d.id} label={d.label} icon={d.icon} href={d.path} />),
+            <ArenaBottomNavItem key="ask" id="ask" label="Preguntar" icon="ph-bold ph-chat-circle-text" />,
           ]}
         </ArenaBottomNav>
       ) : null}
-      <ArenaToastHost placement={movil ? 'top-end' : 'bottom-end'}>
-        {avisos.toasts.map((t) => (
+      <ArenaToastHost placement={mobile ? 'top-end' : 'bottom-end'}>
+        {toasts.toasts.map((t) => (
           <ArenaToast
             key={t.id}
             title={t.title}
@@ -116,17 +114,17 @@ export function Shell() {
             tone={t.tone}
             actionLabel={t.actionLabel}
             onAction={() => {
-              accionDeAviso(t.id)?.ejecutar();
-              avisos.dismiss(t.id);
+              toastAction(t.id)?.run();
+              toasts.dismiss(t.id);
             }}
             persist={t.persist}
             dismissible
-            onClose={() => avisos.dismiss(t.id)}
+            onClose={() => toasts.dismiss(t.id)}
           />
         ))}
       </ArenaToastHost>
       <Chat />
-      <DialogoConsulta />
+      <QueryDialog />
     </div>
   );
 }

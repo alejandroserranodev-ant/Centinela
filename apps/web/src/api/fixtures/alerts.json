@@ -1,0 +1,398 @@
+[
+  {
+    "id": "alert-overdue-a",
+    "severity": "high",
+    "metric": "saldo_vencido",
+    "simulatedDate": "2026-09-14",
+    "title": {
+      "text": "Cliente de ejemplo A tiene {0} vencidos, con facturas de hasta {1} días de mora",
+      "figures": [
+        { "value": 47500000, "unit": "COP", "queryId": "q-overdue-a-balance" },
+        { "value": 38, "unit": "days", "queryId": "q-overdue-a-balance" }
+      ]
+    },
+    "pesosAtRisk": { "value": 47500000, "unit": "COP", "queryId": "q-overdue-a-balance" },
+    "recoverablePerMonth": null,
+    "confidence": { "level": "high", "assumptions": ["Los pagos registrados hasta el día simulado están completos"] },
+    "cause": {
+      "kind": "identified",
+      "sentence": {
+        "text": "Sus pagos se alargaron de {0} a {1} días desde junio, con un plazo pactado de {2} días",
+        "figures": [
+          { "value": 31, "unit": "days", "queryId": "q-overdue-a-payment-days" },
+          { "value": 58, "unit": "days", "queryId": "q-overdue-a-payment-days" },
+          { "value": 30, "unit": "days", "queryId": "q-overdue-a-balance" }
+        ]
+      },
+      "evidence": [
+        {
+          "claim": {
+            "text": "Las facturas de agosto de 2026 se pagaron en {0} días en promedio",
+            "figures": [{ "value": 58, "unit": "days", "queryId": "q-overdue-a-payment-days" }]
+          },
+          "queryId": "q-overdue-a-payment-days",
+          "series": [
+            { "date": "2026-03-01", "value": 31 },
+            { "date": "2026-04-01", "value": 30 },
+            { "date": "2026-05-01", "value": 33 },
+            { "date": "2026-06-01", "value": 41 },
+            { "date": "2026-07-01", "value": 49 },
+            { "date": "2026-08-01", "value": 58 }
+          ]
+        },
+        {
+          "claim": {
+            "text": "El saldo abierto es de {0}, de los cuales {1} están vencidos, por encima del límite de mora de la política de crédito",
+            "figures": [
+              { "value": 62300000, "unit": "COP", "queryId": "q-overdue-a-balance" },
+              { "value": 47500000, "unit": "COP", "queryId": "q-overdue-a-balance" }
+            ]
+          },
+          "queryId": "q-overdue-a-balance"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "id": "overdue-a-reminder",
+        "title": "Recordatorio de pago",
+        "type": "email_draft",
+        "description": {
+          "text": "Borrador de correo a Cliente de ejemplo A que pide el pago de {0} vencidos y propone un acuerdo de pago",
+          "figures": [{ "value": 47500000, "unit": "COP", "queryId": "q-overdue-a-balance" }]
+        },
+        "impact": {
+          "figure": { "value": 47500000, "unit": "COP", "queryId": "q-overdue-a-balance" },
+          "period": "once"
+        },
+        "confidence": { "level": "medium", "assumptions": ["El cliente conserva capacidad de pago"] },
+        "parameters": { "recipient": "Cliente de ejemplo A", "agreement_term_days": 15 }
+      },
+      {
+        "id": "overdue-a-credit-limit",
+        "title": "Revisar el cupo de crédito",
+        "type": "task",
+        "description": {
+          "text": "Tarea para cartera: revisar el cupo del cliente antes de despachar nuevos pedidos a crédito mientras tenga {0} vencidos",
+          "figures": [{ "value": 47500000, "unit": "COP", "queryId": "q-overdue-a-balance" }]
+        },
+        "impact": null,
+        "confidence": { "level": "high", "assumptions": [] },
+        "parameters": { "owner": "Jefe de cartera" }
+      }
+    ],
+    "script": {
+      "analista": "Comparando los días de pago del cliente mes a mes y leyendo la política de crédito",
+      "estratega": "Preparando el recordatorio de pago y la revisión del cupo"
+    }
+  },
+  {
+    "id": "alert-stockout",
+    "severity": "critical",
+    "metric": "cobertura_dias",
+    "simulatedDate": "2026-09-14",
+    "title": {
+      "text": "SKU de ejemplo 1 se agota en {0} días en la bodega de Bogotá",
+      "figures": [{ "value": 4.2, "unit": "days", "queryId": "q-stockout-coverage" }]
+    },
+    "pesosAtRisk": { "value": 39400000, "unit": "COP", "queryId": "q-stockout-sales" },
+    "recoverablePerMonth": null,
+    "confidence": { "level": "high", "assumptions": ["La demanda de los próximos días se parece a la de los últimos 30"] },
+    "cause": {
+      "kind": "identified",
+      "sentence": {
+        "text": "La existencia de {0} unidades no alcanza para los {1} unidades pendientes de despacho, con una demanda de {2} unidades al día",
+        "figures": [
+          { "value": 630, "unit": "units", "queryId": "q-stockout-coverage" },
+          { "value": 900, "unit": "units", "queryId": "q-stockout-coverage" },
+          { "value": 150, "unit": "units", "queryId": "q-stockout-coverage" }
+        ]
+      },
+      "evidence": [
+        {
+          "claim": {
+            "text": "La cobertura es de {0} días, por debajo del mínimo de la política de inventario para productos clase A",
+            "figures": [{ "value": 4.2, "unit": "days", "queryId": "q-stockout-coverage" }]
+          },
+          "queryId": "q-stockout-coverage"
+        },
+        {
+          "claim": {
+            "text": "Si se agota, se dejan de vender {0} hasta que llegue la reposición",
+            "figures": [{ "value": 39400000, "unit": "COP", "queryId": "q-stockout-sales" }]
+          },
+          "queryId": "q-stockout-sales"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "id": "stockout-order",
+        "title": "Orden de compra de reposición",
+        "type": "purchase_order_draft",
+        "description": {
+          "text": "Borrador de orden de compra por {0} unidades de SKU de ejemplo 1 para la bodega de Bogotá, 30 días de demanda",
+          "figures": [{ "value": 4500, "unit": "units", "queryId": "q-stockout-coverage" }]
+        },
+        "impact": {
+          "figure": { "value": 39400000, "unit": "COP", "queryId": "q-stockout-sales" },
+          "period": "once"
+        },
+        "confidence": { "level": "high", "assumptions": ["El proveedor entrega en su plazo habitual"] },
+        "parameters": { "units": 4500, "warehouse": "BOD-BOG" }
+      },
+      {
+        "id": "stockout-transfer",
+        "title": "Traslado entre bodegas",
+        "type": "task",
+        "description": {
+          "text": "Tarea para logística: trasladar {0} unidades desde la bodega de Medellín, que tiene más de 30 días de cobertura",
+          "figures": [{ "value": 1200, "unit": "units", "queryId": "q-stockout-other-warehouse" }]
+        },
+        "impact": null,
+        "confidence": { "level": "medium", "assumptions": ["El traslado llega antes que la orden de compra"] },
+        "parameters": { "units": 1200, "origin": "BOD-MDE", "destination": "BOD-BOG" }
+      }
+    ],
+    "script": {
+      "analista": "Cruzando la existencia con la demanda y los pedidos pendientes",
+      "estratega": "Calculando la reposición y buscando unidades en la otra bodega"
+    }
+  },
+  {
+    "id": "alert-hogar-margin",
+    "severity": "high",
+    "metric": "margen_pct",
+    "simulatedDate": "2026-09-15",
+    "title": {
+      "text": "El margen de la línea Hogar cayó {0} puntos en 3 semanas",
+      "figures": [{ "value": 6.05, "unit": "points", "queryId": "q-hogar-drop" }]
+    },
+    "pesosAtRisk": { "value": 58200000, "unit": "COP", "queryId": "q-hogar-risk" },
+    "recoverablePerMonth": { "value": 42000000, "unit": "COP", "queryId": "q-hogar-recoverable" },
+    "confidence": {
+      "level": "high",
+      "assumptions": ["Los precios de venta de la línea no cambiaron en el período", "El alza de costo del proveedor X es permanente"]
+    },
+    "cause": {
+      "kind": "identified",
+      "sentence": {
+        "text": "El proveedor X subió el costo de {0} SKU de la línea, en promedio un {1}",
+        "figures": [
+          { "value": 4, "unit": "units", "queryId": "q-hogar-sku-cost" },
+          { "value": 9.8, "unit": "percent", "queryId": "q-hogar-sku-cost" }
+        ]
+      },
+      "evidence": [
+        {
+          "claim": {
+            "text": "El margen pasó de {0} en promedio a {1} la semana del 7 de septiembre de 2026",
+            "figures": [
+              { "value": 31.55, "unit": "percent", "queryId": "q-hogar-drop" },
+              { "value": 25.5, "unit": "percent", "queryId": "q-hogar-drop" }
+            ]
+          },
+          "queryId": "q-hogar-margin-series",
+          "series": [
+            { "date": "2026-06-29", "value": 31.8 },
+            { "date": "2026-07-06", "value": 31.2 },
+            { "date": "2026-07-13", "value": 31.6 },
+            { "date": "2026-07-20", "value": 31.4 },
+            { "date": "2026-07-27", "value": 31.9 },
+            { "date": "2026-08-03", "value": 31.3 },
+            { "date": "2026-08-10", "value": 31.5 },
+            { "date": "2026-08-17", "value": 31.7 },
+            { "date": "2026-08-24", "value": 29.4 },
+            { "date": "2026-08-31", "value": 27.6 },
+            { "date": "2026-09-07", "value": 25.5 }
+          ]
+        },
+        {
+          "claim": {
+            "text": "{0} SKU del proveedor X subieron su costo unitario un {1} desde la semana del 24 de agosto de 2026; el resto de la línea no cambió",
+            "figures": [
+              { "value": 4, "unit": "units", "queryId": "q-hogar-sku-cost" },
+              { "value": 9.8, "unit": "percent", "queryId": "q-hogar-sku-cost" }
+            ]
+          },
+          "queryId": "q-hogar-sku-cost"
+        },
+        {
+          "claim": {
+            "text": "Si la caída se mantiene, la línea deja de ganar {0} al mes",
+            "figures": [{ "value": 58200000, "unit": "COP", "queryId": "q-hogar-risk" }]
+          },
+          "queryId": "q-hogar-risk"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "id": "hogar-price",
+        "title": "Subir el precio de los SKU afectados",
+        "type": "price_change_draft",
+        "description": {
+          "text": "Borrador de ajuste de precio: subir un {0} el precio de lista de los {1} SKU afectados",
+          "figures": [
+            { "value": 3, "unit": "percent", "queryId": "q-hogar-recoverable" },
+            { "value": 4, "unit": "units", "queryId": "q-hogar-sku-cost" }
+          ]
+        },
+        "impact": {
+          "figure": { "value": 42000000, "unit": "COP", "queryId": "q-hogar-recoverable" },
+          "period": "month"
+        },
+        "confidence": { "level": "medium", "assumptions": ["La demanda de los 4 SKU no cae con un alza del 3 %"] },
+        "parameters": { "price_increase_pct": 3 }
+      },
+      {
+        "id": "hogar-renegotiate",
+        "title": "Renegociar con el proveedor X",
+        "type": "email_draft",
+        "description": {
+          "text": "Borrador de correo al proveedor X que pide devolver la mitad del alza de costo de los {0} SKU",
+          "figures": [{ "value": 4, "unit": "units", "queryId": "q-hogar-sku-cost" }]
+        },
+        "impact": {
+          "figure": { "value": 29100000, "unit": "COP", "queryId": "q-hogar-renegotiate" },
+          "period": "month"
+        },
+        "confidence": { "level": "low", "assumptions": ["El proveedor acepta devolver la mitad del alza"] },
+        "parameters": { "recipient": "Proveedor X", "requested_reduction_pct": 50 }
+      },
+      {
+        "id": "hogar-substitutes",
+        "title": "Buscar sustitutos",
+        "type": "task",
+        "description": {
+          "text": "Tarea para compras: cotizar con otro proveedor sustitutos de los {0} SKU",
+          "figures": [{ "value": 4, "unit": "units", "queryId": "q-hogar-sku-cost" }]
+        },
+        "impact": null,
+        "confidence": { "level": "medium", "assumptions": [] },
+        "parameters": { "owner": "Jefe de compras" }
+      }
+    ],
+    "script": {
+      "analista": "Comparando el costo de cada SKU de Hogar semana a semana",
+      "estratega": "Calculando cuánto recupera cada acción en pesos"
+    }
+  },
+  {
+    "id": "alert-no-evidence",
+    "severity": "medium",
+    "metric": "dias_pago_prom",
+    "simulatedDate": "2026-09-16",
+    "title": {
+      "text": "Cliente de ejemplo B paga en {0} días, un {1} más lento que su promedio",
+      "figures": [
+        { "value": 44, "unit": "days", "queryId": "q-no-evidence-days" },
+        { "value": 57.1, "unit": "percent", "queryId": "q-no-evidence-days" }
+      ]
+    },
+    "pesosAtRisk": { "value": 23000000, "unit": "COP", "queryId": "q-no-evidence-balance" },
+    "recoverablePerMonth": null,
+    "confidence": {
+      "level": "low",
+      "assumptions": ["Ninguna factura del cliente está vencida todavía", "Las políticas no registran un plazo especial para este cliente"]
+    },
+    "cause": {
+      "kind": "no_evidence",
+      "reason": "No tengo evidencia suficiente para explicar por qué este cliente paga más tarde. Sus compras siguen a su ritmo habitual y no tiene facturas vencidas; la causa puede estar fuera de los datos que reviso.",
+      "queriesReviewed": ["q-no-evidence-days", "q-no-evidence-balance", "q-no-evidence-activity"]
+    },
+    "actions": [
+      {
+        "id": "no-evidence-ask",
+        "title": "Preguntar al cliente",
+        "type": "task",
+        "description": {
+          "text": "Tarea para el responsable de la cuenta: preguntar a Cliente de ejemplo B por qué paga más tarde, antes de que venza su saldo de {0}",
+          "figures": [{ "value": 23000000, "unit": "COP", "queryId": "q-no-evidence-balance" }]
+        },
+        "impact": null,
+        "confidence": { "level": "low", "assumptions": [] },
+        "parameters": { "owner": "Responsable de la cuenta" }
+      }
+    ],
+    "script": {
+      "analista": "Buscando la causa en la cartera, la actividad de compra y la política de crédito",
+      "estratega": "Sin causa demostrada: preparando solo una tarea de revisión"
+    }
+  },
+  {
+    "id": "alert-discounts",
+    "severity": "medium",
+    "metric": "descuento_en_exceso",
+    "simulatedDate": "2026-09-18",
+    "title": {
+      "text": "Vendedor de ejemplo 3 dio {0} descuentos por encima del tope sin aprobación en 2 semanas",
+      "figures": [{ "value": 37, "unit": "units", "queryId": "q-discounts-lines" }]
+    },
+    "pesosAtRisk": { "value": 12400000, "unit": "COP", "queryId": "q-discounts-lines" },
+    "recoverablePerMonth": { "value": 26600000, "unit": "COP", "queryId": "q-discounts-month" },
+    "confidence": { "level": "high", "assumptions": ["Ninguna aprobación especial quedó sin registrar"] },
+    "cause": {
+      "kind": "identified",
+      "sentence": {
+        "text": "Los descuentos superan el tope de su segmento en {0} puntos en promedio y ninguno tiene aprobación especial",
+        "figures": [{ "value": 6.5, "unit": "points", "queryId": "q-discounts-points" }]
+      },
+      "evidence": [
+        {
+          "claim": {
+            "text": "{0} líneas de pedido suman {1} de descuento por encima del tope",
+            "figures": [
+              { "value": 37, "unit": "units", "queryId": "q-discounts-lines" },
+              { "value": 12400000, "unit": "COP", "queryId": "q-discounts-lines" }
+            ]
+          },
+          "queryId": "q-discounts-lines"
+        },
+        {
+          "claim": {
+            "text": "Proyectado a un mes, el descuento en exceso llega a {0}",
+            "figures": [{ "value": 26600000, "unit": "COP", "queryId": "q-discounts-month" }]
+          },
+          "queryId": "q-discounts-month"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "id": "discounts-notice",
+        "title": "Aviso al jefe de ventas",
+        "type": "email_draft",
+        "description": {
+          "text": "Borrador de correo al jefe de ventas con las {0} líneas fuera de política y el tope de cada segmento",
+          "figures": [{ "value": 37, "unit": "units", "queryId": "q-discounts-lines" }]
+        },
+        "impact": {
+          "figure": { "value": 26600000, "unit": "COP", "queryId": "q-discounts-month" },
+          "period": "month"
+        },
+        "confidence": { "level": "medium", "assumptions": ["El vendedor ajusta sus descuentos tras el aviso"] },
+        "parameters": { "recipient": "Jefe de ventas" }
+      },
+      {
+        "id": "discounts-approval",
+        "title": "Exigir aprobación especial",
+        "type": "task",
+        "description": {
+          "text": "Tarea para comercial: exigir aprobación especial a cada descuento de Vendedor de ejemplo 3 durante el próximo mes",
+          "figures": []
+        },
+        "impact": {
+          "figure": { "value": 26600000, "unit": "COP", "queryId": "q-discounts-month" },
+          "period": "month"
+        },
+        "confidence": { "level": "high", "assumptions": [] },
+        "parameters": { "owner": "Gerente comercial", "duration_days": 30 }
+      }
+    ],
+    "script": {
+      "analista": "Agrupando los descuentos fuera de política por vendedor y semana",
+      "estratega": "Preparando el aviso y el control de aprobación"
+    }
+  }
+]

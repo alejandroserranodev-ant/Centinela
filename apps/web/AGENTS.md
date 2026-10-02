@@ -27,7 +27,25 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   iterators shaped like SSE events, and reveals each alert when the simulated day reaches its date.
   It is replaced by a fetch client without touching a screen. `src/api/types.ts` is a draft
   contract: `apps/api`'s Pydantic models are the source, and these types follow them. Every number
-  travels as a `Cifra` with its `consultaId`, so the type itself asks each figure for its query.
+  travels as a `Figure` with its `queryId`, so the type itself asks each figure for its query.
+- **Code is written in English; what a person reads stays in Spanish.** Files, components,
+  functions, types, props, state keys and our own CSS classes are English. Every text on screen,
+  including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
+  fixtures. The words the data names keep their Spanish in code too: the agents (`vigia`,
+  `analista`, `estratega`, `ejecutor`), the metrics (`margen_pct`…), the `v_*` views and the
+  `alertas` table, because a translation would make a second name for one thing.
+- **The draft contract is English except its routes.** Field names and values in
+  `src/api/types.ts` are English (`status: 'proposed'`, `severity: 'critical'`), so the
+  `apps/api` models and the web read one vocabulary of code. The endpoint paths and their query
+  string stay as the brief writes them (`/simulacion/avanzar`, `/alertas?estado=propuesta`,
+  `/alertas/{id}/decision`, `/chat`, `/bitacora`), because the jury calls them by those names;
+  where the brief's query string carries a lifecycle value, the fetch client sends the brief's
+  spelling.
+- **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
+  address bar is on screen during the demo and the paths mirror the API and the brief's screen
+  names.
+- **Fixture files and ids are English** (`alerts.json`, `alert-hogar-margin`, `q-hogar-drop`); the
+  line name stays as the data spells it. An id never reaches a manager's screen.
 - **The fixtures in `src/api/fixtures/` are illustrative.** They are built from the brief's public
   example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
   examples, never from the dataset, because figures read from `data/csv/` would name the seeded
@@ -36,12 +54,12 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   show; the queries are not run.
 - **The screen computes no figure.** The inbox totals (money at risk today, decisions pending,
   recoverable per month) are sums over alerts rather than a `v_*` view, so the API computes them
-  and sends each as a `Cifra` whose query reads the alerts table, which is why `Consulta.vista`
+  and sends each as a `Figure` whose query reads the alerts table, which is why `Query.source`
   also takes `alertas`. A sum taken on screen would be a figure with no query behind it.
 - **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's
-  rule `arenaToastDelay`, which `src/estado/Simulacion.tsx:useAvisos()` applies with the shorter
+  rule `arenaToastDelay`, which `src/state/Simulation.tsx:useToasts()` applies with the shorter
   interval.
 - **Each chart sits in a box that clips sideways.** `ArenaLineChart` hides its accessible table in
   a one-pixel box, but a table lays out to its content anyway, and at phone width that box widened

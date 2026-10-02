@@ -1,54 +1,54 @@
 import { useState } from 'react';
 import { ArenaButton, ArenaDialog, ArenaTextarea } from '@dravensoft/arena-react';
-import { ErrorApi } from '../api/client';
+import { ApiError } from '../api/client';
 
 interface Props {
-  abierto: boolean;
-  onCerrar: () => void;
-  onRechazar: (motivo: string) => Promise<void>;
+  open: boolean;
+  onClose: () => void;
+  onReject: (reason: string) => Promise<void>;
 }
 
-export function DialogoRechazo({ abierto, onCerrar, onRechazar }: Props) {
-  const [motivo, setMotivo] = useState('');
+export function RejectDialog({ open, onClose, onReject }: Props) {
+  const [reason, setReason] = useState('');
   const [error, setError] = useState<string | undefined>();
-  const [enviando, setEnviando] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const cerrar = () => {
-    setMotivo('');
+  const close = () => {
+    setReason('');
     setError(undefined);
-    onCerrar();
+    onClose();
   };
 
-  const rechazar = async () => {
-    if (!motivo.trim()) {
+  const reject = async () => {
+    if (!reason.trim()) {
       setError('Escribe el motivo del rechazo para continuar.');
       return;
     }
-    setEnviando(true);
+    setSending(true);
     try {
-      await onRechazar(motivo.trim());
-      setMotivo('');
+      await onReject(reason.trim());
+      setReason('');
       setError(undefined);
     } catch (e) {
-      setError(e instanceof ErrorApi ? e.message : 'No se pudo registrar el rechazo. Inténtalo de nuevo.');
+      setError(e instanceof ApiError ? e.message : 'No se pudo registrar el rechazo. Inténtalo de nuevo.');
     } finally {
-      setEnviando(false);
+      setSending(false);
     }
   };
 
   return (
     <ArenaDialog
-      open={abierto}
+      open={open}
       eyebrow="Rechazar"
       title="¿Por qué rechazas la propuesta?"
       fillBelow="sm"
-      onClose={cerrar}
+      onClose={close}
       footer={
         <>
-          <ArenaButton variant="ghost" onClick={cerrar}>
+          <ArenaButton variant="ghost" onClick={close}>
             Cancelar
           </ArenaButton>
-          <ArenaButton variant="danger" icon="ph-bold ph-x" loading={enviando} onClick={rechazar}>
+          <ArenaButton variant="danger" icon="ph-bold ph-x" loading={sending} onClick={reject}>
             Rechazar
           </ArenaButton>
         </>
@@ -62,11 +62,11 @@ export function DialogoRechazo({ abierto, onCerrar, onRechazar }: Props) {
           rows={4}
           maxLength={500}
           counter
-          value={motivo}
+          value={reason}
           error={error}
-          onChange={(texto) => {
-            setMotivo(texto);
-            if (texto.trim()) {
+          onChange={(text) => {
+            setReason(text);
+            if (text.trim()) {
               setError(undefined);
             }
           }}
