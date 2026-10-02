@@ -1,14 +1,22 @@
 # apps/api: the API, the clock and the log
 
+<<<<<<< HEAD
 This level is the only door into Centinela: the web, the jury and any script reach it through
 the public endpoints; `packages/agents` reaches it through internal endpoints. It owns the alert
 lifecycle, the simulated clock, the `bitácora`, and the interface contract. This page states the
 decisions the code is written against. The endpoints it serves are
+=======
+This level is the only door into Centinela: the web, the jury and any script reach the agents
+through it. It holds the skeleton the endpoints are built on: FastAPI, the API's own schema, the
+alert lifecycle and the `bitácora`, not yet wired to `packages/agents` or `packages/tools`. This
+page states the decisions the code is written against. The endpoints it must serve are
+>>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
 [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its minimal API section.
 
 ## Decisions
 
 - **Python, FastAPI and Pydantic**, REST plus SSE streaming for the chat and for agent progress.
+<<<<<<< HEAD
 - **The API owns the simulated clock.** Advancing it moves the simulated day that replaces
   `fecha_corte()` (see [`../../data/AGENTS.md`](../../data/AGENTS.md), its clock section).
 - **The API owns the alert lifecycle: it validates every transition and persists it**, and
@@ -56,6 +64,35 @@ decisions the code is written against. The endpoints it serves are
 - **The API owns the `bitácora`**, which is append-only: alert, evidence, proposal, decision,
   action and result, each with who and when. Nothing updates or deletes a row of it.
 - **Roles decide who may approve.** Full enterprise authentication is out of scope; roles are not.
+=======
+  `centinela_api/sse.py:flujo()` turns an async generator of `(event, model)` pairs into
+  `text/event-stream`.
+- **The HTTP contract is English and camelCase**, mirroring `apps/web/src/api/types.ts` field for
+  field: `centinela_api/modelos.py` is the source, and `Esquema`'s `alias_generator` emits
+  `pesosAtRisk` from `pesos_at_risk` so the web's fetch client can replace its simulated one without
+  a reshape.
+- **The lifecycle's Spanish names stay at the edge.** `estado=propuesta` on `GET /alertas` is the
+  brief's spelling; `centinela_api/ciclo_vida.py:ESTADO_A_STATUS` maps it to the English `status`
+  (`proposed`) that the contract, the database and `ciclo_vida.transicionar()` use everywhere else.
+- **The API owns the simulated clock**, in `api.simulacion`, a single-row table. Advancing it moves
+  the simulated day that replaces `fecha_corte()` (see
+  [`../../data/AGENTS.md`](../../data/AGENTS.md), its clock section); the first read seeds it from
+  `centinela.fecha_corte()`.
+- **The API owns the alert lifecycle and persists it**: `nueva` → `en análisis` → `propuesta` →
+  `aprobada` or `rechazada` → `ejecutada`. A transition the lifecycle does not list is refused,
+  enforced in code by `ciclo_vida.transicionar()`.
+- **Approving stops at `aprobada`.** Reaching `ejecutada` is `Ejecutor` running the action, which
+  this skeleton does not build yet; `POST /alertas/{id}/decision` never executes anything itself.
+- **Roles decide who may approve**, read from an `X-User-Role` header against
+  `config.ROLES_CON_DECISION` (`gerente`, `lider_proceso`). Full enterprise authentication is out of
+  scope, so there is no login yet: `X-User-Name` carries the acting person's display name,
+  percent-encoded, because a raw header is ASCII-only and Colombian names are not.
+- **This skeleton does not call `packages/agents` or `packages/tools` yet.**
+  `POST /simulacion/avanzar` only moves the clock and ends with no new alerts; `POST /chat` always
+  answers "no tengo evidencia suficiente". Wiring in `Vigía`, `Analista`, `Estratega` and `Ejecutor`
+  is the next task, and `api.alertas` has no writer until then besides a decision on an
+  already-seeded alert.
+>>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
 
 ## Rules of this level
 
@@ -65,6 +102,7 @@ decisions the code is written against. The endpoints it serves are
   `data/docker-compose.yml` already runs): alerts, decisions and the log, never in the dataset's
   `centinela` schema.
 - **An alert carries its cost**: tokens and model calls are recorded per alert, in `api.alertas.costos`,
+<<<<<<< HEAD
   a column reserved for a list. No code writes it until an agent runs, and it is not in the public
   `Alert` contract because `apps/web/src/api/types.ts` does not carry it.
 - **Timeouts and retries are explicit**: `packages/agents` handles these; the API returns what it
@@ -158,6 +196,14 @@ curl http://localhost:8000/bitacora?alertId=alerta_abc123
 #   {type: "action", actor: {kind: "agent", agent: "ejecutor"}, detail: "..."}
 # }
 ```
+=======
+  a column reserved for a list of `packages/agents/src/centinela_agents/esquemas.py:RegistroCosto`.
+  No code writes it until an agent runs, and it is not in the public `Alert` contract because
+  `apps/web/src/api/types.ts` does not carry it.
+- **Timeouts and retries are explicit**, and "not enough evidence" is a valid response, not an error.
+- **The `bitácora` is append-only in code, not yet by a database grant**: nothing in this level
+  issues `UPDATE` or `DELETE` against `api.bitacora`. *No gate holds this.*
+>>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
 
 ## Commands
 
@@ -169,6 +215,7 @@ already up and `data/sql/01..03` already applied:
 | `pip install -e ".[dev]"` | installs the package and test dependencies |
 | `psql "$DSN_ADMIN" -f sql/01_esquema.sql` | creates the `api` schema; safe to re-run, nothing drops |
 | `uvicorn centinela_api.main:app --reload` | runs the API on `http://127.0.0.1:8000` |
+<<<<<<< HEAD
 | `pytest tests/test_flujo_agentes.py` | quick unit tests (no DB needed) |
 | `pytest -m integracion` | integration tests (requires DB up and DSN_ADMIN set) |
 
@@ -237,3 +284,16 @@ already up and `data/sql/01..03` already applied:
 - How to handle retries and timeouts (circuit breaker logic)
 - How to embed policies in pgvector and retrieve them
 - Whether to call agents in-process or as a microservice
+=======
+| `pytest` | the unit tests, always; `pytest -m integracion` also needs this level's schema applied and `DSN_ADMIN` set |
+
+`DSN_ADMIN` is a Postgres connection string with write access; copy `.env.example` to `.env` to get
+the one `data/docker-compose.yml` creates. Without a local `psql` client, the schema command becomes
+`cat sql/01_esquema.sql | docker exec -i centinela-db psql -U centinela -d centinela` (PowerShell:
+`Get-Content sql/01_esquema.sql -Raw | docker exec -i centinela-db psql -U centinela -d centinela`),
+run against the container `data/docker-compose.yml` starts.
+
+With the server running, `http://127.0.0.1:8000/docs` is a Swagger UI that calls every endpoint
+from the browser; `GET /alertas` and `POST /alertas/{id}/decision` need a row in `api.alertas` to
+act on, since nothing creates one until `Vigía` exists.
+>>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
