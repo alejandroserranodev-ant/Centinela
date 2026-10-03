@@ -76,6 +76,11 @@ def test_a_dry_run_returns_a_sample_the_count_and_the_time(connect):
     assert answer["hash"] and "%(dia)s" in answer["sql"]
 
 
+@pytest.mark.parametrize("kpi_id", ["oc_abiertas", "facturas_abiertas", "ventas_semana_linea"])
+def test_every_fixture_kpi_fits_the_default_cost_cap(connect, kpi_id):
+    assert kpi_validar(fixture_block(kpi_id), date(2026, 3, 2), SOURCES, connect, Settings())["costo"] <= Settings().max_cost
+
+
 def test_the_cost_guard_refuses_over_its_cap(connect):
     with pytest.raises(Refused) as refused:
         kpi_validar(fixture_block("ventas_semana_linea"), date(2026, 3, 2), SOURCES, connect, Settings(max_cost=1.0))

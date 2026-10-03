@@ -50,7 +50,7 @@ LAST = {"semana": sql.SQL("date_trunc('week', {} - 6)::date"), "mes": sql.SQL("(
 START = {"semana": sql.SQL("({} - 7 * {})"), "mes": sql.SQL("({} - interval '1 month' * {})::date")}
 END = {"semana": sql.SQL("({} + 7)"), "mes": sql.SQL("({} + interval '1 month')::date")}
 STEP = {"semana": sql.SQL("interval '1 week'"), "mes": sql.SQL("interval '1 month'")}
-FILL = {True: sql.SQL("coalesce(({}), 0)"), False: sql.SQL("({})")}
+FILL = {True: sql.SQL("coalesce(periodos.valor, 0)"), False: sql.SQL("periodos.valor")}
 ZERO_WHEN_EMPTY = frozenset({"sum", "count"})
 DELTA = {
     "delta": sql.SQL("({valor} - {base})::numeric"),
@@ -317,21 +317,22 @@ def baseline(block, scope, dims, measured, kind, conditions, source) -> Compiled
         sql.SQL("{} IS NOT DISTINCT FROM {}").format(sql.Identifier("periodos", name), sql.Identifier("entidades", name)) for name in names
     )
     filled = "medida" in block and block["medida"]["agregado"] in ZERO_WHEN_EMPTY
-    lookup = sql.SQL("SELECT periodos.valor FROM periodos WHERE {same} AND periodos.periodo = serie.periodo").format(same=same)
     out = block["salida"]
     value_now = sql.SQL("max(marco.valor) FILTER (WHERE marco.periodo = {})::numeric").format(current)
     base_before = sql.SQL("avg(marco.valor) FILTER (WHERE marco.periodo < {})::numeric").format(current)
     query = sql.SQL(
         "WITH periodos AS ({inner}), entidades AS (SELECT DISTINCT {entity} FROM periodos), "
-        "marco AS (SELECT {framed}, serie.periodo::date AS periodo, {fill} AS valor "
-        "FROM entidades, generate_series({first}, {current}, {step}) AS serie(periodo)) "
+        "marco AS (SELECT {framed}, serie.periodo, {fill} AS valor "
+        "FROM entidades CROSS JOIN (SELECT generate_series({first}, {current}, {step})::date AS periodo) AS serie "
+        "LEFT JOIN periodos ON {same} AND periodos.periodo = serie.periodo) "
         "SELECT {dims}, {value_now} AS {valor}, {base_before} AS {base}, {delta} AS {delta_name} "
         "FROM marco GROUP BY {group}"
     ).format(
         inner=inner,
         entity=sql.SQL(", ").join(sql.Identifier(name) for name in names),
         framed=sql.SQL(", ").join(sql.Identifier("entidades", name) for name in names),
-        fill=FILL[filled].format(lookup),
+        fill=FILL[filled],
+        same=same,
         first=START[period].format(current, sql.Literal(spec["n"])),
         current=current,
         step=STEP[period],
