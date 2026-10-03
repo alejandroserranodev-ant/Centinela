@@ -174,7 +174,7 @@ def test_a_metric_name_outside_the_pattern_is_refused():
 
 def test_freezing_keeps_the_text_its_hash_and_the_compiler_version():
     frozen = freeze(compile_kpi(fixture_block("oc_abiertas"), SOURCES))
-    assert "%(dia)s" in frozen.sql and frozen.hash == digest(frozen.sql) and frozen.compiler_version == "2"
+    assert "%(dia)s" in frozen.sql and frozen.hash == digest(frozen.sql) and frozen.compiler_version == "3"
 
 
 def calls(tree, attribute):

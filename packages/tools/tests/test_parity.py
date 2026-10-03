@@ -1,12 +1,12 @@
-# Parity of every base KPI of data/metricas.yaml, in two halves. On fecha_corte() the kit's views are
-# right by definition, so each KPI returns its view's rows, value for value, on the columns the view
-# holds. On earlier simulated days the views leak, so each KPI agrees with a hand-written as-of query
-# here, never with the view. Each test is one KER- case of evals/AGENTS.md. margen_pct and
-# dias_pago_prom are compared on the entities measured in the current period, because no view or
-# as-of query holds a row for a week or a month with no sale or payment. descuento_en_exceso agrees
-# with its view within half a peso per line, because the kit rounds each line and the kernel rounds
-# the week's sum. dias_pago_prom has no view half: it measures by month of payment, and its view by
-# month of invoice, whose last months hold only the invoices already paid.
+# Parity of every base KPI of data/metricas.yaml, one KER- case of evals/AGENTS.md per test. On fecha_corte()
+# each KPI returns its view's rows, value for value; on earlier days the views leak, so it agrees with a
+# hand-written as-of query instead. margen_pct and dias_pago_prom compare the entities measured in the current
+# period, since nothing holds a row for a week or month with no sale or payment. descuento_en_exceso agrees
+# with its view within half a peso per line: the kit rounds each line, the kernel the week. dias_pago_prom has
+# no view half: its view groups by month of invoice. The as-of counts business days by arithmetic from a
+# Monday, not by the compiler's series of days, so a shared mistake cannot pass. pedidos_pendientes shares one
+# decision with the kernel on purpose: it counts a SKU's orders across both warehouses, which data/AGENTS.md
+# gives the reason for.
 from datetime import date
 from decimal import Decimal
 
@@ -27,6 +27,7 @@ DAYS = [date(2025, 12, 15), date(2026, 4, 8), date(2026, 9, 15)]
 WEEK = "date_trunc('week', %(d)s::date - 6)::date"
 MONTH = "(date_trunc('month', %(d)s::date + 1) - interval '1 month')::date"
 OPEN = "f.fecha_factura <= %(d)s AND NOT EXISTS (SELECT 1 FROM centinela.pagos pg WHERE pg.factura_id = f.factura_id AND pg.fecha_pago <= %(d)s)"
+WEEKDAYS = "(5 * (({x} - date '2001-01-01' + 1) / 7) + least(({x} - date '2001-01-01' + 1) %% 7, 5))"
 SOLD = "FROM centinela.pedidos_detalle dd JOIN centinela.pedidos p USING (pedido_id) WHERE p.estado <> 'Cancelado' AND p.fecha <= %(d)s"
 
 VIEWS = {
@@ -100,14 +101,12 @@ AS_OF = {
         "FROM centinela.lista_precios WHERE fecha_vigencia <= %(d)s GROUP BY 1), "
         "v AS (SELECT dd.sku, coalesce(sum(dd.cantidad) FILTER (WHERE p.fecha >= c.fv), 0) AS desde, "
         "coalesce(sum(dd.cantidad) FILTER (WHERE p.fecha > %(d)s::date - 90), 0) AS n90 "
-        f"{SOLD.replace('USING (pedido_id)', 'USING (pedido_id) LEFT JOIN c USING (sku)')} GROUP BY 1), "
-        "habiles AS (SELECT c.sku, count(g.dia) FILTER (WHERE extract(isodow FROM g.dia) BETWEEN 1 AND 5) AS n "
-        "FROM c LEFT JOIN LATERAL generate_series(c.fv + 1, %(d)s::date, interval '1 day') AS g(dia) ON TRUE GROUP BY 1) "
+        f"{SOLD.replace('USING (pedido_id)', 'USING (pedido_id) LEFT JOIN c USING (sku)')} GROUP BY 1) "
         "SELECT c.sku, c.cu AS costo_unitario, c.ca AS costo_anterior, c.fv AS fecha_vigencia, lp.precio AS precio_lista, "
         "round(100 * (c.cu / nullif(c.ca, 0) - 1), 2) AS variacion_pct, "
-        "CASE WHEN lp.cambio >= c.fv THEN 0 ELSE h.n END AS dias_habiles_sin_traslado, "
+        f"CASE WHEN lp.cambio >= c.fv THEN 0 ELSE {WEEKDAYS.format(x='%(d)s::date')} - {WEEKDAYS.format(x='c.fv')} END AS dias_habiles_sin_traslado, "
         "round((c.cu - c.ca) * v.desde, 0) AS pesos_en_riesgo, round(v.n90 / 3.0, 1) AS unidades_mes_prom "
-        "FROM c LEFT JOIN lp USING (sku) LEFT JOIN v USING (sku) JOIN habiles h USING (sku)"
+        "FROM c LEFT JOIN lp USING (sku) LEFT JOIN v USING (sku)"
     ),
     "dias_retraso": (
         "SELECT oc_id, CASE WHEN fecha_recibida <= %(d)s THEN fecha_recibida END AS fecha_recibida, fecha_esperada, "

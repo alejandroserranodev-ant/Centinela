@@ -125,8 +125,8 @@ def test_a_condition_reaches_back_from_a_date_by_months():
 
 def test_the_last_and_the_previous_value_follow_an_event_date():
     query = text("variacion_costo_pct")
-    assert '(array_agg("costos_proveedor"."costo_unitario" ORDER BY "costos_proveedor"."fecha_vigencia" DESC))[1]' in query
-    assert '(array_agg("costos_proveedor"."costo_unitario" ORDER BY "costos_proveedor"."fecha_vigencia" DESC))[2]' in query
+    assert '(array_agg("costos_proveedor"."costo_unitario" ORDER BY "costos_proveedor"."fecha_vigencia" DESC NULLS LAST))[1]' in query
+    assert '(array_agg("costos_proveedor"."costo_unitario" ORDER BY "costos_proveedor"."fecha_vigencia" DESC NULLS LAST))[2]' in query
 
 
 def test_a_taken_kpi_joins_on_its_whole_entity_and_reads_the_same_day():

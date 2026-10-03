@@ -1,6 +1,8 @@
 # The generator of data/sql/05_kpis.generated.sql: the committed file is exactly what it writes from
 # the tree, so a hand edit fails here; the roles, the column grants and a function are written as
-# the kernel's page says; and a KPI over the planner's cap is refused by the guard costo.
+# the kernel's page says; and a KPI over the planner's cap is refused by the guard costo. Against the
+# scratch database, the file applies over a k_ function whose columns changed, inside a rolled-back
+# transaction.
 import pytest
 
 from centinela_tools.generate import render, view_names
@@ -8,7 +10,7 @@ from centinela_tools.paths import GENERATED, METRICAS, SQL_DIR
 from centinela_tools.refusal import Refused
 from centinela_tools.settings import Settings
 from centinela_tools.sources import load_sources
-from centinela_tools.tools import load_entries
+from centinela_tools.tools import catalogue_of, load_entries
 
 from support import fixture_entries
 
@@ -59,3 +61,15 @@ def test_a_kpi_over_the_cost_cap_is_refused():
 def test_the_settings_read_the_environment():
     settings = Settings.from_env({"CENTINELA_KERNEL_COSTO_MAX": "10", "CENTINELA_KERNEL_TIMEOUT_MS": "20", "CENTINELA_KERNEL_GRUPOS_MAX": "30", "CENTINELA_KERNEL_MUESTRA": "4"})
     assert settings == Settings(10.0, 20, 30, 4)
+
+
+@pytest.mark.db
+def test_the_file_replaces_a_function_whose_columns_changed(superuser):
+    entries = load_entries(METRICAS)
+    with superuser.transaction(force_rollback=True):
+        superuser.execute("DROP FUNCTION centinela.k_saldo_vencido(date)")
+        superuser.execute("CREATE FUNCTION centinela.k_saldo_vencido(dia date) RETURNS TABLE (otra integer) LANGUAGE sql AS 'SELECT 1'")
+        superuser.execute(render(SOURCES, entries, view_names(SQL_DIR), any_cost, Settings()))
+        cursor = superuser.execute("SELECT * FROM centinela.k_saldo_vencido('2026-03-02') LIMIT 0")
+        returned = [column.name for column in cursor.description]
+    assert returned == [name for name, _ in catalogue_of(entries, SOURCES).kpis["saldo_vencido"].columns]

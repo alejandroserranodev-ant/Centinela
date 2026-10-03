@@ -2,7 +2,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from psycopg import sql
 
@@ -10,7 +10,7 @@ from .language import check_block
 from .refusal import Refused
 from .sources import Join, Source, Sources, Table
 
-COMPILER_VERSION = "2"
+COMPILER_VERSION = "3"
 NAME = re.compile(r"^[a-z][a-z0-9_]{0,60}$")
 NUMERIC = frozenset({"integer", "bigint", "numeric"})
 RESERVED = frozenset({"dia", "periodo", "valor"})
@@ -45,8 +45,8 @@ AGGREGATE = {
     "min": sql.SQL("min({})"),
     "max": sql.SQL("max({})"),
     "count": sql.SQL("count({})"),
-    "ultimo": sql.SQL("array_agg({} ORDER BY {} DESC)"),
-    "anterior": sql.SQL("array_agg({} ORDER BY {} DESC)"),
+    "ultimo": sql.SQL("array_agg({} ORDER BY {} DESC NULLS LAST)"),
+    "anterior": sql.SQL("array_agg({} ORDER BY {} DESC NULLS LAST)"),
 }
 FILTERED = sql.SQL("{} FILTER (WHERE {})")
 PICK = {"ultimo": sql.SQL("({})[1]"), "anterior": sql.SQL("({})[2]")}
@@ -604,14 +604,6 @@ def finish(block: Mapping[str, Any], core: Compiled, day: sql.Composable, thresh
     for name in places:
         if name in core.entity or name not in available or available[name][1] not in NUMERIC:
             raise Refused("lenguaje", f"decimales: {name} is no numeric output column of this KPI")
-    selected = []
-    for name, kind in columns:
-        expr = available[name][0]
-        if name in places:
-            expr, kind = ROUND.format(expr, sql.Literal(places[name])), "numeric"
-        selected.append(sql.SQL("{}::{} AS {}").format(expr, TYPES[kind], sql.Identifier(name)))
-    columns = [(name, "numeric" if name in places else kind) for name, kind in columns]
-    query = sql.SQL("SELECT {} FROM ({}) AS nucleo").format(sql.SQL(", ").join(selected), core.query)
     kinds = dict(columns)
     having = []
     for spec in block.get("tener", []):
@@ -619,8 +611,24 @@ def finish(block: Mapping[str, Any], core: Compiled, day: sql.Composable, thresh
             raise Refused("lenguaje", f"tener: {spec['columna']} is no numeric output column of this KPI")
         having.append(COMPARE[spec["op"]].format(sql.Identifier("kpi", spec["columna"]), sql.Literal(spec["valor"])))
     if having:
-        query = sql.SQL("SELECT * FROM ({}) AS kpi WHERE {}").format(query, sql.SQL(" AND ").join(having))
+        unrounded = sql.SQL("SELECT {} FROM ({}) AS nucleo").format(output(columns, {}, lambda name: available[name][0]), core.query)
+        query = sql.SQL("SELECT {} FROM ({}) AS kpi WHERE {}").format(
+            output(columns, places, lambda name: sql.Identifier("kpi", name)), unrounded, sql.SQL(" AND ").join(having)
+        )
+    else:
+        query = sql.SQL("SELECT {} FROM ({}) AS nucleo").format(output(columns, places, lambda name: available[name][0]), core.query)
+    columns = [(name, "numeric" if name in places else kind) for name, kind in columns]
     return Compiled(query, tuple(columns), core.entity)
+
+
+def output(columns: list[tuple[str, str]], places: Mapping[str, int], read: Callable[[str], sql.Composable]) -> sql.Composable:
+    selected = []
+    for name, kind in columns:
+        expr = read(name)
+        if name in places:
+            expr, kind = ROUND.format(expr, sql.Literal(places[name])), "numeric"
+        selected.append(sql.SQL("{}::{} AS {}").format(expr, TYPES[kind], sql.Identifier(name)))
+    return sql.SQL(", ").join(selected)
 
 
 def function_definition(metric: str, block: Mapping[str, Any], sources: Sources, thresholds: Mapping[str, Any] | None = None) -> sql.Composable:

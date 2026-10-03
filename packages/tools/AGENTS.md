@@ -136,12 +136,30 @@ Every refusal names its guard, from `centinela_tools/refusal.py:GUARDS`:
 | `hash` | an approved KPI whose stored SQL changed | on every call | |
 | `catalogo` | an id in no catalogue | on every call | |
 
-**The cost cap is a measurement.** The planner's total cost on the official dataset is 25632.92 for
-`v_cartera_cliente`, 5258.55 for `v_cobertura_inventario` and 2966.31 for `v_actividad_cliente`, and
-79009.95 for a weekly baseline over eight weeks. Ten times `v_cartera_cliente`'s is about 256000;
-the default of 1000000 leaves room for a baseline KPI. The base KPIs of `data/metricas.yaml` cost
-at most 339131 on the official dataset, `dias_pago_prom`'s. The rows a dry run returns are capped
-by `CENTINELA_KERNEL_MUESTRA`, 20. The settings are sized to the machine, as Ollama's model is. Every
+**The cost cap is a measurement.** This command, run from this directory against a database loaded
+with the official dataset, prints the planner's total cost on `fecha_corte()` of three of the kit's
+views and of every base KPI of `data/metricas.yaml`:
+
+```bash
+CENTINELA_DSN=postgresql://centinela:centinela@localhost:55432/centinela uv run python -c '
+import os
+from psycopg import sql
+from centinela_tools.compiler import compile_kpi
+from centinela_tools.generate import database_cost
+from centinela_tools.paths import METRICAS
+from centinela_tools.sources import load_sources
+from centinela_tools.tools import load_entries
+cost = database_cost(os.environ["CENTINELA_DSN"])
+for view in ("v_cartera_cliente", "v_cobertura_inventario", "v_actividad_cliente"):
+    print(view, round(cost(sql.SQL("SELECT * FROM {}").format(sql.Identifier("centinela", view)))))
+for metric, entry in load_entries(METRICAS).items():
+    print(metric, round(cost(compile_kpi(entry["kernel"], load_sources(), thresholds=entry.get("umbrales")).query)))
+'
+```
+
+The default of 1000000 is well over ten times `v_cartera_cliente`'s, the costliest of the three
+views, and leaves room above the costliest base KPI, a baseline. The rows a dry run returns are
+capped by `CENTINELA_KERNEL_MUESTRA`, 20. The settings are sized to the machine, as Ollama's model is. Every
 run is a transaction opened `READ ONLY` with its `statement_timeout`,
 `centinela_tools/tools.py:guarded(conn, settings)`, inside the roles of
 [`../../data/AGENTS.md`](../../data/AGENTS.md).
