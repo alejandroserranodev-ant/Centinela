@@ -63,7 +63,7 @@ docker run -d --rm --name centinela-kernel-test -p 55432:5432 \
   -v "$PWD/../../data/sql/02_carga.sql:/docker-entrypoint-initdb.d/02_carga.sql:ro" \
   -v "$PWD/../../data/sql/03_capa_semantica.sql:/docker-entrypoint-initdb.d/03_capa_semantica.sql:ro" \
   -v "$PWD/../../data/sql/04_vistas_causa.sql:/docker-entrypoint-initdb.d/04_vistas_causa.sql:ro" \
-  -v "$PWD/../../data/csv:/csv:ro" postgres:16-alpine
+  -v "$PWD/../../data/csv:/csv:ro" pgvector/pgvector:pg16
 export CENTINELA_TEST_DSN=postgresql://centinela:centinela@localhost:55432/centinela
 ```
 

@@ -27,7 +27,7 @@ the kit delivers the dataset free to use for the challenge.
 | `kernel/lenguaje.schema.json` | the kernel's language as a JSON Schema: the closed keys of a `kernel:` block with their bounds, and the fields of a KPI's card under `$defs/ficha` |
 | `kernel/fuentes.yaml` | what the kernel may read: each table's key, its readable columns with their type, the role of each date column, its `fuga` columns with the values known when a row is created, and the columns it excludes with the reason; and each source's joins, closings, dimensions and `fechada_por` |
 | `sql/05_kpis.generated.sql` | written by the kernel's generator ([`../GENERATED.md`](../GENERATED.md)): the roles `centinela_lector`, `centinela_kernel` and `centinela_propietario` with their grants, `fecha_corte()` made readable through the views, and one function `centinela.k_<metric>(dia date)` per metric with a `kernel:` block |
-| `docker-compose.yml` | a disposable PostgreSQL 16 on port 5432 that runs `sql/01_esquema.sql` to `sql/05_kpis.generated.sql` against `csv/` on its first start, keeping the database in the volume `pgdata`, and pgAdmin on port 5050 |
+| `docker-compose.yml` | a disposable PostgreSQL 16 with the pgvector extension available, which policy search needs, on port 5432; it runs `sql/01_esquema.sql` to `sql/05_kpis.generated.sql` against `csv/` on its first start, keeping the database in the volume `pgdata`, and pgAdmin on port 5050 |
 | `diccionario_de_datos.xlsx` | tables, fields, types and examples |
 | `policies/` | credit, discount and inventory policies in PDF, the corpus for policy search (RAG) |
 | `generator/generar_dataset.py` | produces a dataset with the same structure and scenarios on other entities |
