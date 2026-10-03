@@ -3,9 +3,15 @@ OpenAI LLM Provider: remote API via OpenAI client.
 
 Requires OPENAI_API_KEY environment variable.
 Supports gpt-4o-mini, gpt-4-turbo, and other OpenAI models with JSON schema.
+
+Setup:
+    1. Export API key: export OPENAI_API_KEY="sk-proj-..."
+    2. Or create .env file: OPENAI_API_KEY=sk-proj-...
+    3. Use python-dotenv to load: from dotenv import load_dotenv; load_dotenv()
 """
 
 import json
+import logging
 import os
 from typing import Any
 
@@ -18,6 +24,8 @@ from .llm_provider import (
     ModelConfig,
 )
 
+logger = logging.getLogger(__name__)
+
 try:
     from openai import OpenAI, APIError, APIConnectionError, APITimeoutError
 except ImportError:
@@ -29,12 +37,13 @@ except ImportError:
 class OpenAIProvider(LLMProvider):
     """Language model provider using OpenAI API."""
 
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: ModelConfig, skip_health_check: bool = False):
         """
         Initialize OpenAI provider.
 
         Args:
             config: ModelConfig with model name
+            skip_health_check: Skip API validation (for testing)
 
         Raises:
             ValueError: if OPENAI_API_KEY is not set or API is unreachable
@@ -44,22 +53,37 @@ class OpenAIProvider(LLMProvider):
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError(
-                "OPENAI_API_KEY environment variable not set. "
-                "Set it or use a different LLM_PROVIDER."
+                "OPENAI_API_KEY environment variable not set.\n"
+                "Set it with: export OPENAI_API_KEY='sk-proj-...'\n"
+                "Or create .env file and use: from dotenv import load_dotenv; load_dotenv()"
             )
 
+        # Validate API key format
+        if not api_key.startswith("sk-"):
+            logger.warning("API key does not start with 'sk-', may be invalid")
+
         self.client = OpenAI(api_key=api_key)
+        logger.info(f"OpenAI provider initialized with model: {config.model}")
 
-        if not self.health_check():
-            raise ValueError("OpenAI API is not reachable or API key is invalid")
+        if not skip_health_check and not self._health_check():
+            raise ValueError(
+                "OpenAI API health check failed.\n"
+                "Possible causes:\n"
+                "  - Invalid API key\n"
+                "  - API key revoked or expired\n"
+                "  - Network connectivity issue\n"
+                "  - Org/project not configured correctly"
+            )
 
-    def health_check(self) -> bool:
-        """Check that OpenAI API is reachable."""
+    def _health_check(self) -> bool:
+        """Check that OpenAI API is reachable and API key is valid."""
         try:
             # List models to verify API access
             self.client.models.list()
+            logger.debug("OpenAI API health check passed")
             return True
-        except (APIError, APIConnectionError, APITimeoutError):
+        except (APIError, APIConnectionError, APITimeoutError) as e:
+            logger.error(f"OpenAI API health check failed: {e}")
             return False
 
     def generate_text(self, request: LLMRequest) -> LLMResponse:
