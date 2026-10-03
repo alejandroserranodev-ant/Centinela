@@ -222,3 +222,4 @@ __marimo__/
 node_modules/
 apps/web/src/*.generated.css
 data/generator/csv/
+!docs/guide/.env

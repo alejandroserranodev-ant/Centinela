@@ -12,7 +12,8 @@ nothing written there, only what `publish.py` builds from this repository.
 | `chapters/` | the pages only this guide owns: the reading order, the journey of one alert, the decision tree and the KPI kernel as decided, and the status map |
 | `publish.py` | builds the zip from the manifest and imports it into Docmost as the space `centinela` |
 | `docker-compose.yml` | Docmost with its own Postgres and Redis |
-| `.env.example` | every setting the compose and `publish.py` read; `.env` holds the real secrets and git ignores it |
+| `.env.example` | every setting the compose and `publish.py` read; the template a fresh instance starts from |
+| `.env` | the settings of the team's instance, versioned on purpose so every member signs in to Docmost with the same admin credentials; the instance listens only on localhost and holds nothing but the published guide |
 
 ## Decisions
 
