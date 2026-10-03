@@ -36,129 +36,146 @@ class Esquema(BaseModel):
 
 
 class Figure(Esquema):
-    value: float
-    unit: FigureUnit
-    query_id: str
+    """Quantitative measurement with unit and traceability."""
+    value: float = Field(..., description="Numeric value", example=42000000)
+    unit: FigureUnit = Field(..., description="Unit of measurement (COP, percent, days, etc.)")
+    query_id: str = Field(..., description="Reference to SQL query that produced this figure")
 
 
 class Sentence(Esquema):
-    text: str
-    figures: list[Figure] = Field(default_factory=list)
+    """Natural language statement with optional supporting figures."""
+    text: str = Field(..., description="Human-readable statement")
+    figures: list[Figure] = Field(default_factory=list, description="Numeric evidence supporting the statement")
 
 
 class Confidence(Esquema):
-    level: ConfidenceLevel
-    assumptions: list[str] = Field(default_factory=list)
+    """Confidence assessment with assumptions."""
+    level: ConfidenceLevel = Field(..., description="Confidence level: high, medium, or low")
+    assumptions: list[str] = Field(default_factory=list, description="Assumptions underlying the confidence assessment")
 
 
 class SeriesPoint(Esquema):
-    date: str
-    value: float
+    """Single data point in a time series."""
+    date: str = Field(..., description="ISO 8601 date", example="2026-10-01")
+    value: float = Field(..., description="Value at this date")
 
 
 class Evidence(Esquema):
-    claim: Sentence
-    query_id: str
-    series: list[SeriesPoint] | None = None
+    """Supporting data for a claim: statement + historical series."""
+    claim: Sentence = Field(..., description="Statement with figures")
+    query_id: str = Field(..., description="SQL query ID that retrieved this evidence")
+    series: list[SeriesPoint] | None = Field(None, description="Historical series supporting the claim")
 
 
 class CauseIdentified(Esquema):
-    kind: Literal["identified"] = "identified"
-    sentence: Sentence
-    evidence: list[Evidence]
+    """Root cause found with evidence."""
+    kind: Literal["identified"] = Field("identified", description="Discriminator: cause was identified")
+    sentence: Sentence = Field(..., description="Root cause statement with figures")
+    evidence: list[Evidence] = Field(..., description="Supporting evidence", min_length=1)
 
 
 class CauseNoEvidence(Esquema):
-    kind: Literal["no_evidence"] = "no_evidence"
-    reason: str
-    queries_reviewed: list[str] = Field(default_factory=list)
+    """Root cause could not be identified with available data."""
+    kind: Literal["no_evidence"] = Field("no_evidence", description="Discriminator: cause could not be identified")
+    reason: str = Field(..., description="Explanation why cause could not be determined")
+    queries_reviewed: list[str] = Field(default_factory=list, description="Query IDs that were searched")
 
 
 Cause = Annotated[Union[CauseIdentified, CauseNoEvidence], Field(discriminator="kind")]
 
 
 class Impact(Esquema):
-    figure: Figure
-    period: Literal["month", "once"]
+    """Expected business impact of an action."""
+    figure: Figure = Field(..., description="Impact magnitude (pesos, percent, etc.)")
+    period: Literal["month", "once"] = Field(..., description="Recurrence: monthly or one-time")
 
 
 class Action(Esquema):
-    id: str
-    title: str
-    description: Sentence
-    type: ActionType
-    impact: Impact | None
-    confidence: Confidence
-    parameters: dict[str, str | float] = Field(default_factory=dict)
+    """Proposed mitigation action with impact and parameters."""
+    id: str = Field(..., description="Unique action ID", example="action_raise_price_3pct")
+    title: str = Field(..., description="Short action title")
+    description: Sentence = Field(..., description="Detailed action description with impact figures")
+    type: ActionType = Field(..., description="Type: email_draft, task, purchase_order_draft, or price_change_draft")
+    impact: Impact | None = Field(None, description="Expected business impact if executed")
+    confidence: Confidence = Field(..., description="Confidence in the action's effectiveness")
+    parameters: dict[str, str | float] = Field(default_factory=dict, description="Editable parameters (price, qty, etc.)")
 
 
 class ExecutedAction(Esquema):
-    action_id: str
-    result: str
+    """Result of executing an approved action."""
+    action_id: str = Field(..., description="ID of the executed action")
+    result: str = Field(..., description="Execution outcome: success, failed, or partial")
 
 
 class Alert(Esquema):
-    id: str
-    status: AlertStatus
-    severity: Severity
-    metric: Metric
-    title: Sentence
-    pesos_at_risk: Figure
-    recoverable_per_month: Figure | None
-    confidence: Confidence
-    simulated_date: str
-    cause: Cause
-    actions: list[Action] = Field(default_factory=list, min_length=0, max_length=3)
-    executed_action: ExecutedAction | None = None
+    """Complete alert lifecycle state."""
+    id: str = Field(..., description="Unique alert ID", example="alerta_abc123def456")
+    status: AlertStatus = Field(..., description="Current status in lifecycle: new → analyzing → proposed → approved/rejected → executed")
+    severity: Severity = Field(..., description="Alert severity: critical, high, medium, or low")
+    metric: Metric = Field(..., description="Metric that triggered this alert")
+    title: Sentence = Field(..., description="Alert title with initial impact figures")
+    pesos_at_risk: Figure = Field(..., description="Pesos at risk (COP)")
+    recoverable_per_month: Figure | None = Field(None, description="Potential monthly recovery if action taken")
+    confidence: Confidence = Field(..., description="Confidence in the alert detection")
+    simulated_date: str = Field(..., description="Simulated date when alert was created (ISO 8601)")
+    cause: Cause = Field(..., description="Root cause (identified with evidence or no_evidence)")
+    actions: list[Action] = Field(default_factory=list, min_length=0, max_length=3, description="Proposed mitigation actions")
+    executed_action: ExecutedAction | None = Field(None, description="Action executed (only when status=executed)")
 
 
 class AgentStep(Esquema):
-    alert_id: str | None
-    agent: Agent
-    status: Literal["running", "done"]
-    description: str
-    start: str
-    end: str | None = None
+    """Progress event during agent processing (for SSE streams)."""
+    alert_id: str | None = Field(None, description="Alert ID being processed")
+    agent: Agent = Field(..., description="Agent name")
+    status: Literal["running", "done"] = Field(..., description="Step status")
+    description: str = Field(..., description="Human-readable step description")
+    start: str = Field(..., description="UTC start time (ISO 8601)")
+    end: str | None = Field(None, description="UTC end time (ISO 8601), null if running")
 
 
 class ActorAgent(Esquema):
-    kind: Literal["agent"] = "agent"
-    agent: Agent
+    """Alert action performed by an agent."""
+    kind: Literal["agent"] = Field("agent", description="Discriminator: action by agent")
+    agent: Agent = Field(..., description="Agent name (vigia, analista, estratega, ejecutor)")
 
 
 class ActorPerson(Esquema):
-    kind: Literal["person"] = "person"
-    name: str
-    role: str
+    """Alert decision made by a human."""
+    kind: Literal["person"] = Field("person", description="Discriminator: action by person")
+    name: str = Field(..., description="Person name (percent-encoded)")
+    role: str = Field(..., description="Person role (gerente, lider_proceso)")
 
 
 Actor = Annotated[Union[ActorAgent, ActorPerson], Field(discriminator="kind")]
 
 
 class LogEvent(Esquema):
-    id: str
-    date: str
-    simulated_day: str
-    alert_id: str
-    type: LogEventType
-    actor: Actor
-    detail: str
-    query_id: str | None = None
+    """Audit log entry for alert lifecycle event."""
+    id: str = Field(..., description="Log entry ID")
+    date: str = Field(..., description="UTC timestamp of event (ISO 8601)")
+    simulated_day: str = Field(..., description="Simulated date when event occurred")
+    alert_id: str = Field(..., description="Alert ID")
+    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result")
+    actor: Actor = Field(..., description="Who/what performed the action (agent or person)")
+    detail: str = Field(..., description="Human-readable description or JSON cost data")
+    query_id: str | None = Field(None, description="SQL query ID if relevant to this event")
 
 
 class ChatMessage(Esquema):
-    id: str
-    role: Literal["user", "centinela"]
-    text: str
-    figures: list[Figure] = Field(default_factory=list)
-    alert_id: str | None = None
-    series: list[SeriesPoint] | None = None
-    enough_evidence: bool
-    date: str
+    """Chat response from Centinela (Analista)."""
+    id: str = Field(..., description="Message ID")
+    role: Literal["user", "centinela"] = Field(..., description="Message source: user question or centinela answer")
+    text: str = Field(..., description="Message text")
+    figures: list[Figure] = Field(default_factory=list, description="Numeric evidence in the message")
+    alert_id: str | None = Field(None, description="Related alert ID if any")
+    series: list[SeriesPoint] | None = Field(None, description="Historical series if relevant")
+    enough_evidence: bool = Field(..., description="Whether answer is based on sufficient evidence")
+    date: str = Field(..., description="Message timestamp (ISO 8601)")
 
 
 class ChatQuestion(Esquema):
-    question: str
+    """User question for Centinela (Analista)."""
+    question: str = Field(..., description="Natural language question about alert or metric")
 
 
 class SimulatedDay(Esquema):
@@ -167,19 +184,22 @@ class SimulatedDay(Esquema):
 
 
 class DecisionApprove(Esquema):
-    kind: Literal["approve"] = "approve"
-    action_id: str
+    """Human decision: approve and execute action."""
+    kind: Literal["approve"] = Field("approve", description="Discriminator: approve decision")
+    action_id: str = Field(..., description="ID of action to approve")
 
 
 class DecisionEdit(Esquema):
-    kind: Literal["edit"] = "edit"
-    action_id: str
-    parameters: dict[str, str | float]
+    """Human decision: approve with modified parameters."""
+    kind: Literal["edit"] = Field("edit", description="Discriminator: edit and approve decision")
+    action_id: str = Field(..., description="ID of action to modify and approve")
+    parameters: dict[str, str | float] = Field(..., description="Modified parameters (price, qty, etc.)")
 
 
 class DecisionReject(Esquema):
-    kind: Literal["reject"] = "reject"
-    reason: str
+    """Human decision: reject alert."""
+    kind: Literal["reject"] = Field("reject", description="Discriminator: reject decision")
+    reason: str = Field(..., description="Reason for rejection")
 
 
 Decision = Annotated[
@@ -188,45 +208,40 @@ Decision = Annotated[
 
 
 class AgentAlertInput(Esquema):
-    """Entrada de Vigía: una nueva alerta detectada."""
-
-    severity: Severity
-    metric: Metric
-    title: Sentence
-    pesos_at_risk: Figure
-    recoverable_per_month: Figure | None = None
-    confidence: Confidence
-    simulated_date: str
+    """Vigía input: new alert detected from metric anomaly."""
+    severity: Severity = Field(..., description="Alert severity (critical, high, medium, low)")
+    metric: Metric = Field(..., description="Metric that triggered alert")
+    title: Sentence = Field(..., description="Alert title with figures")
+    pesos_at_risk: Figure = Field(..., description="Pesos at risk (COP)")
+    recoverable_per_month: Figure | None = Field(None, description="Monthly recovery potential")
+    confidence: Confidence = Field(..., description="Confidence in the alert detection")
+    simulated_date: str = Field(..., description="Simulated date of detection (ISO 8601)")
 
 
 class AgentCauseInput(Esquema):
-    """Entrada de Analista: causa e evidencia de una alerta."""
-
-    cause: Cause
-    evidence: list[Evidence] = Field(default_factory=list)
+    """Analista input: root cause explanation with evidence."""
+    cause: Cause = Field(..., description="Root cause (identified or no_evidence)")
+    evidence: list[Evidence] = Field(default_factory=list, description="Additional evidence queries run by Analista")
 
 
 class AgentProposalInput(Esquema):
-    """Entrada de Estratega: acciones propuestas para una alerta."""
-
-    actions: list[Action] = Field(min_length=1, max_length=3)
+    """Estratega input: proposed mitigation actions."""
+    actions: list[Action] = Field(..., min_length=1, max_length=3, description="1-3 proposed actions with impact and parameters")
 
 
 class AgentExecutionInput(Esquema):
-    """Entrada de Ejecutor: resultado de ejecutar una acción."""
-
-    action_id: str
-    status: Literal["success", "failed", "partial"]
-    result: str
-    error: str | None = None
+    """Ejecutor input: result of executing an approved action."""
+    action_id: str = Field(..., description="ID of the action executed")
+    status: Literal["success", "failed", "partial"] = Field(..., description="Execution result")
+    result: str = Field(..., description="Human-readable result or error message")
+    error: str | None = Field(None, description="Detailed error if status != success")
 
 
 class CostoAgente(Esquema):
-    """Registro de costo: tokens, modelo, latencia por paso."""
-
-    agent: Agent
-    step: str
-    modelo: str
-    tokens_entrada: int
-    tokens_salida: int
-    latencia_ms: int
+    """Agent cost tracking: tokens, model, and latency."""
+    agent: Agent = Field(..., description="Agent that ran (vigia, analista, estratega, ejecutor)")
+    step: str = Field(..., description="Step name (e.g., search_policies, generate_actions)")
+    modelo: str = Field(..., description="Model used (e.g., claude-opus-5)")
+    tokens_entrada: int = Field(..., description="Input tokens consumed")
+    tokens_salida: int = Field(..., description="Output tokens generated")
+    latencia_ms: int = Field(..., description="Total latency in milliseconds")
