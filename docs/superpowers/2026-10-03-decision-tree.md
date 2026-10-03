@@ -1,6 +1,6 @@
 # Spec 2 of 6: the decision tree
 
-**Status:** pending its plan. **Depends on:** spec 1, `normative-foundations`, for the vocabulary
+**Status:** planned in `2026-10-03-decision-tree-plan.md`. **Depends on:** spec 1, `normative-foundations`, for the vocabulary
 (rule, node, `fundamento`, registry, leaf, gate, self-expansion, atomicity), the laws of level L0,
 and the scope: who may grow the tree and how far.
 
