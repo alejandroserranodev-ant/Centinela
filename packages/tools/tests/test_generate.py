@@ -16,11 +16,15 @@ SOURCES = load_sources()
 
 
 def no_database(query):
-    raise AssertionError("no entry of data/metricas.yaml carries kernel:, so no cost is estimated")
+    raise AssertionError("an empty metricas.yaml estimates no cost")
+
+
+def any_cost(query):
+    return 0.0
 
 
 def test_the_committed_file_is_what_the_generator_writes():
-    assert GENERATED.read_text() == render(SOURCES, load_entries(METRICAS), view_names(SQL_DIR), no_database, Settings())
+    assert GENERATED.read_text() == render(SOURCES, load_entries(METRICAS), view_names(SQL_DIR), any_cost, Settings())
 
 
 def test_the_view_names_come_from_both_view_files():
@@ -38,12 +42,12 @@ def test_the_file_opens_with_its_banner_and_grants_column_by_column():
     assert "ALTER ROLE centinela_kernel SET default_transaction_read_only = on;" in text
     assert 'GRANT SELECT ON "centinela"."v_ventas" TO centinela_lector;' in text
     assert "ALTER FUNCTION centinela.fecha_corte() SECURITY DEFINER" in text
-    assert "CREATE OR REPLACE FUNCTION" not in text
+    assert "CREATE FUNCTION" not in text
 
 
 def test_a_fixture_kpi_becomes_a_function():
     text = render(SOURCES, fixture_entries(), view_names(SQL_DIR), lambda query: 1.0, Settings())
-    assert text.count("CREATE OR REPLACE FUNCTION") == 3
+    assert text.count("CREATE FUNCTION") == 3
 
 
 def test_a_kpi_over_the_cost_cap_is_refused():

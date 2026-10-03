@@ -42,11 +42,13 @@ def test_every_join_follows_a_foreign_key_or_reaches_a_ref_tables_key():
                 assert SCHEMA[origin].references.get(local) == join.table or join.table.startswith("ref_"), f"{source.name}.{join.name}"
 
 
-def test_every_closing_reads_a_child_that_references_its_source():
+def test_every_closing_reads_a_child_that_references_its_source_or_the_table_that_dates_it():
     for source in SOURCES.sources.values():
+        dating = source.joins[source.dated_by].table if source.dated_by else None
         for closing in source.closings.values():
-            for child_column in closing.on:
-                assert SCHEMA[closing.table].references.get(child_column) == source.name, f"{source.name}.{closing.name}"
+            for child_column, parent_column in closing.on.items():
+                target = SCHEMA[closing.table].references.get(child_column)
+                assert target == source.name or (target == dating and SCHEMA[source.name].references.get(parent_column) == dating), f"{source.name}.{closing.name}"
 
 
 def test_a_persons_name_is_excluded_and_the_two_states_are_fuga():

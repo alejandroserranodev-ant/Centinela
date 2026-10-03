@@ -1,5 +1,5 @@
 # Centinela · definición única de las métricas (capa semántica)
-# Los agentes consultan estas métricas a través de las vistas SQL; nunca recalculan con el modelo de lenguaje.
+# Vigía lee estas métricas a través del kernel, centinela.k_<métrica>(dia), y el Analista además a través de las vistas SQL; nunca se recalculan con el modelo de lenguaje.
 moneda: COP
 fecha_corte: "máximo de inventario_diario.fecha (o el día del reloj simulado)"
 metricas:
@@ -12,6 +12,45 @@ metricas:
     umbrales: { caida_pts: 3, margen_pct: { columna: margen_minimo_pct } }
     fuente_umbral: "kit; margen mínimo en OPE-POL-007 §4 (vista v_margen_minimo_linea)"
     pesos_en_riesgo: "(max(promedio 8 semanas previas, margen_minimo_pct) - margen_pct) / 100 * ventas de la semana"
+    unidad: "%"
+    rango: { min: null, max: 100 }
+    tendencia: mayor_es_mejor
+    temporalidad: semanal
+    audiencia: [supervision]
+    kernel:
+      fuente: pedidos_detalle
+      unir: [pedidos, productos, margen_minimo]
+      filtro:
+        - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+      agrupar: [productos.linea]
+      razon:
+        numerador:
+          agregado: sum
+          de: { op: "*", izq: { op: "-", izq: pedidos_detalle.valor_neto, der: { op: "*", izq: pedidos_detalle.cantidad, der: pedidos_detalle.costo_unitario } }, der: 100 }
+        denominador: { agregado: sum, de: pedidos_detalle.valor_neto }
+      linea_base: { columna: pedidos.fecha, periodo: semana, n: 8, salida: caida }
+      columnas:
+        ventas: { agregado: sum, de: pedidos_detalle.valor_neto }
+        margen_minimo_pct: { agregado: max, de: margen_minimo.margen_minimo_pct }
+        ventas_mes_prom: { agregado: max, de: trimestre.ventas_mes_prom }
+      tomar:
+        trimestre:
+          por: { linea: productos.linea }
+          kpi:
+            fuente: pedidos_detalle
+            unir: [pedidos, productos]
+            ventana: { columna: pedidos.fecha, dias: 90 }
+            filtro:
+              - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+            agrupar: [productos.linea]
+            medida: { agregado: sum, de: pedidos_detalle.valor_neto }
+            derivadas:
+              ventas_mes_prom: { op: "/", izq: ventas_90d, der: 3 }
+            salida: { valor: ventas_90d }
+      derivadas:
+        pesos_en_riesgo: { op: "*", izq: { op: "/", izq: { op: "-", izq: { mayor: [margen_pct_base, margen_minimo_pct] }, der: margen_pct }, der: 100 }, der: ventas }
+      decimales: { margen_pct: 2, margen_pct_base: 2, caida_pts: 2, ventas_mes_prom: 0, pesos_en_riesgo: 0 }
+      salida: { valor: margen_pct, base: margen_pct_base, delta: caida_pts }
   saldo_vencido:
     descripcion: Valor de facturas abiertas con fecha de vencimiento anterior al corte
     vista: v_cartera_cliente
@@ -20,6 +59,28 @@ metricas:
     fuente_umbral: "FIN-POL-004 §3 y §4"
     tramos: "FIN-POL-004 §4 por max_dias_vencido: tramo_1 de 1 a 15, tramo_2 de 16 a 30, tramo_3 de 31 a 60, tramo_4 más de 60"
     pesos_en_riesgo: "saldo_vencido"
+    unidad: COP
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [operacion, supervision, gerencia]
+    kernel:
+      fuente: facturas
+      unir: [clientes]
+      abierto_al_dia: { desde: facturas.fecha_factura, hasta: pagada }
+      agrupar: [facturas.cliente_id]
+      medida:
+        agregado: sum
+        de: facturas.valor_total
+        si:
+          - { columna: facturas.fecha_vencimiento, op: "<", contra: dia }
+      columnas:
+        saldo_abierto: { agregado: sum, de: facturas.valor_total }
+        max_dias_vencido: { agregado: max, de: { op: "-", izq: dia, der: facturas.fecha_vencimiento } }
+        cupo_credito: { agregado: max, de: clientes.cupo_credito }
+      derivadas:
+        pesos_en_riesgo: saldo_vencido
+      salida: { valor: saldo_vencido }
   concentracion_vencida_pct:
     descripcion: Participación del cliente en la cartera vencida total
     formula: saldo_vencido del cliente / sum(saldo_vencido) de todos los clientes
@@ -28,13 +89,56 @@ metricas:
     umbrales: { concentracion_vencida_pct: 10 }
     fuente_umbral: "FIN-POL-004 §5"
     pesos_en_riesgo: "saldo_vencido"
+    unidad: "%"
+    rango: { min: 0, max: 100 }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [operacion, supervision]
+    kernel:
+      fuente: facturas
+      abierto_al_dia: { desde: facturas.fecha_factura, hasta: pagada }
+      agrupar: [facturas.cliente_id]
+      medida:
+        agregado: sum
+        de: facturas.valor_total
+        si:
+          - { columna: facturas.fecha_vencimiento, op: "<", contra: dia }
+      derivadas:
+        concentracion_vencida_pct: { participacion: saldo_vencido }
+        pesos_en_riesgo: saldo_vencido
+      decimales: { concentracion_vencida_pct: 2 }
+      salida: { valor: saldo_vencido }
   dias_pago_prom:
-    descripcion: Días promedio entre factura y pago, por mes de factura
+    descripcion: Días promedio entre factura y pago, por mes de pago
     vista: v_dias_pago_mensual
     umbral_alerta: "aumento > 50% frente al promedio histórico del cliente"
     umbrales: { aumento_pct: 50 }
     fuente_umbral: "FIN-POL-004 §5"
     pesos_en_riesgo: "saldo_abierto del cliente en v_cartera_cliente"
+    unidad: días
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: mensual
+    audiencia: [operacion]
+    kernel:
+      fuente: pagos
+      unir: [facturas]
+      agrupar: [facturas.cliente_id]
+      medida: { agregado: avg, de: { op: "-", izq: pagos.fecha_pago, der: facturas.fecha_factura } }
+      linea_base: { columna: pagos.fecha_pago, periodo: mes, n: 12, salida: delta_pct }
+      columnas:
+        pesos_en_riesgo: { agregado: max, de: cartera.saldo_abierto }
+      tomar:
+        cartera:
+          por: { cliente_id: facturas.cliente_id }
+          kpi:
+            fuente: facturas
+            abierto_al_dia: { desde: facturas.fecha_factura, hasta: pagada }
+            agrupar: [facturas.cliente_id]
+            medida: { agregado: sum, de: facturas.valor_total }
+            salida: { valor: saldo_abierto }
+      decimales: { dias_pago_prom: 1, dias_pago_prom_base: 1 }
+      salida: { valor: dias_pago_prom, base: dias_pago_prom_base, delta: aumento_pct }
   cobertura_dias:
     descripcion: Existencia / demanda promedio diaria de los últimos 30 días
     vista: v_cobertura_inventario
@@ -42,6 +146,47 @@ metricas:
     umbrales: { cobertura_dias: { por: clase_abc, valores: { A: 10, B: 7 } } }
     fuente_umbral: "OPE-POL-007 §2; clase B < 7 días; clase C sin acción automática, no alerta"
     pesos_en_riesgo: "demanda_prom_30d * (cobertura mínima de la clase - cobertura_dias) * precio_lista vigente en v_precio_sku"
+    unidad: días
+    rango: { min: 0, max: null }
+    tendencia: mayor_es_mejor
+    temporalidad: diaria
+    audiencia: [operacion]
+    kernel:
+      fuente: inventario_diario
+      unir: [productos]
+      ventana: { columna: inventario_diario.fecha, dias: 30 }
+      agrupar: [inventario_diario.sku, inventario_diario.bodega_id]
+      medida: { agregado: avg, de: inventario_diario.salidas }
+      columnas:
+        existencia: { agregado: ultimo, de: inventario_diario.existencia_final, por: inventario_diario.fecha }
+        clase_abc: { agregado: max, de: productos.clase_abc }
+        precio_lista: { agregado: max, de: precio.precio_lista }
+        pedidos_por_despachar: { agregado: max, de: pendientes.pedidos }
+      tomar:
+        precio:
+          por: { sku: inventario_diario.sku }
+          kpi:
+            fuente: lista_precios
+            agrupar: [lista_precios.sku]
+            medida: { agregado: ultimo, de: lista_precios.precio_lista, por: lista_precios.fecha_vigencia }
+            salida: { valor: precio_lista }
+        pendientes:
+          por: { sku: inventario_diario.sku }
+          kpi:
+            fuente: pedidos_detalle
+            unir: [pedidos]
+            abierto_al_dia: { desde: pedidos.fecha, hasta: facturada }
+            filtro:
+              - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+            agrupar: [pedidos_detalle.sku]
+            medida: { agregado: count }
+            salida: { valor: pedidos }
+      derivadas:
+        cobertura_dias: { op: "/", izq: existencia, der: demanda_prom_30d }
+        pedidos_pendientes: { mayor: [pedidos_por_despachar, 0] }
+        pesos_en_riesgo: { op: "*", izq: { op: "*", izq: demanda_prom_30d, der: { op: "-", izq: { umbral: cobertura_dias }, der: cobertura_dias } }, der: precio_lista }
+      decimales: { demanda_prom_30d: 1, cobertura_dias: 1, pesos_en_riesgo: 0 }
+      salida: { valor: demanda_prom_30d }
   variacion_costo_pct:
     descripcion: Variación del costo unitario de un SKU frente a su costo anterior
     vista: v_costo_sku
@@ -49,6 +194,72 @@ metricas:
     umbrales: { variacion_pct: 5, dias_habiles_sin_traslado: 10 }
     fuente_umbral: "OPE-POL-007 §4"
     pesos_en_riesgo: "(costo_unitario - costo_anterior) * unidades vendidas del SKU desde fecha_vigencia en v_ventas"
+    unidad: "%"
+    rango: { min: null, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [supervision]
+    kernel:
+      fuente: costos_proveedor
+      agrupar: [costos_proveedor.sku]
+      medida: { agregado: ultimo, de: costos_proveedor.costo_unitario, por: costos_proveedor.fecha_vigencia }
+      columnas:
+        costo_anterior: { agregado: anterior, de: costos_proveedor.costo_unitario, por: costos_proveedor.fecha_vigencia }
+        fecha_vigencia: { agregado: max, de: costos_proveedor.fecha_vigencia }
+        ultimo_cambio_precio: { agregado: max, de: precio.ultimo_cambio_precio }
+        precio_lista: { agregado: max, de: precio.precio_lista }
+        unidades_desde_vigencia: { agregado: max, de: ventas.unidades_desde_vigencia }
+        unidades_mes_prom: { agregado: max, de: ventas.unidades_mes_prom }
+      tomar:
+        precio:
+          por: { sku: costos_proveedor.sku }
+          kpi:
+            fuente: lista_precios
+            agrupar: [lista_precios.sku]
+            medida: { agregado: max, de: lista_precios.fecha_vigencia }
+            columnas:
+              precio_lista: { agregado: ultimo, de: lista_precios.precio_lista, por: lista_precios.fecha_vigencia }
+            salida: { valor: ultimo_cambio_precio }
+        ventas:
+          por: { sku: costos_proveedor.sku }
+          kpi:
+            fuente: pedidos_detalle
+            unir: [pedidos]
+            filtro:
+              - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+            agrupar: [pedidos_detalle.sku]
+            medida:
+              agregado: sum
+              de: pedidos_detalle.cantidad
+              si:
+                - { columna: pedidos.fecha, op: ">=", contra: vigencia.fecha_vigencia }
+            columnas:
+              unidades_90d:
+                agregado: sum
+                de: pedidos_detalle.cantidad
+                si:
+                  - { columna: pedidos.fecha, op: ">", contra: dia, menos_dias: 90 }
+            tomar:
+              vigencia:
+                por: { sku: pedidos_detalle.sku }
+                kpi:
+                  fuente: costos_proveedor
+                  agrupar: [costos_proveedor.sku]
+                  medida: { agregado: max, de: costos_proveedor.fecha_vigencia }
+                  salida: { valor: fecha_vigencia }
+            derivadas:
+              unidades_mes_prom: { op: "/", izq: unidades_90d, der: 3 }
+            salida: { valor: unidades_desde_vigencia }
+      derivadas:
+        variacion_pct: { op: "*", izq: { op: "-", izq: { op: "/", izq: costo_unitario, der: costo_anterior }, der: 1 }, der: 100 }
+        dias_habiles_sin_traslado:
+          si:
+            cuando: { compara: { izq: ultimo_cambio_precio, op: ">=", der: fecha_vigencia } }
+            entonces: 0
+            sino: { dias_habiles: { desde: fecha_vigencia, hasta: dia } }
+        pesos_en_riesgo: { op: "*", izq: { op: "-", izq: costo_unitario, der: costo_anterior }, der: unidades_desde_vigencia }
+      decimales: { variacion_pct: 2, unidades_mes_prom: 1, pesos_en_riesgo: 0 }
+      salida: { valor: costo_unitario }
   dias_retraso:
     descripcion: Días entre la fecha esperada de una orden de compra y su recepción o el corte
     vista: v_ordenes_compra
@@ -56,6 +267,26 @@ metricas:
     umbrales: { dias_retraso: 0, recibida: false }
     fuente_umbral: "OPE-POL-007 §3"
     pesos_en_riesgo: "cantidad * costo_unitario de la orden"
+    unidad: días
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [operacion]
+    kernel:
+      fuente: ordenes_compra
+      agrupar: [ordenes_compra.oc_id]
+      medida: { agregado: max, de: ordenes_compra.fecha_recibida }
+      columnas:
+        fecha_esperada: { agregado: max, de: ordenes_compra.fecha_esperada }
+        pesos_en_riesgo: { agregado: sum, de: { op: "*", izq: ordenes_compra.cantidad, der: ordenes_compra.costo_unitario } }
+      derivadas:
+        recibida: { existe: fecha_recibida }
+        dias_retraso:
+          si:
+            cuando: { existe: fecha_recibida }
+            entonces: { mayor: [{ op: "-", izq: fecha_recibida, der: fecha_esperada }, 0] }
+            sino: { mayor: [{ op: "-", izq: dia, der: fecha_esperada }, 0] }
+      salida: { valor: fecha_recibida }
   descuento_en_exceso:
     descripcion: Descuento otorgado por encima del tope del segmento sin aprobación especial
     vista: v_descuentos_fuera_politica
@@ -63,6 +294,27 @@ metricas:
     umbrales: { descuento_en_exceso: 0 }
     fuente_umbral: "COM-POL-002 §2 y §3; dos semanas consecutivas del mismo vendedor escala según §5"
     pesos_en_riesgo: "sum(descuento_en_exceso)"
+    unidad: COP
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: semanal
+    audiencia: [supervision, gerencia]
+    kernel:
+      fuente: pedidos_detalle
+      unir: [pedidos, clientes, topes]
+      filtro:
+        - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+        - { columna: pedidos_detalle.aprobacion_especial, op: "=", valor: "N" }
+        - { columna: pedidos_detalle.descuento_pct, op: ">", contra: topes.tope_descuento_pct }
+      agrupar: [pedidos.vendedor_id, { columna: pedidos.fecha, por: semana }]
+      medida:
+        agregado: sum
+        de: { op: "/", izq: { op: "*", izq: { op: "*", izq: pedidos_detalle.cantidad, der: pedidos_detalle.precio_unitario }, der: { op: "-", izq: pedidos_detalle.descuento_pct, der: topes.tope_descuento_pct } }, der: 100 }
+      derivadas:
+        exceso_semana_anterior: { periodo_anterior: descuento_en_exceso }
+        pesos_en_riesgo: descuento_en_exceso
+      decimales: { descuento_en_exceso: 0, exceso_semana_anterior: 0, pesos_en_riesgo: 0 }
+      salida: { valor: descuento_en_exceso }
   margen_bruto_negativo:
     descripcion: Líneas de pedido vendidas por debajo del costo
     vista: v_ventas
@@ -70,6 +322,26 @@ metricas:
     umbrales: { margen_bruto: 0 }
     fuente_umbral: "COM-POL-002 §4; los datos no registran la aprobación escrita de Gerencia General"
     pesos_en_riesgo: "-sum(margen_bruto)"
+    unidad: COP
+    rango: { min: null, max: 0 }
+    tendencia: mayor_es_mejor
+    temporalidad: diaria
+    audiencia: [gerencia]
+    kernel:
+      fuente: pedidos_detalle
+      unir: [pedidos]
+      filtro:
+        - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+      agrupar: [pedidos_detalle.pedido_id, pedidos_detalle.linea_n]
+      medida: { agregado: sum, de: { op: "-", izq: pedidos_detalle.valor_neto, der: { op: "*", izq: pedidos_detalle.cantidad, der: pedidos_detalle.costo_unitario } } }
+      columnas:
+        sku: { agregado: max, de: pedidos_detalle.sku }
+        fecha: { agregado: max, de: pedidos.fecha }
+      derivadas:
+        pesos_en_riesgo: { op: "-", izq: 0, der: margen_bruto }
+      tener:
+        - { columna: margen_bruto, op: "<", valor: 0 }
+      salida: { valor: margen_bruto }
   veces_intervalo_habitual:
     descripcion: Días sin comprar / intervalo habitual entre pedidos del cliente
     vista: v_actividad_cliente
@@ -77,3 +349,51 @@ metricas:
     umbrales: { pedidos: 10, veces_intervalo_habitual: 3 }
     fuente_umbral: "kit"
     pesos_en_riesgo: "valor_neto promedio por mes del cliente en v_ventas, últimos 6 meses hasta ultima_compra"
+    unidad: veces
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [operacion]
+    kernel:
+      fuente: pedidos
+      filtro:
+        - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+      agrupar: [pedidos.cliente_id]
+      medida: { agregado: count }
+      columnas:
+        ultima_compra: { agregado: max, de: pedidos.fecha }
+        primera_compra: { agregado: min, de: pedidos.fecha }
+        pesos_en_riesgo: { agregado: max, de: compras.valor_mes_prom }
+      tomar:
+        compras:
+          por: { cliente_id: pedidos.cliente_id }
+          kpi:
+            fuente: pedidos_detalle
+            unir: [pedidos]
+            filtro:
+              - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+            agrupar: [pedidos.cliente_id]
+            medida:
+              agregado: sum
+              de: pedidos_detalle.valor_neto
+              si:
+                - { columna: pedidos.fecha, op: ">", contra: ultima.ultima_compra, menos_meses: 6 }
+            tomar:
+              ultima:
+                por: { cliente_id: pedidos.cliente_id }
+                kpi:
+                  fuente: pedidos
+                  filtro:
+                    - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+                  agrupar: [pedidos.cliente_id]
+                  medida: { agregado: max, de: pedidos.fecha }
+                  salida: { valor: ultima_compra }
+            derivadas:
+              valor_mes_prom: { op: "/", izq: valor_6m, der: 6 }
+            salida: { valor: valor_6m }
+      derivadas:
+        intervalo_prom_dias: { op: "/", izq: { op: "-", izq: ultima_compra, der: primera_compra }, der: { op: "-", izq: pedidos, der: 1 } }
+        dias_sin_comprar: { op: "-", izq: dia, der: ultima_compra }
+        veces_intervalo_habitual: { op: "/", izq: dias_sin_comprar, der: intervalo_prom_dias }
+      decimales: { intervalo_prom_dias: 1, veces_intervalo_habitual: 1, pesos_en_riesgo: 0 }
+      salida: { valor: pedidos }

@@ -61,6 +61,8 @@ tablas:
 fuentes:
   pedidos_detalle:
     fechada_por: pedidos
+    cierres:
+      facturada: { tabla: facturas, por: { pedido_id: pedido_id }, fecha: fecha_factura }
     uniones:
       pedidos: { desde: pedidos_detalle, tabla: pedidos, por: { pedido_id: pedido_id } }
       productos: { desde: pedidos_detalle, tabla: productos, por: { sku: sku } }

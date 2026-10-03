@@ -158,7 +158,7 @@ def test_a_block_the_kernel_cannot_bound_is_refused_with_its_guard(block, guard,
 
 def test_a_function_reads_its_argument_and_belongs_to_the_owner_role():
     definition = function_definition("oc_abiertas", fixture_block("oc_abiertas"), SOURCES).as_string()
-    assert definition.startswith('CREATE OR REPLACE FUNCTION "centinela"."k_oc_abiertas"(dia date) RETURNS TABLE ("proveedor_id" text, "ordenes_abiertas" bigint)')
+    assert definition.startswith('DROP FUNCTION IF EXISTS "centinela"."k_oc_abiertas"(date);\nCREATE FUNCTION "centinela"."k_oc_abiertas"(dia date) RETURNS TABLE ("proveedor_id" text, "ordenes_abiertas" bigint)')
     assert "SECURITY DEFINER SET search_path = pg_catalog, pg_temp" in definition
     assert "CAST(dia AS date)" in definition and "%(dia)s" not in definition
     assert 'ALTER FUNCTION "centinela"."k_oc_abiertas"(date) OWNER TO centinela_propietario;' in definition
@@ -174,7 +174,7 @@ def test_a_metric_name_outside_the_pattern_is_refused():
 
 def test_freezing_keeps_the_text_its_hash_and_the_compiler_version():
     frozen = freeze(compile_kpi(fixture_block("oc_abiertas"), SOURCES))
-    assert "%(dia)s" in frozen.sql and frozen.hash == digest(frozen.sql) and frozen.compiler_version == "1"
+    assert "%(dia)s" in frozen.sql and frozen.hash == digest(frozen.sql) and frozen.compiler_version == "2"
 
 
 def calls(tree, attribute):
