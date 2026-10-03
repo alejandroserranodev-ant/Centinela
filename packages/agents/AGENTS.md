@@ -98,7 +98,8 @@ falls outside them, the answer says so.
 
 - **Input:** the alert, its `Cause`, and the rejection reasons kept for its metric. On
   `no_evidence`, or when the orchestrator marks `revision_manual`, it proposes one `task` for a
-  manual review and nothing else; that branch is code and calls no model.
+  manual review and nothing else; that branch is code and calls no model, and its `owner` is the
+  one `skills/estratega/acciones.md` names for the metric.
 - **Tools:** read-only SQL, policy search, and the impact calculator in `packages/tools`.
 - **Output:** one to three `Action`s with `impact` and `confidence`.
 - **Ceiling:** every action is a row of `skills/estratega/acciones.md` for the metric, and
@@ -111,7 +112,8 @@ falls outside them, the answer says so.
 ### `Ejecutor` acts after approval
 
 - **Input:** the approved or edited action, with the decision `apps/api` recorded.
-- **Tools:** only the action tools, each a draft or a sandbox effect.
+- **Tools:** none for its model. The node `ejecutar` calls the action tool in code, each a draft or
+  a sandbox effect, and the model is called only to write the body of an approved `email_draft`.
 - **Output:** an `ExecutedAction`.
 - **Ceiling: no discretion.** It passes the approved `parameters` unchanged, keyed by alert and
   action so a second run has no effect. The model writes only the body of an email, with the
@@ -129,8 +131,9 @@ except one step that classifies a rejection reason. How it routes is the next se
   first two, the rejection reasons `apps/api` keeps for the alert's metric.
 - **Tools: none.** Each step that might want one reads its input instead: the order reads
   `pesosAtRisk`, which `Vigía` computed in SQL; the check on `same_cause_as` reads the earlier
-  alerts `apps/api` hands in; the classifier reads the reason, the `Cause` sentence and the action
-  titles. No step needs a query, a policy or an action, so the graph gives it no tool.
+  alerts `apps/api` hands in; the classifier reads the reason, the `Cause` with its evidence, and
+  the actions with their impact and parameters, each placeholder replaced by its figure. No step
+  needs a query, a policy or an action, so the graph gives it no tool.
 - **Output:** the state of each alert's graph; an `AgentStep` when an agent's node starts and when
   it ends, with a Spanish `description`, never for its own steps, because `Agent` names the four
   agents only; and, to `apps/api`, the transitions it proposes, the log events, the target of a
@@ -160,10 +163,12 @@ is stored is `apps/api`'s. The checkpoint is working state, never the lifecycle 
 |---|---|---|---|
 | start | `titular` (`Vigía`, the title) | always | `nueva` |
 | `titular` | `analizar` (`Analista`) | always; if the title step fails, the title is the metric's `descripcion` in `metricas.yaml` followed by the entity | `en análisis` |
-| `analizar` | `unir` | `same_cause_as` names an earlier alert in `nueva`, `en análisis` or `propuesta` that is not this one | none |
-| `analizar` | `proponer` (`Estratega`) | otherwise; a `same_cause_as` that fails the check above is dropped and logged | none |
+| `analizar` | `unir` | `same_cause_as` names an earlier alert in `en análisis` or `propuesta` that is not this one | none |
+| `analizar` | `absorber` | `same_cause_as` names an alert of the day still in `nueva`, which the day run has not reached and which is therefore the smaller | none |
+| `analizar` | `proponer` (`Estratega`) | otherwise; a `same_cause_as` that fails both checks above is dropped and logged | none |
 | `analizar` | `revision_manual` | the step fails: the `Cause` is `no_evidence`, `reason` is the fallback for the failure, `queriesReviewed` the queries run so far | none |
 | `unir` | end | always: this alert takes `merged_into`, the target adds this id to `merged_alerts` | `unida` |
+| `absorber` | `proponer` | always: the named alert takes `merged_into` this alert, which adds it to `merged_alerts`; when the day run reaches it, it is `unida`, its graph does not run, and its title is the fallback of `titular` | `unida`, for the named alert |
 | `proponer` | `analizar` | the output is `insufficient_cause` and `analyst_returns` is 0: it becomes 1, and `Analista` receives the cause as `causa_insuficiente` | none; the alert is still `en análisis` |
 | `proponer` | `revision_manual` | the output is `insufficient_cause` and `analyst_returns` is 1, or the step fails | none |
 | `proponer` | `esperar_decision` | otherwise: one to three `Action`s whose `type` appears in the metric's rows of `skills/estratega/acciones.md` | `propuesta` |
@@ -260,9 +265,10 @@ transition comes from where, who validates it and why, is the lifecycle on
 **The alerts of one day run in series, by `pesosAtRisk` from the largest**, ties broken by severity
 from `critical` down, then by alert id. In series, because one model is loaded and parallel
 requests share its memory and compute, so running alerts side by side buys no speed on this
-machine. By pesos, because the largest exposure reaches the inbox first, and because a merge then
-keeps the alert analysed first, which is the larger. A chat question does not wait for the day run, only for the
-model call in course.
+machine. By pesos, because the largest exposure reaches the inbox first, and because a merge keeps
+the alert analysed first, which is the larger: `unir` joins this alert to one analysed before it,
+and `absorber` joins to this alert one the day run has not reached yet. A chat question does not
+wait for the day run, only for the model call in course.
 
 ### Cost and trace
 
@@ -312,7 +318,7 @@ The command lists the gaps, and prints nothing when every metric is covered:
 ```bash
 for m in $(grep -oP '^  \K[a-z_]+(?=:)' data/metricas.yaml); do
   [ -f packages/agents/skills/analista/$m.md ] || echo "analista: $m"
-  grep -q "^| \`$m\`" packages/agents/skills/estratega/acciones.md || echo "estratega: $m"
+  sed '/^## /q' packages/agents/skills/estratega/acciones.md | grep -q "^| \`$m\`" || echo "estratega: $m"
 done
 ```
 
@@ -326,8 +332,8 @@ in `packages/tools` before any agent sees it.
 
 - **The model never produces a number.** Every figure in an explanation or a proposal comes from a
   tool call, and the call travels with the figure as evidence. *No gate holds this.*
-- **An agent is given only the tools its section names.** The graph does not pass the action tools
-  to any agent but `Ejecutor`. *No gate holds this.*
+- **An agent is given only the tools its section names.** The graph passes the action tools to no
+  model: the node `ejecutar` calls them in code. *No gate holds this.*
 - **One cause, one alert**, ranked by pesos at risk.
 - **"Not enough evidence" is a complete answer.** An agent that cannot support a claim says so
   instead of guessing, and states its confidence and assumptions when it can.

@@ -19,7 +19,8 @@ computes, defined in `packages/tools/AGENTS.md`.
 | `saldo_vencido` | `saldo_abierto` > `cupo_credito` | `task` | `owner: Dirección Financiera`, `cliente_id` | none | `FIN-POL-004 §3` |
 | `concentracion_vencida_pct` | always | `task` | `owner: Jefe de cartera`, `cliente_id` | `cartera_vencida` | `FIN-POL-004 §5` |
 | `dias_pago_prom` | always | `email_draft` | `recipient: cliente_id`, `vendedor_id` | none | `FIN-POL-004 §5` |
-| `cobertura_dias` | the cause names an open order | `purchase_order_draft` | `oc_id`, `proveedor_id`, `sku`, `warehouse: bodega_id` (expedite) | `ventas_protegidas` | `OPE-POL-007 §2` |
+| `cobertura_dias` | the cause names an open order | `email_draft` | `recipient: proveedor_id`, `oc_id` (expedite) | none | `OPE-POL-007 §2` |
+| `cobertura_dias` | the cause names an open order | `task` | `owner: Compras`, `oc_id` (another supplier or an urgent partial delivery) | `ventas_protegidas` | `OPE-POL-007 §3` |
 | `cobertura_dias` | the cause names no open order | `purchase_order_draft` | `proveedor_id`, `sku`, `warehouse: bodega_id`, `units` | `ventas_protegidas` | `OPE-POL-007 §2` |
 | `cobertura_dias` | `clase_abc` is `B` | `task` | `owner: Compras`, `sku` (review reorder point) | none | `OPE-POL-007 §2` |
 | `dias_retraso` | always | `email_draft` | `recipient: proveedor_id`, `oc_id` | none | `OPE-POL-007 §3` |
@@ -31,3 +32,23 @@ computes, defined in `packages/tools/AGENTS.md`.
 
 `units` in a new order is `demanda_prom_30d` times the class minimum coverage minus `existencia`,
 computed by `calcular_impacto`, never chosen.
+
+## The owner of a manual review
+
+When the cause is `no_evidence` or the orchestrator marks `revision_manual`, the orchestrator
+proposes one `task` in code, `title` "Revisión manual de la alerta", `impact: null`, with the
+`owner` this table names for the metric. Each owner is the role the metric's policy charges with
+it, so the code chooses no one.
+
+| `metrica` | `owner` | Policy |
+|---|---|---|
+| `margen_pct` | `Comercial` | `OPE-POL-007 §4` |
+| `variacion_costo_pct` | `Comercial` | `OPE-POL-007 §4` |
+| `saldo_vencido` | `Analista de cartera` | `FIN-POL-004 §4` |
+| `concentracion_vencida_pct` | `Analista de cartera` | `FIN-POL-004 §4` |
+| `dias_pago_prom` | `Analista de cartera` | `FIN-POL-004 §4` |
+| `cobertura_dias` | `Compras` | `OPE-POL-007 §2` |
+| `dias_retraso` | `Compras` | `OPE-POL-007 §3` |
+| `descuento_en_exceso` | `Control Comercial` | `COM-POL-002 §5` |
+| `margen_bruto_negativo` | `Gerencia Comercial` | `COM-POL-002 §4` |
+| `veces_intervalo_habitual` | `vendedor_id` | none; the policies name no owner, as in the action row above |

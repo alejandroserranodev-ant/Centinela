@@ -84,7 +84,7 @@ Representative rows:
 
 | Today | In the tree |
 |---|---|
-| `analizar` → `unir` when `same_cause_as` names an open alert | node `explicar.misma_causa`, `lee: estado.same_cause_as`, `op: existe`, `fundamento: iso9001.10.2.1.b.3` |
+| `analizar` → `unir` or `absorber` when `same_cause_as` names an open alert | two nodes: `explicar.misma_causa` (`lee: estado.same_cause_as`, `op: existe`), then `explicar.destino_analizado` (`lee: estado.same_cause_as.status`, `op: en`, list `[en análisis, propuesta]`): `si` joins this alert to the named one, `no` joins the named one, still `nueva`, to this alert; both `fundamento: iso9001.10.2.1.b.3` |
 | `proponer` → `analizar` when `insufficient_cause` and `analyst_returns` is 0 | two nodes: `proponer.causa_insuficiente` (`existe`), then `proponer.retorno_disponible` (`analyst_returns` `=` 0); two predicates, so two nodes |
 | `esperar_decision` → `ejecutar` on `approve` or `edit` | gate `aprobar.decision`, `lee: estado.decision.kind`, `op: en`, list `[approve, edit]` |
 
@@ -160,7 +160,7 @@ L3 leaf whose skill is missing, is a refusal instead of a printed gap.
 | `packages/agents/AGENTS.md`, "The orchestrator's graph" | "Nodes and edges" is replaced by "The decision tree": where the base and the registry live, the node schema, the levels, the validator, `ejecutar.vigente`, and the sentence "The tree compiles to the LangGraph graph; an invalid base stops the start." The state, order, cost and failure subsections stay |
 | `packages/agents/AGENTS.md`, "Coverage" | the coverage command is replaced by the validator's test command |
 | `packages/agents/AGENTS.md`, "The universe" | a row: the goals of a customer or of the company (the diagram's "meta de $1.000 en 6 meses") — no table records them |
-| `packages/agents/skills/AGENTS.md` | the sentence "any other file is loaded only when the alert's metric names it" becomes "any other file is loaded only when the leaf the walk reaches names it" |
+| `packages/agents/skills/AGENTS.md` | the loading rule gains a third exception: a file named for a decision (`expandir.md`, `proponer_kpi.md`) is loaded only when the walk reaches that decision's leaf; a file named for a metric stays loaded only for an alert of that `metrica` or a chat question anchored to one, every other file stays always loaded, and of `estratega/acciones.md` only the rows of the alert's `metrica` |
 | `apps/api/AGENTS.md` | the decision check gains `request_changes` (a reason is required, and it is refused on an alert that already had one); the lifecycle gains no state, because `request_changes` keeps the alert in `propuesta` |
 | `apps/web/src/api/types.ts` (draft contract) | `Decision` gains `request_changes`; the alert detail shows "Solicitar cambios" beside approve, edit and reject |
 | `evals/AGENTS.md` | `ORQ-` cases: a tree with a missing `no` (refused at startup), a `request_changes` (one re-proposal, a second refused), an action type with no tool (one `task`), an approved action whose KPI no longer breaks on the day of execution (`fin.ya_no_aplica`, `Ejecutor` not called), a path to `Ejecutor` without `aprobar` (refused), the walkthrough above |

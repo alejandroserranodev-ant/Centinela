@@ -15,7 +15,7 @@ Write the body in Spanish, in this order and with nothing else:
 ## Rules
 
 1. Write each figure as a placeholder `{0}` that points to a `Figure` of the action's `description`.
-2. Write no digit in the body.
-3. Add the `vendedor_id` parameter as a copy when the action holds one. Otherwise, add no copy.
-4. Write no threat, no deadline and no consequence the action does not name.
-5. Write no sentence about the cause or about other customers.
+2. Write no figure outside a `Figure`: no amount, percentage, count of days or count of units. The
+   only digits allowed outside a `Figure` are in identifiers copied from `parameters`.
+3. Write no threat, no deadline and no consequence the action does not name.
+4. Write no sentence about the cause or about other customers.

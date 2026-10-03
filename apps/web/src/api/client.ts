@@ -14,6 +14,7 @@ import type {
   AgentStep,
   Alert,
   AlertFilter,
+  Cause,
   ChatEvent,
   ChatMessage,
   ChatQuestion,
@@ -348,20 +349,23 @@ function normalize(text: string): string {
 }
 
 function resolveAlert(fixture: AlertFixture): AlertFixture {
-  const cause: AlertFixture['cause'] =
-    fixture.cause.kind === 'identified'
-      ? {
-          ...fixture.cause,
-          sentence: resolveSentence(fixture.cause.sentence),
-          evidence: fixture.cause.evidence.map((e) => ({ ...e, claim: resolveSentence(e.claim) })),
-        }
-      : fixture.cause;
   return {
     ...fixture,
     title: resolveSentence(fixture.title),
-    cause,
+    cause: resolveCause(fixture.cause),
     actions: fixture.actions.map((a) => ({ ...a, description: resolveSentence(a.description) })) as Alert['actions'],
+    mergedAlerts: fixture.mergedAlerts?.map((m) => ({ ...m, title: resolveSentence(m.title), cause: resolveCause(m.cause) })),
   };
+}
+
+function resolveCause(cause: Cause): Cause {
+  return cause.kind === 'identified'
+    ? {
+        ...cause,
+        sentence: resolveSentence(cause.sentence),
+        evidence: cause.evidence.map((e) => ({ ...e, claim: resolveSentence(e.claim) })),
+      }
+    : cause;
 }
 
 function resolveSentence(sentence: Sentence): Sentence {

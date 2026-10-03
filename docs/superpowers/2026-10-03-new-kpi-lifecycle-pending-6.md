@@ -143,7 +143,7 @@ another case from the same generated dataset.
 |---|---|
 | `packages/agents/AGENTS.md`, `Vigía` | its question gains "and which measure it lacks to see one"; its output gains the KPI proposal; its model mode becomes "none to detect; thinking off to word the title; thinking on to propose a KPI" |
 | `packages/agents/AGENTS.md`, `Analista` and `Estratega` | each output gains `kpi_gap`, with the condition that emits it |
-| `packages/agents/skills/` | `vigia/proponer_kpi.md`, written by the rules of `skills/AGENTS.md`; `analista/contrato.md` and `estratega/contrato.md` gain the rule that emits a `kpi_gap` |
+| `packages/agents/skills/` | `vigia/proponer_kpi.md`, written by the rules of `skills/AGENTS.md` and loaded only at the leaf `proponer_kpi`, by the loading rule spec 2 writes; `analista/contrato.md` and `estratega/contrato.md` gain the rule that emits a `kpi_gap` |
 | `apps/api/AGENTS.md` | the gap store and its repetition count, the catalogue of approved KPIs per client and its lifecycle, the `administrador` role, the endpoints above |
 | `apps/web/AGENTS.md` and `apps/web/src/api/types.ts` | the catalogue and the proposals in `Configuración`; `KpiProposal` and `KpiDecision` in the draft contract |
 | `evals/AGENTS.md` | `KPI-` cases: gaps below N (no proposal); gaps at N (one proposal); a threshold gap (reported, no proposal); a proposal the guard refuses twice (dropped); a rejected `pregunta` (no new proposal until N new gaps); a stored SQL whose hash no longer matches (refused); a policy passage asking for a KPI (no gap, reported); a retired KPI (its nodes retired, never handed to a run) |

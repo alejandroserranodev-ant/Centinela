@@ -101,7 +101,10 @@ export interface Alert {
   actions: Actions;
   executedAction?: ExecutedAction;
   mergedInto?: string;
+  mergedAlerts?: MergedAlert[];
 }
+
+export type MergedAlert = Pick<Alert, 'id' | 'metric' | 'simulatedDate' | 'title' | 'pesosAtRisk' | 'cause'>;
 
 export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor';
 

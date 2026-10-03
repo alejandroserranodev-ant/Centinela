@@ -3,9 +3,11 @@
 A skill is a Markdown file the orchestrator puts in front of a model. Skills are grouped by agent,
 one directory each, and an agent is given only its own directory: `vigia/`, `analista/`,
 `estratega/`, `ejecutor/`, and `orquestador/` for the one step of the orchestrator that calls a
-model. Within it, `contrato.md` is always loaded; any other file is loaded only when the alert's
-metric names it. What each agent may and may not do is [`../AGENTS.md`](../AGENTS.md); a skill
-turns that page into orders and never widens it.
+model. Within it, every file is always loaded except two: a file named for a metric,
+`<metrica>.md`, is loaded only for an alert of that `metrica` or a chat question anchored to one,
+and of the table in `estratega/acciones.md` only the rows of the alert's `metrica` are loaded,
+because the token cost of each alert is recorded and judged. What each agent may and may not do
+is [`../AGENTS.md`](../AGENTS.md); a skill turns that page into orders and never widens it.
 
 ## Decisions
 

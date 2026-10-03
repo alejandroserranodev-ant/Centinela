@@ -22,14 +22,24 @@ minimal API section.
   | → `nueva` | the orchestrator, when `Vigía` detects |
   | `nueva` → `en análisis` | the orchestrator, when the title is written |
   | `en análisis` → `propuesta` | the orchestrator, when `Estratega` proposes |
-  | `en análisis` → `unida` | the orchestrator, when it merges the alert into another |
+  | `en análisis` → `unida` | the orchestrator, when it merges the alert into one analysed before it |
+  | `nueva` → `unida` | the orchestrator, when an alert of the same day, analysed first because its pesos at risk are larger, names this one as the same cause |
   | `propuesta` → `aprobada` or `rechazada` | the API, from a person's decision |
   | `aprobada` → `ejecutada` | the orchestrator, when `Ejecutor` returns its result |
 
 - **`unida` is a state the brief's lifecycle does not have.** An alert whose cause `Analista` finds
   already explains another alert ends there, pointing to the alert that remains, because the brief
   asks that one cause raise one alert and its lifecycle has no end for the second. `rechazada`
-  would claim a decision no person made. `unida` is final, and the alert leaves the inbox.
+  would claim a decision no person made, so `unida` is final and never counts as decided.
+- **A merge keeps one alert in view and loses nothing.** The API accepts a transition to `unida`
+  only while its target is in `nueva`, `en análisis` or `propuesta`, checked in the transaction
+  that records it, so every alert of one cause points to the one that remains and none points to a
+  merged alert. The inbox lists only the alert that remains, and its detail carries, beside its
+  own, the detection and evidence of each alert in its `merged_alerts`. Its pesos at risk stay its
+  own, because two detections of one cause would count the same pesos twice.
+- **One day run at a time.** A call to `/simulacion/avanzar` while a day run is in course is
+  refused with 409, because the second run would detect against earlier alerts the first has not
+  recorded yet, and one cause would raise two alerts.
 - **The API hands each run what the orchestrator cannot read**: the metric, entity, severity and
   state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps
   each reason with the target the orchestrator classified it to, the metric and the entity.

@@ -24,7 +24,7 @@ const FILTERS = [
   { value: 'all', label: 'Todas' },
 ];
 
-const DECIDED: Alert['status'][] = ['approved', 'rejected', 'executed', 'merged'];
+const DECIDED: Alert['status'][] = ['approved', 'rejected', 'executed'];
 
 function passesFilter(alert: Alert, filter: Filter): boolean {
   const decided = DECIDED.includes(alert.status);
@@ -93,7 +93,7 @@ export function Inbox() {
     );
   }
 
-  const visible = alerts?.filter((a) => passesFilter(a, filter)) ?? null;
+  const visible = alerts?.filter((a) => a.status !== 'merged' && passesFilter(a, filter)) ?? null;
 
   return (
     <div className="arena-band page arena-stack arena-stack--section">

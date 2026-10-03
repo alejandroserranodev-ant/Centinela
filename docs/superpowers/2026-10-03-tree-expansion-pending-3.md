@@ -88,7 +88,7 @@ it, so "how I got here" shows the path, not just the queries.
 | `packages/agents/AGENTS.md`, "The decision tree" (written by spec 2) | a subsection "How the tree grows": self-expansion, the three moves, the triggers per agent, the fixed criteria, the version record |
 | `packages/agents/AGENTS.md`, each agent in "What a leaf may use" | its output gains an expansion move, inside its stage |
 | `packages/agents/AGENTS.md`, "The state of an alert" | a row: `arbol_version`, written by the orchestrator, read by `apps/api` |
-| `packages/agents/skills/` | one `expandir.md` per agent directory, written by the rules of `skills/AGENTS.md` |
+| `packages/agents/skills/` | one `expandir.md` per agent directory, written by the rules of `skills/AGENTS.md`, and loaded only at the leaf `expandir`, by the loading rule spec 2 writes |
 | `apps/api/AGENTS.md` | the store of tree versions per client, handed to each run; the administrator's retirement of an expansion; the tree version on each alert event of the `bitácora` |
 | `apps/web/AGENTS.md` | `Configuración` lists the client's expansions, newest first, each with its evidence and a "Retirar" action |
 | `evals/AGENTS.md` | `ORQ-` cases: an expansion outside its agent's stage (refused); a `fundamento` absent from the registry (refused); a split leaf whose old branch still produces the earlier output; a move that bypasses `aprobar` (refused); evidence below N (no expansion); a retired expansion not drafted again before N; a change to an L1 node (refused) |

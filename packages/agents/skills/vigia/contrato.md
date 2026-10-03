@@ -15,7 +15,10 @@ A `Sentence`: `text` in Spanish, and `figures`, the list of `Figure`s the text c
 ## Rules
 
 1. Write one sentence in Spanish that states what happened to which entity.
-2. Write every number as a placeholder `{0}`, `{1}`, in the order of `figures`. Write no digit in `text`.
+2. Write every figure as a placeholder `{0}`, `{1}`, in the order of `figures`. Write no figure
+   outside a `Figure`: no amount, percentage, count of days or count of units. The only digits
+   allowed outside a `Figure` are in the entity's identifier, copied from `entidad`, and in the
+   date, copied from `dia`.
 3. Copy each `Figure` from the input unchanged. Add no figure the input does not hold.
 4. Name the entity by the field the input gives: `linea`, `cliente_id`, `sku` and `bodega_id`,
    `vendedor_id`, `oc_id`.

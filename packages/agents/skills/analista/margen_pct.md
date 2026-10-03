@@ -16,3 +16,5 @@ previous weeks.
 2. If H1 holds and H2 is refuted, report H1 as main and test H3 and H4 as contributing.
 3. Compare the line's `margen_pct` with `margen_minimo_pct` in `v_margen_minimo_linea` and state it as evidence.
 4. If H1, H3 and H4 are refuted, answer `no_evidence`.
+5. If H1 and H2 hold and the input lists an open `variacion_costo_pct` alert on a SKU of H1, set
+   `same_cause_as` to its `id`. Otherwise, set none.

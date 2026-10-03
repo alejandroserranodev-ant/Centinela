@@ -59,9 +59,10 @@ sequenceDiagram
   W->>A: POST /alertas/{id}/decision
   A->>A: checks the role, records aprobada or rechazada
   A->>O: resumes the alert with the recorded decision
-  O->>X: execute the approved action
-  X->>T: a draft or sandbox action
-  X-->>O: ExecutedAction
+  O->>X: an approved email_draft only: write its body
+  X-->>O: the body
+  O->>T: the action tool, in code, with the approved parameters unchanged
+  T-->>O: the draft or sandbox result
   O-->>A: proposes ejecutada
   Note over A: every step lands in the bitácora
 ```
@@ -82,8 +83,8 @@ The steps, each with the page that owns it:
   from `calcular_impacto` ([packages/tools](../../../packages/tools/AGENTS.md)).
 - **Approval.** The graph pauses before `Ejecutor` and resumes only with a decision `apps/api`
   recorded; a rejection's reason is kept and routed back to the agent it concerns.
-- **Execution.** `Ejecutor` turns the approved action into a draft, unchanged, and a second run has
-  no effect.
+- **Execution.** The orchestrator calls the action tool in code with the approved parameters
+  unchanged, so a second run has no effect; `Ejecutor`'s model only writes the body of an email.
 - **The log.** Every step lands in the `bitácora`, which `apps/api` owns and nothing updates.
 
 ## The lifecycle of an alert
@@ -94,7 +95,8 @@ stateDiagram-v2
   [*] --> nueva: Vigía detects
   nueva --> en_analisis: the title is written
   en_analisis --> propuesta: Estratega proposes
-  en_analisis --> unida: merged into another alert
+  en_analisis --> unida: merged into one analysed before it
+  nueva --> unida: an alert analysed first names it as the same cause
   propuesta --> aprobada: a person approves or edits
   propuesta --> rechazada: a person rejects, with a reason
   aprobada --> ejecutada: Ejecutor returns its result
