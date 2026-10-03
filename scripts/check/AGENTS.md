@@ -20,8 +20,8 @@ All run from the root, after `npm install` there.
 
 | Gate | Fails when | Its maps |
 |---|---|---|
-| `check:agents` | an `AGENTS.md` that no chain of links from the root `AGENTS.md` reaches; a `README.md` other than the root's; `CLAUDE.md` is not a symlink to `AGENTS.md`; a `package.json` or `pyproject.toml` has no `AGENTS.md` beside it to name its commands | `SURVIVORS` |
-| `check:citations` | a relative link or its `#anchor` resolves to nothing; a path in a code span resolves neither from the root, beside the page nor from the root of the package holding the page; a `file.py:member(...)` or `file.ts:member(...)` names a member the file does not declare; code is cited by line number | `EXEMPT`, `EXEMPT_DOCUMENTS` |
+| `check:agents` | an `AGENTS.md` that no chain of links from the root `AGENTS.md` reaches; a `README.md` other than the root's; `CLAUDE.md` is not a symlink to `AGENTS.md`; an npm or a uv manifest has no `AGENTS.md` beside it to name its commands | `SURVIVORS` |
+| `check:citations` | a relative link or its `#anchor` resolves to nothing; a path in a code span resolves neither from the root, beside the page nor from the root of the package holding the page; a `path:member(parameters)` citation of a Python or TypeScript file names a member the file does not declare; code is cited by line number | `EXEMPT`, `EXEMPT_DOCUMENTS` |
 | `check:vocabulary` | a page names an `npm run` script, a `uv run python -m` module, a `uv run` tool or test file, or a `python` script that the governing manifest does not declare or the tree does not hold. The governing manifest is the nearest one of its kind, a manifest in a directory the same paragraph names, or the directory a `cd` enters | `EXEMPT`, `EXEMPT_DOCUMENTS` |
 | `check:docs` | a document passes its character cap or a table cell passes its own; hand-written source carries a comment other than one leading header of at most ten lines on a script, a test or a SQL file | `ALLOWANCES`, `VENDORED` |
 | `check:generated` | a file named `.generated.` carries no banner naming its command; a lockfile is missing from `UNMARKED`; `GENERATED.md` does not name an output | `UNMARKED` |
@@ -34,8 +34,8 @@ router does not.
 ## Decisions
 
 - **One walk.** `tree.ts:walk(root)` lists the tree with `git ls-files -co --exclude-standard` and
-  drops the directories in `tree.ts:FOREIGN`. No gate spells its own skip set, so a worktree under
-  `.claude` is never read as a second copy of the tree.
+  drops the directories in `tree.ts:FOREIGN`. No gate spells its own skip set, so a worktree under a
+  foreign directory is never read as a second copy of the tree.
 - **A gate's logic is pure functions that return problem strings**, and the work sits behind
   `import.meta.main`. A suite imports a gate and calls it on a planted tree without running it.
 - **Every map carries its reason as a string value, and a stale entry fails.** An exemption names
