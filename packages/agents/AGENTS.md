@@ -339,9 +339,12 @@ handed, never against a database. `uv run pytest` plants one violation per rule.
 Before every `Ejecutor` leaf, `ejecutar.vigente` reads `estado.detection.vigente`:
 `centinela_agents/walk.py:still_breaks(state, ctx)` reads, on the simulated day of the decision,
 the KPI row of the alert's entity and re-applies each node of `detectar` the detection passed on
-`si`, with the same `umbral`. `si` goes on to `ejecutar.automatizable`; `no`, or no row for the
-entity, ends at `fin.ya_no_aplica`. It is code, so `Ejecutor` keeps no discretion, and it rests on
-`iso9001.10.2.1.c`: an action addresses a nonconformity, which a resolved one no longer has.
+`si`, with the same `umbral`. `si` goes on to `ejecutar.automatizable`; `no`, no row for the
+entity, or a path none of whose KPI nodes is left in the tree, ends at `fin.ya_no_aplica`, because
+nothing runs on a condition no node can check again. Two rows for one entity raise, and the resume
+fails, because the entity is the key of the KPI and a second row breaks the kernel's contract. It is
+code, so `Ejecutor` keeps no discretion, and it rests on `iso9001.10.2.1.c`: an action addresses a
+nonconformity, which a resolved one no longer has.
 
 ### How a step runs
 

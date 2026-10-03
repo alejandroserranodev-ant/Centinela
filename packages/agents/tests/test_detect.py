@@ -109,3 +109,16 @@ BY_CUPO = [*BY_DAYS[:3], ["detectar.cartera.saldo_vencido.dias", "no"], ["detect
 def test_still_breaks_reapplies_each_node_the_detection_passed_on_si(path, rows, expected):
     state, ctx = state_of(path, rows)
     assert still_breaks(state, ctx) is expected
+
+
+def test_still_breaks_is_false_when_no_kpi_node_of_the_path_is_left_in_the_tree():
+    gone = [["detectar.cartera.saldo_vencido.retirado", "si"]]
+    state, ctx = state_of(gone, [{"cliente_id": "CLI-001", "max_dias_vencido": 25, "saldo_abierto": 1, "cupo_credito": 5}])
+    assert still_breaks(state, ctx) is False
+
+
+def test_still_breaks_refuses_two_rows_of_one_entity():
+    late = {"cliente_id": "CLI-001", "max_dias_vencido": 25, "saldo_abierto": 1, "cupo_credito": 5}
+    state, ctx = state_of(BY_DAYS, [late, {**late, "max_dias_vencido": 0}])
+    with pytest.raises(ValueError, match="CLI-001"):
+        still_breaks(state, ctx)

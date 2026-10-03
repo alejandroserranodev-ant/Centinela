@@ -88,11 +88,13 @@ def still_breaks(state: Mapping[str, Any], ctx: Context) -> bool:
     kpi = ctx.catalog.kpis[detection["metric"]]
     entity = list(detection["entity"])
     rows = [row for row in ctx.reader(detection["metric"], day) if [row.get(column) for column in kpi.entity] == entity]
-    if not rows:
-        return False
+    if len(rows) > 1:
+        raise ValueError(f"{detection['metric']} returns {len(rows)} rows for {entity} on {day}, and its entity names one")
     passed = [
         ctx.nodes[node_id].predicado
         for node_id, branch in detection["path"]
         if branch == "si" and node_id in ctx.nodes and is_kpi(ctx.nodes[node_id].predicado.lee)
     ]
+    if not rows or not passed:
+        return False
     return all(kpi_holds(predicate, rows[0], ctx) for predicate in passed)
