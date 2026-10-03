@@ -25,6 +25,12 @@ leaks the data page lists stop reaching any alert.
   own examples read them, and because they are the reference for the first half of parity.
 - **`pesos_en_riesgo` and every formula of `calcular_impacto` read kernel KPIs**, so the exposure
   `Vigía` reports and the recovery `Estratega` proposes are computed by one definition.
+- **Every base KPI outputs a `pesos_en_riesgo` column**, the formula its entry writes in prose,
+  because bug spec 1, `orchestrator-runtime`, which runs after this one, reads the exposure of a
+  detection from that column and computes none. **`cobertura_dias` also outputs
+  `pedidos_pendientes`**, the orders pending dispatch on `dia`, built from their dates, because
+  OPE-POL-007 §2 makes a coverage under 5 days with pending orders critical and `pedidos.estado`
+  is marked `fuga`.
 - **A metric whose `umbral_alerta` needs a measure the language cannot express is a defect of the
   language**, fixed by adding a primitive in spec 4's table, with its bound, never by a hand-written
   function in `05_kpis.generated.sql`. Expected cases: `margen_pct` needs `linea_base` over 8 weeks and the

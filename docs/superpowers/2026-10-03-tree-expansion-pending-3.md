@@ -1,6 +1,7 @@
 # Spec 3 of 6: how the decision tree grows
 
-**Status:** pending its plan. **Depends on:** spec 2, `decision-tree`, for the node, the levels and
+**Status:** pending its plan; runs after bug spec 1, `orchestrator-runtime`, whose day run, `cost`
+and `AgentStep` it builds on. **Depends on:** spec 2, `decision-tree`, for the node, the levels and
 the validator; spec 1, `normative-foundations`, for the scope this spec implements: any agent
 expands the tree inside its own stage, resting only on what the tree already holds, with no
 approval before the expansion runs and no agent writing to a database.
