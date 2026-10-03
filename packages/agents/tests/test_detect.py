@@ -3,7 +3,7 @@ from centinela_agents.metrics import load_metrics
 from centinela_agents.walk import Context, detect, still_breaks
 import pytest
 
-from support import METRICAS, KERNEL_CATALOG, base_tree
+from support import METRICAS, KERNEL_CATALOG, SALDO_ROW, base_tree
 
 DAY = "2026-03-02"
 LATER = "2026-03-05"
@@ -18,9 +18,9 @@ FIRING = [
     ("saldo_vencido", {"cliente_id": "CLI-001", "max_dias_vencido": 20, "saldo_abierto": 100, "cupo_credito": 5000}, "detectar.cartera.saldo_vencido.dias"),
     ("saldo_vencido", {"cliente_id": "CLI-001", "max_dias_vencido": 6, "saldo_abierto": 6000, "cupo_credito": 5000}, "detectar.cartera.saldo_vencido.cupo"),
     ("concentracion_vencida_pct", {"cliente_id": "CLI-002", "concentracion_vencida_pct": 12.5}, "detectar.cartera.concentracion_vencida_pct.participacion"),
-    ("dias_pago_prom", {"cliente_id": "CLI-003", "mes_factura": "2026-02-01", "aumento_pct": 60.0}, "detectar.cartera.dias_pago_prom.aumento"),
-    ("margen_pct", {"semana": "2026-02-23", "linea": "Hogar", "caida_pts": 3.5, "margen_pct": 20.0, "margen_minimo_pct": 18.0}, "detectar.margen.margen_pct.caida"),
-    ("margen_pct", {"semana": "2026-02-23", "linea": "Hogar", "caida_pts": 1.0, "margen_pct": 15.0, "margen_minimo_pct": 18.0}, "detectar.margen.margen_pct.minimo"),
+    ("dias_pago_prom", {"cliente_id": "CLI-003", "aumento_pct": 60.0}, "detectar.cartera.dias_pago_prom.aumento"),
+    ("margen_pct", {"linea": "Hogar", "caida_pts": 3.5, "margen_pct": 20.0, "margen_minimo_pct": 18.0}, "detectar.margen.margen_pct.caida"),
+    ("margen_pct", {"linea": "Hogar", "caida_pts": 1.0, "margen_pct": 15.0, "margen_minimo_pct": 18.0}, "detectar.margen.margen_pct.minimo"),
     ("cobertura_dias", {"sku": "SKU-1", "bodega_id": "BOD-MDE", "clase_abc": "A", "cobertura_dias": 9.0}, "detectar.inventario.cobertura_dias.minima"),
     ("cobertura_dias", {"sku": "SKU-1", "bodega_id": "BOD-MDE", "clase_abc": "B", "cobertura_dias": 6.0}, "detectar.inventario.cobertura_dias.minima"),
     ("descuento_en_exceso", {"vendedor_id": "VEN-01", "semana": "2026-02-23", "descuento_en_exceso": 120000}, "detectar.comercial.descuento_en_exceso.tope"),
@@ -39,6 +39,22 @@ QUIET = [
     ("descuento_en_exceso", {"vendedor_id": "VEN-01", "semana": "2026-02-23", "descuento_en_exceso": 0}),
 ]
 
+SILENT = [
+    ("saldo_vencido", {"cliente_id": "CLI-009", "max_dias_vencido": None, "saldo_abierto": 0, "cupo_credito": 5000}),
+    ("cobertura_dias", {"sku": "SKU-1", "bodega_id": "BOD-MDE", "clase_abc": "C", "cobertura_dias": 1.0}),
+    ("cobertura_dias", {"sku": "SKU-1", "bodega_id": "BOD-MDE", "clase_abc": "A", "cobertura_dias": None}),
+]
+LATE_HABIT = {
+    "saldo_vencido": [{"cliente_id": "CLI-007", "max_dias_vencido": 6, "saldo_abierto": 900000, "cupo_credito": 5000000}],
+    "dias_pago_prom": [{"cliente_id": "CLI-007", "aumento_pct": 20.0}],
+}
+EXAMPLES = [(metric, row) for metric, row, _ in FIRING] + QUIET + SILENT + [(metric, row) for metric, rows in LATE_HABIT.items() for row in rows] + [("saldo_vencido", SALDO_ROW)]
+
+
+@pytest.mark.parametrize("metric, row", EXAMPLES)
+def test_an_example_row_holds_only_columns_its_kpi_returns(metric, row):
+    assert set(row) <= KERNEL_CATALOG.kpis[metric].columns, sorted(set(row) - KERNEL_CATALOG.kpis[metric].columns)
+
 
 @pytest.mark.parametrize("metric, row, last", FIRING, ids=[last for _, _, last in FIRING])
 def test_each_threshold_node_fires_on_a_breaking_row(metric, row, last):
@@ -54,14 +70,7 @@ def test_a_row_inside_its_threshold_fires_nothing(metric, row):
     assert run(metric, row) == []
 
 
-@pytest.mark.parametrize(
-    "metric, row",
-    [
-        ("saldo_vencido", {"cliente_id": "CLI-009", "max_dias_vencido": None, "saldo_abierto": 0, "cupo_credito": 5000}),
-        ("cobertura_dias", {"sku": "SKU-1", "bodega_id": "BOD-MDE", "clase_abc": "C", "cobertura_dias": 1.0}),
-        ("cobertura_dias", {"sku": "SKU-1", "bodega_id": "BOD-MDE", "clase_abc": "A", "cobertura_dias": None}),
-    ],
-)
+@pytest.mark.parametrize("metric, row", SILENT)
 def test_a_null_value_or_a_class_without_threshold_fires_nothing(metric, row):
     assert run(metric, row) == []
 
@@ -73,11 +82,7 @@ def test_a_descriptive_kpi_fires_nothing():
 
 
 def test_a_customer_six_days_late_on_a_thirty_day_habit_fires_nothing_on_the_base():
-    rows = {
-        "saldo_vencido": [{"cliente_id": "CLI-007", "max_dias_vencido": 6, "saldo_abierto": 900000, "cupo_credito": 5000000}],
-        "dias_pago_prom": [{"cliente_id": "CLI-007", "mes_factura": "2026-02-01", "aumento_pct": 20.0}],
-    }
-    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, lambda metric, day: rows.get(metric, []))
+    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, lambda metric, day: LATE_HABIT.get(metric, []))
     assert detect(ctx, DAY) == []
 
 

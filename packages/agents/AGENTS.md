@@ -57,9 +57,9 @@ development machine has no `ensurepip` and uv builds the environment without it:
 - **The kernel reaches the tree through two inputs**: the catalogue of KPI columns the validator
   checks each `lee` against, and a reader the interpreter calls with a metric and a simulated day.
   The tree never opens a connection, because no agent does.
-  `centinela_agents/catalog.py:catalog_from_kernel(kpis)` builds the catalogue from `kpi_catalogo`,
-  and `centinela_agents/catalog.py:kernel_reader(call)` builds the reader from `kpi_consultar`,
-  raising on a refusal, so a refused reading never passes for a day with no alert.
+  `centinela_agents/catalog.py:catalog_from_kernel(answer)` builds the catalogue from the answer of
+  `kpi_catalogo`, and `centinela_agents/catalog.py:kernel_reader(call)` builds the reader from
+  `kpi_consultar`, raising on a refusal, so a refused reading never passes for a day with no alert.
 
 ## The universe
 

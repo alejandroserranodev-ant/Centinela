@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Mapping
 
 from .metrics import Metrics
 
@@ -27,11 +27,11 @@ def thresholds_named(name: str, metrics: Metrics, catalog: Catalog) -> Mapping[s
     return kpi.thresholds if kpi is not None and kpi.thresholds else None
 
 
-def catalog_from_kernel(kpis: Iterable[Mapping[str, Any]]) -> Catalog:
+def catalog_from_kernel(answer: Mapping[str, Any]) -> Catalog:
     return Catalog(
         {
             kpi["id"]: Kpi(tuple(kpi["entidad"]), frozenset(column["nombre"] for column in kpi["columnas"]), bool(kpi["descriptivo"]))
-            for kpi in kpis
+            for kpi in answer["kpis"]
         }
     )
 

@@ -213,7 +213,7 @@ def expanded():
 def test_orq_walkthrough_a_customer_who_paid_in_30_days_is_6_days_late():
     late = {
         "saldo_vencido": [{"cliente_id": "CLI-007", "max_dias_vencido": 6, "saldo_abierto": 900000, "cupo_credito": 5000000}],
-        "dias_pago_prom": [{"cliente_id": "CLI-007", "mes_factura": "2026-02-01", "aumento_pct": 20.0}],
+        "dias_pago_prom": [{"cliente_id": "CLI-007", "aumento_pct": 20.0}],
         "retraso_habito": [{"cliente_id": "CLI-007", "dias_sobre_habito": 6}],
     }
     base_ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: late}))

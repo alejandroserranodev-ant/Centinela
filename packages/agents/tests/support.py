@@ -21,7 +21,7 @@ METRICAS = AGENTS.parents[1] / "data" / "metricas.yaml"
 SKILLS = AGENTS / "skills"
 
 
-KERNEL_CATALOG = catalog_from_kernel(kpi_catalogo(catalogue_of(load_entries(METRICAS), load_sources())))
+KERNEL_CATALOG = catalog_from_kernel({"kpis": kpi_catalogo(catalogue_of(load_entries(METRICAS), load_sources()))})
 
 
 def base_data() -> dict:
@@ -48,7 +48,7 @@ def grounds(catalog: Catalog = KERNEL_CATALOG, metrics=None) -> Grounds:
 
 DAY = "2026-03-02"
 DECISION_DAY = "2026-03-05"
-SALDO_ROW = {"cliente_id": "CLI-001", "segmento": "Mayorista", "cupo_credito": 5000000, "saldo_abierto": 1200000, "saldo_vencido": 800000, "max_dias_vencido": 20}
+SALDO_ROW = {"cliente_id": "CLI-001", "cupo_credito": 5000000, "saldo_abierto": 1200000, "saldo_vencido": 800000, "max_dias_vencido": 20}
 IDENTIFIED = {"kind": "identified", "sentence": {"text": "El cliente dejó de pagar desde enero.", "figures": []}, "evidence": []}
 EMAIL = {"id": "act-email", "title": "Recordatorio de pago", "type": "email_draft", "impact": None, "parameters": {"recipient": "CLI-001", "vendedor_id": "VEN-01"}}
 MANUAL_TASK = {"id": "act-manual", "title": "Revisión manual de la alerta", "type": "task", "impact": None, "parameters": {"owner": "Analista de cartera"}}
