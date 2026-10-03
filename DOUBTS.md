@@ -56,15 +56,6 @@ hold the criteria the jury scores. It is paid when the complete deck replaces th
 challenge page is re-read against it. Re-derive it with
 `pdftotext -layout docs/challenge/hackathon-brief.pdf - | grep -n "Evaluación\|Criterios\|oculto\|Escenarios"`.
 
-**The clauses the registry cites are unverified.**
-[`packages/agents/arbol/fundamentos.yaml`](./packages/agents/arbol/fundamentos.yaml) cites clauses
-of ISO standards whose texts are licensed and not in the repository, so no reader can check that a
-clause says what its entry claims, and an entry that cites no clause number cannot be checked at
-all. It costs a `fundamento` that cites the wrong clause, which founds nothing. It is paid when a
-person with access to the texts confirms every entry before the first node of the decision tree
-cites one, and each entry added later is confirmed in the review of its pull request.
-Re-derive it with `grep -o 'ISO[^"]*' packages/agents/arbol/fundamentos.yaml | sort -u`.
-
 **The base tree reads KPI columns no kernel builds.**
 [`packages/agents/arbol/base.yaml`](./packages/agents/arbol/base.yaml) compares columns of
 `kpi.<metric>.<column>`, and the validator checks them against the catalogue it is handed. No part

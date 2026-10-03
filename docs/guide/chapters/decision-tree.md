@@ -19,15 +19,14 @@ and ISO 9001 say *that* risk is evaluated against criteria, not *which* criteria
 | Standard | Founds |
 |---|---|
 | ISO 31000:2018, risk management | the stages of the tree and their order |
-| ISO 9001:2015, quality management | §9.1: the KPI kernel and `Vigía` as owner of measurement; §10.2: the stages read as react, find the cause, find similar cases, act, review effectiveness |
+| ISO 9001:2026, quality management | §9.1: the KPI kernel and `Vigía` as owner of measurement; §10.2: the stages read as react, find the cause, find similar cases, act, review effectiveness |
 | ISO/IEC 42001:2023, AI management system | the laws on human approval, on what an agent may change, and on the `bitácora` |
-| ISO 22400-2:2014, KPI description | the fields of a KPI in the kernel |
+| ISO 22400-2:2014+A1:2017, KPI description | the fields of a KPI in the kernel |
 | Goal-Question-Metric (Basili, Caldiera and Rombach, 1994) | the only admissible justification for a new KPI: a node asks a question no KPI answers |
 
 GQM is a method, not a standard; it is admitted because it ties a metric to the decision it serves.
 Every clause a node may cite is an entry of [the registry](../../../packages/agents/arbol/fundamentos.yaml),
-which only a person extends, and whose clauses are unverified until a person with the licensed texts
-confirms them ([Debts](../../../DOUBTS.md)).
+which only a person extends, and whose every clause is confirmed against its licensed text.
 
 ## The stages, level L1
 
@@ -36,7 +35,7 @@ flowchart TB
   detectar["detectar<br/>ISO 31000 §6.4.2 · ISO 9001 §10.2.1 a)<br/>Vigía"]
   explicar["explicar<br/>ISO 31000 §6.4.3 · ISO 9001 §10.2.1 b) 2) and 3)<br/>Analista"]
   proponer["proponer<br/>ISO 31000 §6.4.4, §6.5.2 · ISO 9001 §10.2.1 b)<br/>Estratega"]
-  aprobar{{"aprobar<br/>ISO 31000 §6.5.3 · ISO/IEC 42001 human oversight<br/>a person"}}
+  aprobar{{"aprobar<br/>ISO 31000 §6.5.3 · ISO/IEC 42001 A.9.3<br/>a person"}}
   ejecutar["ejecutar<br/>ISO 31000 §6.5.3 · ISO 9001 §10.2.1 c)<br/>Ejecutor"]
   cerrar["cerrar<br/>ISO 31000 §6.6, §6.7 · ISO 9001 §10.2.1 d), §10.2.2<br/>apps/api, Vigía for effectiveness"]
   medir["medir<br/>ISO 31000 §6.6 · ISO 9001 §9.1.1, §9.1.3<br/>Vigía, through the kernel"]

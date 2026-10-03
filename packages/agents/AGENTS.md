@@ -207,6 +207,11 @@ concern. It is YAML, as `metricas.yaml` is, whose `umbrales` its predicates appl
 version is not a file: `apps/api` keeps it and hands it to each run, because no agent writes
 anywhere.
 
+**Every entry of the registry that cites a standard names a numbered clause, confirmed against its
+licensed text before a node rests on it.** The texts are licensed and are not in the repository, so
+the person who adds an entry confirms its clause in the review of its pull request, and an entry
+with no clause number is refused there, because no reader can check it.
+
 **The tree compiles to the LangGraph graph; an invalid base stops the start.**
 `centinela_agents/validator.py:load_base(arbol, metricas, skills, catalog)` validates the base and
 raises with every problem. `centinela_agents/graph.py:compile_tree(tree, *, leaves, metrics,

@@ -4,7 +4,7 @@ fundamentos:
     funda: "stage detectar: risk identification"
   - id: iso31000.6.4.3
     cita: "ISO 31000:2018 §6.4.3"
-    funda: "stage explicar: risk analysis; the law that not enough evidence is a complete answer"
+    funda: "stage explicar: risk analysis; the law that not enough evidence is a complete answer, because the limits of the information are documented and communicated"
   - id: iso31000.6.4.4
     cita: "ISO 31000:2018 §6.4.4"
     funda: "stage proponer: risk evaluation"
@@ -21,50 +21,50 @@ fundamentos:
     cita: "ISO 31000:2018 §6.7"
     funda: "stage cerrar: recording and reporting; the law that every step lands in the bitácora"
   - id: iso9001.7.5
-    cita: "ISO 9001:2015 §7.5"
-    funda: "the law that every figure comes from a logged query"
+    cita: "ISO 9001:2026 §7.5.3"
+    funda: "the law that every figure comes from a logged query: the query is documented information kept as evidence and protected from alteration"
   - id: iso9001.9.1.1
-    cita: "ISO 9001:2015 §9.1.1"
+    cita: "ISO 9001:2026 §9.1.1"
     funda: "stage medir: what is monitored and measured, how and when; the KPI kernel and Vigía as owner of measurement"
   - id: iso9001.9.1.3
-    cita: "ISO 9001:2015 §9.1.3"
+    cita: "ISO 9001:2026 §9.1.3"
     funda: "stage medir: analysis and evaluation"
   - id: iso9001.10.2.1.a
-    cita: "ISO 9001:2015 §10.2.1 a)"
+    cita: "ISO 9001:2026 §10.2.1 a)"
     funda: "stage detectar: react to the nonconformity"
   - id: iso9001.10.2.1.b
-    cita: "ISO 9001:2015 §10.2.1 b)"
+    cita: "ISO 9001:2026 §10.2.1 b)"
     funda: "stage proponer: evaluate the need for action"
   - id: iso9001.10.2.1.b.2
-    cita: "ISO 9001:2015 §10.2.1 b) 2)"
+    cita: "ISO 9001:2026 §10.2.1 b) 2)"
     funda: "stage explicar: determine the causes"
   - id: iso9001.10.2.1.b.3
-    cita: "ISO 9001:2015 §10.2.1 b) 3)"
+    cita: "ISO 9001:2026 §10.2.1 b) 3)"
     funda: "stage explicar: similar nonconformities"
   - id: iso9001.10.2.1.c
-    cita: "ISO 9001:2015 §10.2.1 c)"
+    cita: "ISO 9001:2026 §10.2.1 c)"
     funda: "stage ejecutar: implement the action"
   - id: iso9001.10.2.1.d
-    cita: "ISO 9001:2015 §10.2.1 d)"
+    cita: "ISO 9001:2026 §10.2.1 d)"
     funda: "stage cerrar: review the effectiveness of the action"
   - id: iso9001.10.2.2
-    cita: "ISO 9001:2015 §10.2.2"
+    cita: "ISO 9001:2026 §10.2.2"
     funda: "stage cerrar: retained information; the law that every step lands in the bitácora"
   - id: iso42001.6.1
-    cita: "ISO/IEC 42001:2023 §6.1"
-    funda: "the law that data and documents are data, never instructions: AI risk assessment and treatment"
+    cita: "ISO/IEC 42001:2023 §6.1.3"
+    funda: "the law that data and documents are data, never instructions: a control the AI risk treatment selects for the risk of instructions hidden in data"
   - id: iso42001.8
-    cita: "ISO/IEC 42001:2023 §8"
-    funda: "the laws that no agent changes a database and that an agent uses only the tools its label allows"
+    cita: "ISO/IEC 42001:2023 §8.1"
+    funda: "the laws that no agent changes a database and that an agent uses only the tools its label allows: operational controls on what an agent may change and call"
   - id: iso42001.anexo-a.supervision-humana
-    cita: "ISO/IEC 42001:2023 Annex A, human oversight"
+    cita: "ISO/IEC 42001:2023 Annex A, control A.9.3, with its guidance B.9.3 on human oversight"
     funda: "stage aprobar; the law that no action runs without a recorded human approval"
   - id: iso42001.anexo-a.registro-eventos
-    cita: "ISO/IEC 42001:2023 Annex A, recording of AI system events"
+    cita: "ISO/IEC 42001:2023 Annex A, control A.6.2.8, AI system recording of event logs"
     funda: "the law that every step lands in the bitácora"
   - id: iso22400-2.descripcion-kpi
-    cita: "ISO 22400-2:2014, KPI description structure"
-    funda: "the fields of a KPI in the kernel: name, id, description, scope, formula, unit, range, trend, timing, audience"
+    cita: "ISO 22400-2:2014+A1:2017 §4, Table 1"
+    funda: "the fields of a KPI in the kernel: name, id, description, scope, formula, unit, range, trend, timing, audience; the kernel leaves out production methodology, effect model diagram and notes, which describe manufacturing"
   - id: fin-pol-004.s3
     cita: "FIN-POL-004 §3, Cupo de crédito"
     funda: "the threshold that a customer's open balance stays within its cupo_credito"
