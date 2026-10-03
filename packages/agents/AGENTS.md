@@ -327,7 +327,8 @@ return, `centinela_agents/graph.py:LEAF_OUTPUTS`, so a second proposal never kee
 - a leaf's `skill` is no file under `skills/`, or its `decision` is outside its agent's list;
 - a metric of `metricas.yaml` has no L3 branch in `detectar`, no file in `skills/analista/`, or no
   row in `skills/estratega/acciones.md`;
-- L0 or an L1 node differs from the base.
+- L0 or an L1 node differs from the base, or a leaf of the base changes its agent, its decision or
+  its `sigue`; a new leaf is allowed, so a branch grows without rerouting the base.
 
 The catalogue is an input: the validator checks each `lee` on a KPI against the catalogue it is
 handed, never against a database. `uv run pytest` plants one violation per rule.

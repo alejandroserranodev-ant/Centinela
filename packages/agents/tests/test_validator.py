@@ -84,6 +84,8 @@ PLANTED = [
     ("unknown agent", set_leaf("hoja.vigia.titular", agente="orquestador"), "outside vigia, analista, estratega and ejecutor"),
     ("L0 changed", set_law(0, "iso31000.6.6"), "L0 differs from the base"),
     ("L1 changed", set_predicate("aprobar.decision", valor=["approve"]), "L1 node aprobar.decision differs from the base"),
+    ("base leaf redirected", set_key("hoja.vigia.titular", "sigue", "explicar.con_evidencia"), "leaf hoja.vigia.titular differs from the base"),
+    ("base leaf decision changed", set_leaf("hoja.vigia.titular", decision="detectar"), "leaf hoja.vigia.titular differs from the base"),
     ("return the interpreter does not count", add_return, "cycle"),
     ("kpi read on another metric's row", set_key("detectar.cartera.concentracion_vencida_pct.participacion", "no", "detectar.cartera.saldo_vencido.cupo"), "reads saldo_vencido where the candidate may be concentracion_vencida_pct"),
 ]

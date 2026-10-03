@@ -338,4 +338,14 @@ def base_problems(tree: Tree, base: Tree) -> list[str]:
     theirs = {node.id: node for node in base.nodos if node.hoja is None and level(node.id) == 1}
     found += [f"L1 node {node_id} differs from the base" for node_id in sorted(theirs) if mine.get(node_id) != theirs[node_id]]
     found += [f"L1 node {node_id} is absent from the base" for node_id in sorted(set(mine) - set(theirs))]
+    leaves = {node.id: leaf_route(node) for node in tree.nodos if node.hoja is not None}
+    found += [
+        f"leaf {node.id} differs from the base"
+        for node in sorted(base.nodos, key=lambda node: node.id)
+        if node.hoja is not None and leaves.get(node.id) != leaf_route(node)
+    ]
     return found
+
+
+def leaf_route(node: Node) -> tuple[str, str, str | None]:
+    return node.hoja.agente, node.hoja.decision, node.sigue
