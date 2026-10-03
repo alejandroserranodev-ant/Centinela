@@ -138,12 +138,12 @@ def test_a_block_the_kernel_cannot_bound_is_refused_with_its_guard(block, guard,
     assert refusal.guard == guard and words in refusal.detail, refusal
 
 
-def test_a_function_reads_its_argument_and_belongs_to_the_kernel_role():
+def test_a_function_reads_its_argument_and_belongs_to_the_owner_role():
     definition = function_definition("oc_abiertas", fixture_block("oc_abiertas"), SOURCES).as_string()
     assert definition.startswith('CREATE OR REPLACE FUNCTION "centinela"."k_oc_abiertas"(dia date) RETURNS TABLE ("proveedor_id" text, "ordenes_abiertas" bigint)')
     assert "SECURITY DEFINER SET search_path = pg_catalog, pg_temp" in definition
     assert "CAST(dia AS date)" in definition and "%(dia)s" not in definition
-    assert 'ALTER FUNCTION "centinela"."k_oc_abiertas"(date) OWNER TO centinela_kernel;' in definition
+    assert 'ALTER FUNCTION "centinela"."k_oc_abiertas"(date) OWNER TO centinela_propietario;' in definition
     assert 'REVOKE ALL ON FUNCTION "centinela"."k_oc_abiertas"(date) FROM PUBLIC;' in definition
     assert 'GRANT EXECUTE ON FUNCTION "centinela"."k_oc_abiertas"(date) TO centinela_lector;' in definition
 

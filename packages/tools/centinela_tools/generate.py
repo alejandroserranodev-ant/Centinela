@@ -27,15 +27,18 @@ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'centinela_kernel') THEN
     CREATE ROLE centinela_kernel LOGIN PASSWORD 'centinela_kernel';
   END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'centinela_propietario') THEN
+    CREATE ROLE centinela_propietario NOLOGIN;
+  END IF;
   EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());
   EXECUTE format('GRANT CONNECT ON DATABASE %I TO centinela_lector, centinela_kernel', current_database());
 END
 $roles$;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-GRANT USAGE ON SCHEMA centinela TO centinela_lector, centinela_kernel;
+GRANT USAGE ON SCHEMA centinela TO centinela_lector, centinela_kernel, centinela_propietario;
 """
 FECHA_CORTE = """ALTER FUNCTION centinela.fecha_corte() SECURITY DEFINER SET search_path = centinela, pg_temp;
-ALTER FUNCTION centinela.fecha_corte() OWNER TO centinela_kernel;
+ALTER FUNCTION centinela.fecha_corte() OWNER TO centinela_propietario;
 """
 
 
@@ -49,7 +52,7 @@ def view_names(sql_dir: Path) -> list[str]:
 def render(sources: Sources, entries: Mapping[str, Mapping[str, Any]], views: list[str], cost: Callable[[sql.Composable], float], settings: Settings) -> str:
     parts = [BANNER, ROLES]
     for name, table in sources.tables.items():
-        grant = sql.SQL("GRANT SELECT ({}) ON {} TO centinela_kernel;\n").format(
+        grant = sql.SQL("GRANT SELECT ({}) ON {} TO centinela_kernel, centinela_propietario;\n").format(
             sql.SQL(", ").join(sql.Identifier(column) for column in table.columns), sql.Identifier("centinela", name)
         )
         parts.append(grant.as_string())

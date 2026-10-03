@@ -1,5 +1,6 @@
 # The gate of the law that no agent changes a database: what centinela_lector and centinela_kernel
-# can read and run, and that every write either role attempts fails. Needs the scratch database.
+# can read and run, that every write either role attempts fails, and that neither can become
+# centinela_propietario, the NOLOGIN owner of the functions. Needs the scratch database.
 import psycopg
 import pytest
 
@@ -13,6 +14,9 @@ WRITES = [
     "CREATE TABLE centinela.intruso (x int)",
     "CREATE TABLE public.intruso (x int)",
     "CREATE TEMP TABLE intruso (x int)",
+    "DROP FUNCTION centinela.k_oc_abiertas(date)",
+    "ALTER FUNCTION centinela.fecha_corte() SECURITY INVOKER",
+    "GRANT SELECT ON centinela.pedidos TO centinela_lector",
 ]
 
 
@@ -54,3 +58,9 @@ def test_every_write_of_either_role_fails(connect, superuser, role, statement):
     with connect(role) as conn:
         fails(conn, statement)
     assert superuser.execute("SELECT (SELECT count(*) FROM centinela.pagos), (SELECT count(*) FROM centinela.bodegas)").fetchone() == before
+
+
+@pytest.mark.parametrize("role", ["lector", "kernel"])
+def test_neither_login_role_can_become_the_owner(connect, role):
+    with connect(role) as conn:
+        fails(conn, "SET ROLE centinela_propietario")

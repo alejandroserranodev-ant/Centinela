@@ -357,7 +357,7 @@ def function_definition(metric: str, block: Mapping[str, Any], sources: Sources)
     return sql.SQL(
         "CREATE OR REPLACE FUNCTION {fn}(dia date) RETURNS TABLE ({returns}) LANGUAGE sql STABLE SECURITY DEFINER "
         "SET search_path = pg_catalog, pg_temp AS {body};\n"
-        "ALTER FUNCTION {fn}(date) OWNER TO centinela_kernel;\n"
+        "ALTER FUNCTION {fn}(date) OWNER TO centinela_propietario;\n"
         "REVOKE ALL ON FUNCTION {fn}(date) FROM PUBLIC;\n"
         "GRANT EXECUTE ON FUNCTION {fn}(date) TO centinela_lector;\n"
     ).format(fn=function, returns=returns, body=sql.Literal(compiled.query.as_string()))

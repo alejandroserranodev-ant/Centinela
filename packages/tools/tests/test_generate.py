@@ -31,7 +31,8 @@ def test_the_view_names_come_from_both_view_files():
 def test_the_file_opens_with_its_banner_and_grants_column_by_column():
     text = render(SOURCES, {}, view_names(SQL_DIR), no_database, Settings())
     assert text.startswith("-- Written by `uv run python -m centinela_tools.generate`")
-    assert 'GRANT SELECT ("vendedor_id", "region") ON "centinela"."vendedores" TO centinela_kernel;' in text
+    assert 'GRANT SELECT ("vendedor_id", "region") ON "centinela"."vendedores" TO centinela_kernel, centinela_propietario;' in text
+    assert "CREATE ROLE centinela_propietario NOLOGIN;" in text
     assert 'GRANT SELECT ON "centinela"."v_ventas" TO centinela_lector;' in text
     assert "ALTER FUNCTION centinela.fecha_corte() SECURITY DEFINER" in text
     assert "CREATE OR REPLACE FUNCTION" not in text
