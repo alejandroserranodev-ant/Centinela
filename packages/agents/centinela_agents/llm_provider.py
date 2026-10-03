@@ -18,7 +18,7 @@ class ModelConfig:
     temperature: float = 0.0
     top_p: float = 1.0
     thinking: bool = False  # extended thinking (if supported)
-    timeout_seconds: int = 30
+    timeout_seconds: int = 180
 
 
 @dataclass
