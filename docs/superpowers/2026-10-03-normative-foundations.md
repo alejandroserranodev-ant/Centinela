@@ -1,6 +1,6 @@
 # Spec 1 of 6: the normative foundations, the scope and the scale
 
-**Status:** planned in `2026-10-03-normative-foundations-plan.md`. **Series:** 1 `normative-foundations` → 2 `decision-tree` →
+**Status:** executed; kept while specs 2 to 6 build on it. **Series:** 1 `normative-foundations` → 2 `decision-tree` →
 3 `tree-expansion`; 1 → 4 `kpi-kernel` → 5 `current-kpis-in-kernel`; 3 and 5 → 6 `new-kpi-lifecycle`.
 
 ## Why
