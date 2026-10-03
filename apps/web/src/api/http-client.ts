@@ -207,13 +207,75 @@ export async function getInboxSummary(): Promise<InboxSummary> {
 }
 
 export async function getSettings(): Promise<Settings> {
-  // For now, return hardcoded settings (not implemented in API yet)
   return {
+    metrics: [
+      {
+        metric: 'margen_pct',
+        name: 'Margen porcentual',
+        description: 'Margen bruto sobre ventas por línea de producto',
+        view: 'v_margen_semanal_linea',
+        rule: 'Alerta si cae más de X puntos vs. promedio 4 semanas',
+        threshold: { value: 3, label: 'Caída máxima en puntos porcentuales' },
+        watched: true,
+        owner: 'Gerente Comercial',
+      },
+      {
+        metric: 'saldo_vencido',
+        name: 'Saldo vencido',
+        description: 'Cartera vencida de clientes en COP',
+        view: 'v_cartera_cliente',
+        rule: 'Alerta si supera X% del saldo total por cliente',
+        threshold: { value: 20, label: 'Porcentaje máximo de cartera vencida' },
+        watched: true,
+        owner: 'Gerente Financiero',
+      },
+      {
+        metric: 'dias_pago_prom',
+        name: 'Días promedio de pago',
+        description: 'Promedio de días que tarda un cliente en pagar',
+        view: 'v_dias_pago_mensual',
+        rule: 'Alerta si supera X días vs. política de crédito',
+        threshold: { value: 45, label: 'Días máximos de pago' },
+        watched: true,
+        owner: 'Gerente Financiero',
+      },
+      {
+        metric: 'cobertura_dias',
+        name: 'Cobertura en días',
+        description: 'Días de inventario disponible por producto',
+        view: 'v_cobertura_inventario',
+        rule: 'Alerta si baja de X días de cobertura',
+        threshold: { value: 15, label: 'Días mínimos de cobertura' },
+        watched: true,
+        owner: 'Gerente de Operaciones',
+      },
+      {
+        metric: 'descuento_en_exceso',
+        name: 'Descuento en exceso',
+        description: 'Descuentos aplicados fuera de política comercial',
+        view: 'v_descuentos_fuera_politica',
+        rule: 'Alerta si el descuento supera X% sobre la política',
+        threshold: { value: 5, label: 'Puntos porcentuales sobre política' },
+        watched: false,
+        owner: 'Gerente Comercial',
+      },
+      {
+        metric: 'veces_intervalo_habitual',
+        name: 'Actividad inusual de cliente',
+        description: 'Compras fuera del intervalo habitual del cliente',
+        view: 'v_actividad_cliente',
+        rule: 'Alerta si el intervalo supera X veces el habitual',
+        threshold: { value: 2, label: 'Veces el intervalo habitual' },
+        watched: false,
+        owner: 'Gerente Comercial',
+      },
+    ],
+    owners: ['Gerente Comercial', 'Gerente Financiero', 'Gerente de Operaciones'],
     autonomy: {
-      vigia: 'detects',
-      analista: 'explains',
-      estratega: 'proposes',
-      ejecutor: 'proposes', // Never auto-executes during pilot
+      email_draft: 'propose',
+      task: 'propose',
+      purchase_order_draft: 'propose',
+      price_change_draft: 'propose',
     },
   };
 }
