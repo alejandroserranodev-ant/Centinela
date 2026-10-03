@@ -174,8 +174,12 @@ class ChatMessage(Esquema):
 
 
 class ChatQuestion(Esquema):
+<<<<<<< HEAD
     """User question for Centinela (Analista)."""
     question: str = Field(..., description="Natural language question about alert or metric")
+=======
+    question: str
+>>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
 
 
 class SimulatedDay(Esquema):
@@ -208,6 +212,7 @@ Decision = Annotated[
 
 
 class AgentAlertInput(Esquema):
+<<<<<<< HEAD
     """Vigía input: new alert detected from metric anomaly."""
     severity: Severity = Field(..., description="Alert severity (critical, high, medium, low)")
     metric: Metric = Field(..., description="Metric that triggered alert")
@@ -245,3 +250,47 @@ class CostoAgente(Esquema):
     tokens_entrada: int = Field(..., description="Input tokens consumed")
     tokens_salida: int = Field(..., description="Output tokens generated")
     latencia_ms: int = Field(..., description="Total latency in milliseconds")
+=======
+    """Entrada de Vigía: una nueva alerta detectada."""
+
+    severity: Severity
+    metric: Metric
+    title: Sentence
+    pesos_at_risk: Figure
+    recoverable_per_month: Figure | None = None
+    confidence: Confidence
+    simulated_date: str
+
+
+class AgentCauseInput(Esquema):
+    """Entrada de Analista: causa e evidencia de una alerta."""
+
+    cause: Cause
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class AgentProposalInput(Esquema):
+    """Entrada de Estratega: acciones propuestas para una alerta."""
+
+    actions: list[Action] = Field(min_length=1, max_length=3)
+
+
+class AgentExecutionInput(Esquema):
+    """Entrada de Ejecutor: resultado de ejecutar una acción."""
+
+    action_id: str
+    status: Literal["success", "failed", "partial"]
+    result: str
+    error: str | None = None
+
+
+class CostoAgente(Esquema):
+    """Registro de costo: tokens, modelo, latencia por paso."""
+
+    agent: Agent
+    step: str
+    modelo: str
+    tokens_entrada: int
+    tokens_salida: int
+    latencia_ms: int
+>>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
