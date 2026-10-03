@@ -1,0 +1,115 @@
+# One planted violation per rule of the validator, each on a copy of the base, so a rule that
+# never fires fails here. The base itself must pass with no problem.
+import pytest
+
+from centinela_agents.metrics import Metrics, load_metrics
+from centinela_agents.validator import InvalidTree, checked_base, load_base, load_registry, problems
+from support import ARBOL, METRICAS, SKILLS, VIEW_CATALOG, base_data, grounds, node_of
+
+
+def set_key(node_id, key, value):
+    def plant(data):
+        node_of(data, node_id)[key] = value
+    return plant
+
+
+def drop_key(node_id, key):
+    def plant(data):
+        node_of(data, node_id).pop(key)
+    return plant
+
+
+def set_predicate(node_id, **changes):
+    def plant(data):
+        node_of(data, node_id)["predicado"].update(changes)
+    return plant
+
+
+def set_leaf(node_id, **changes):
+    def plant(data):
+        node_of(data, node_id)["hoja"].update(changes)
+    return plant
+
+
+def duplicate(node_id):
+    def plant(data):
+        data["nodos"].append(dict(node_of(data, node_id)))
+    return plant
+
+
+def set_law(index, fundamento):
+    def plant(data):
+        data["leyes"][index]["fundamento"] = fundamento
+    return plant
+
+
+def both_branches(node_id, target):
+    def plant(data):
+        node_of(data, node_id).update(si=target, no=target)
+    return plant
+
+
+PLANTED = [
+    ("schema", set_key("explicar.misma_causa", "color", "rojo"), "schema:"),
+    ("two values", set_predicate("detectar.cartera.saldo_vencido.dias", valor=15), "compares with an umbral and a valor at once"),
+    ("two operands", set_predicate("explicar.con_evidencia", lee="estado.cause.kind y estado.actions"), "which is not one operand"),
+    ("en without a list", set_predicate("aprobar.decision", valor="approve"), "tests en without a closed list"),
+    ("no fundamento", drop_key("explicar.con_evidencia", "fundamento"), "explicar.con_evidencia lacks its fundamento"),
+    ("no si", drop_key("explicar.con_evidencia", "si"), "explicar.con_evidencia lacks its si"),
+    ("no no", drop_key("explicar.con_evidencia", "no"), "explicar.con_evidencia lacks its no"),
+    ("unregistered fundamento", set_key("explicar.con_evidencia", "fundamento", "iso9999.1"), "absent from fundamentos.yaml"),
+    ("leaf with fundamento", set_key("hoja.vigia.titular", "fundamento", "iso31000.6.4.2"), "inherits its parent's fundamento"),
+    ("duplicate id", duplicate("explicar.con_evidencia"), "explicar.con_evidencia is declared twice"),
+    ("bypass the gate", set_key("proponer.con_acciones", "si", "ejecutar.vigente"), "is reached without passing aprobar.decision"),
+    ("bypass vigente", set_key("aprobar.decision", "si", "ejecutar.automatizable"), "is reached without passing ejecutar.vigente"),
+    ("cycle", set_key("hoja.analista.explicar", "sigue", "hoja.vigia.titular"), "cycle"),
+    ("uncapped return", set_key("proponer.causa_insuficiente", "si", "hoja.analista.explicar"), "cycle"),
+    ("dangling id", set_key("explicar.con_evidencia", "no", "explicar.inexistente"), "names explicar.inexistente, which is no node, leaf or end"),
+    ("unknown end", set_key("explicar.con_evidencia", "no", "fin.inventado"), "names fin.inventado, which is no node, leaf or end"),
+    ("reaches no fin", both_branches("explicar.con_evidencia", "explicar.inexistente"), "explicar.con_evidencia reaches no fin"),
+    ("unknown kpi column", set_predicate("detectar.cartera.saldo_vencido.dias", lee="kpi.saldo_vencido.dias_inventados"), "which the kernel does not build"),
+    ("undeclared state field", set_predicate("explicar.con_evidencia", lee="estado.humor"), "which the alert's state does not declare"),
+    ("kpi outside detectar", set_predicate("proponer.con_acciones", lee="kpi.saldo_vencido.max_dias_vencido", op=">", umbral="saldo_vencido", valor=None), "reads a KPI outside detectar"),
+    ("unknown umbral", set_predicate("detectar.cartera.saldo_vencido.dias", umbral="inventada"), "absent from metricas.yaml and from the approved KPIs"),
+    ("umbral without the column", set_predicate("detectar.cartera.saldo_vencido.dias", lee="kpi.saldo_vencido.saldo_vencido"), "sets no threshold for saldo_vencido"),
+    ("valor on a kpi", set_predicate("detectar.cartera.saldo_vencido.dias", umbral=None, valor=15), "compares a KPI with a valor"),
+    ("umbral on a state field", set_predicate("explicar.con_evidencia", valor=None, umbral="saldo_vencido"), "bounds a state field with an umbral"),
+    ("missing skill", set_leaf("hoja.vigia.titular", skill="vigia/inexistente.md"), "which is no file under packages/agents/skills"),
+    ("decision outside the list", set_leaf("hoja.vigia.titular", decision="proponer"), "outside the decisions of vigia"),
+    ("unknown agent", set_leaf("hoja.vigia.titular", agente="orquestador"), "outside vigia, analista, estratega and ejecutor"),
+    ("L0 changed", set_law(0, "iso31000.6.6"), "L0 differs from the base"),
+    ("L1 changed", set_predicate("aprobar.decision", valor=["approve"]), "L1 node aprobar.decision differs from the base"),
+]
+
+
+def test_the_base_passes():
+    assert problems(base_data(), grounds()) == []
+
+
+@pytest.mark.parametrize("name, plant, expected", PLANTED, ids=[name for name, _, _ in PLANTED])
+def test_the_validator_refuses_each_planted_violation(name, plant, expected):
+    data = base_data()
+    plant(data)
+    found = problems(data, grounds())
+    assert any(expected in problem for problem in found), found
+
+
+def test_a_metric_with_no_branch_skill_or_action_row_is_refused():
+    real = load_metrics(METRICAS)
+    metrics = Metrics({**real.descriptions, "metrica_nueva": "Nueva"}, {**real.thresholds, "metrica_nueva": {"x": 1}})
+    found = problems(base_data(), grounds(metrics=metrics))
+    assert "metric metrica_nueva has no L3 branch in detectar" in found
+    assert "metric metrica_nueva has no skills/analista/metrica_nueva.md" in found
+    assert "metric metrica_nueva has no row in skills/estratega/acciones.md" in found
+
+
+def test_load_base_returns_the_base_from_its_files():
+    assert load_base(ARBOL, METRICAS, SKILLS, VIEW_CATALOG).version == 1
+
+
+def test_checked_base_raises_with_every_problem():
+    data = base_data()
+    node_of(data, "explicar.con_evidencia").pop("no")
+    with pytest.raises(InvalidTree) as refused:
+        checked_base(data, load_registry(ARBOL / "fundamentos.yaml"), load_metrics(METRICAS), VIEW_CATALOG, SKILLS)
+    assert "explicar.con_evidencia lacks its no" in refused.value.problems

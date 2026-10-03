@@ -1,0 +1,318 @@
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping
+
+from pydantic import ValidationError
+
+from .catalog import Catalog, thresholds_named
+from .metrics import Metrics, load_metrics, threshold_shape_problem
+from .predicate import KPI_PATH, STATE_PATH
+from .schema import AGENT_DECISIONS, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, reachable, stage_of
+from .state import STATE_FIELDS
+from .yaml_loader import load_yaml
+
+CAPPED_RETURNS = (
+    ("proponer", "explicar", "estado.analyst_returns"),
+    ("aprobar", "proponer", "estado.proposal_returns"),
+)
+
+
+@dataclass(frozen=True)
+class Grounds:
+    base: Tree
+    registry: frozenset[str]
+    metrics: Metrics
+    catalog: Catalog
+    skills: Path
+
+
+class InvalidTree(Exception):
+    def __init__(self, problems: list[str]):
+        super().__init__("\n".join(problems))
+        self.problems = problems
+
+
+def load_registry(path: Path) -> frozenset[str]:
+    return frozenset(entry["id"] for entry in load_yaml(path)["fundamentos"])
+
+
+def schema_problems(error: ValidationError) -> list[str]:
+    return [f"schema: {'.'.join(map(str, item['loc']))}: {item['msg']}" for item in error.errors()]
+
+
+def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
+    try:
+        tree = Tree.model_validate(data)
+    except ValidationError as error:
+        return schema_problems(error)
+    nodes = index(tree)
+    return [
+        *shape_problems(tree),
+        *atomicity_problems(tree),
+        *fundamento_problems(tree, grounds.registry),
+        *reference_problems(tree, nodes),
+        *approval_problems(nodes),
+        *cycle_problems(nodes),
+        *end_problems(nodes),
+        *operand_problems(tree, grounds.catalog),
+        *threshold_problems(tree, grounds),
+        *leaf_problems(tree, grounds.skills),
+        *coverage_problems(tree, grounds),
+        *base_problems(tree, grounds.base),
+    ]
+
+
+def checked_base(data: Mapping[str, Any], registry: frozenset[str], metrics: Metrics, catalog: Catalog, skills: Path) -> Tree:
+    try:
+        base = Tree.model_validate(data)
+    except ValidationError as error:
+        raise InvalidTree(schema_problems(error)) from error
+    found = problems(data, Grounds(base, registry, metrics, catalog, skills))
+    if found:
+        raise InvalidTree(found)
+    return base
+
+
+def load_base(arbol: Path, metricas: Path, skills: Path, catalog: Catalog) -> Tree:
+    return checked_base(
+        load_yaml(arbol / "base.yaml"),
+        load_registry(arbol / "fundamentos.yaml"),
+        load_metrics(metricas),
+        catalog,
+        skills,
+    )
+
+
+def shape_problems(tree: Tree) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for node in tree.nodos:
+        if node.id in seen:
+            found.append(f"{node.id} is declared twice")
+        seen.add(node.id)
+        head = node.id.split(".")[0]
+        if node.hoja is not None:
+            if head != "hoja":
+                found.append(f"{node.id} is a leaf, so its id starts with hoja")
+            if node.fundamento is not None:
+                found.append(f"{node.id} is a leaf, which inherits its parent's fundamento")
+            if node.predicado is not None or node.si is not None or node.no is not None:
+                found.append(f"{node.id} is a leaf and holds a predicate or a branch")
+            if node.sigue is None:
+                found.append(f"{node.id} lacks its sigue")
+            continue
+        if head not in STAGES:
+            found.append(f"{node.id} names no stage")
+        if node.sigue is not None:
+            found.append(f"{node.id} is a node, and only a leaf has sigue")
+        for key in ("predicado", "fundamento", "si", "no"):
+            if getattr(node, key) is None:
+                found.append(f"{node.id} lacks its {key}")
+    return found
+
+
+def atomicity_problems(tree: Tree) -> list[str]:
+    found: list[str] = []
+    for node in tree.nodos:
+        predicate = node.predicado
+        if predicate is None:
+            continue
+        kpi = KPI_PATH.match(predicate.lee) is not None
+        if not kpi and STATE_PATH.match(predicate.lee) is None:
+            found.append(f"{node.id} reads {predicate.lee}, which is not one operand")
+            continue
+        if predicate.op == "existe":
+            if predicate.umbral is not None or predicate.valor is not None:
+                found.append(f"{node.id} tests existe and compares a value too")
+        elif predicate.umbral is not None and predicate.valor is not None:
+            found.append(f"{node.id} compares with an umbral and a valor at once")
+        elif predicate.umbral is None and predicate.valor is None:
+            found.append(f"{node.id} compares {predicate.lee} with nothing")
+        elif predicate.op == "en" and not (isinstance(predicate.valor, list) and predicate.valor):
+            found.append(f"{node.id} tests en without a closed list")
+        elif predicate.op != "en" and isinstance(predicate.valor, list):
+            found.append(f"{node.id} compares with a list without en")
+        if kpi and predicate.valor is not None:
+            found.append(f"{node.id} compares a KPI with a valor; a KPI takes an umbral")
+        if not kpi and predicate.umbral is not None:
+            found.append(f"{node.id} bounds a state field with an umbral; a state field takes a valor")
+    return found
+
+
+def fundamento_problems(tree: Tree, registry: frozenset[str]) -> list[str]:
+    found = [
+        f"{node.id} rests on {node.fundamento}, absent from fundamentos.yaml"
+        for node in tree.nodos
+        if node.fundamento is not None and node.fundamento not in registry
+    ]
+    found += [
+        f"law {law.id} rests on {law.fundamento}, absent from fundamentos.yaml"
+        for law in tree.leyes
+        if law.fundamento not in registry
+    ]
+    return found
+
+
+def reference_problems(tree: Tree, nodes: Mapping[str, Node]) -> list[str]:
+    return [
+        f"{node.id} {name} names {target}, which is no node, leaf or end"
+        for node in tree.nodos
+        for name, target in branches(node)
+        if target not in nodes and target not in ENDS
+    ]
+
+
+def approval_problems(nodes: Mapping[str, Node]) -> list[str]:
+    found: list[str] = []
+    executors = sorted(node_id for node_id, node in nodes.items() if node.hoja is not None and node.hoja.agente == "ejecutor")
+    for required in (GATE, VIGENTE):
+        if required not in nodes:
+            found.append(f"the tree lacks {required}")
+        bypass = reachable(nodes, [ROOT], without=frozenset({required}))
+        found += [f"{leaf} is reached without passing {required}" for leaf in executors if leaf in bypass]
+    return found
+
+
+def capped_return(node: Node, branch: str, target: str, nodes: Mapping[str, Node]) -> bool:
+    predicate = node.predicado
+    if branch != "si" or predicate is None:
+        return False
+    source, goal = stage_of(node.id, nodes), stage_of(target, nodes)
+    return any(
+        source == start and goal == end and predicate.lee == counter and predicate.op == "=" and predicate.valor == 0
+        for start, end, counter in CAPPED_RETURNS
+    )
+
+
+def cycle_problems(nodes: Mapping[str, Node]) -> list[str]:
+    edges = {
+        node_id: [target for branch, target in branches(node) if target in nodes and not capped_return(node, branch, target, nodes)]
+        for node_id, node in nodes.items()
+    }
+    found: list[str] = []
+    marks: dict[str, str] = {}
+
+    def visit(node_id: str, trail: list[str]) -> None:
+        marks[node_id] = "open"
+        for target in edges[node_id]:
+            if marks.get(target) == "open":
+                found.append("cycle " + " -> ".join([*trail[trail.index(target):], target]))
+            elif target not in marks:
+                visit(target, [*trail, target])
+        marks[node_id] = "done"
+
+    for node_id in sorted(nodes):
+        if node_id not in marks:
+            visit(node_id, [node_id])
+    return found
+
+
+def end_problems(nodes: Mapping[str, Node]) -> list[str]:
+    if ROOT not in nodes:
+        return [f"the tree lacks its root {ROOT}"]
+    finishing: set[str] = set()
+    grown = True
+    while grown:
+        grown = False
+        for node_id, node in nodes.items():
+            if node_id not in finishing and any(target in ENDS or target in finishing for _, target in branches(node)):
+                finishing.add(node_id)
+                grown = True
+    return [f"{node_id} reaches no fin" for node_id in sorted(reachable(nodes, [ROOT])) if node_id in nodes and node_id not in finishing]
+
+
+def operand_problems(tree: Tree, catalog: Catalog) -> list[str]:
+    found: list[str] = []
+    for node in tree.nodos:
+        predicate = node.predicado
+        if predicate is None:
+            continue
+        match = KPI_PATH.match(predicate.lee)
+        if match is not None:
+            metric, column = match.groups()
+            kpi = catalog.kpis.get(metric)
+            if kpi is None or column not in kpi.columns:
+                found.append(f"{node.id} reads {predicate.lee}, which the kernel does not build")
+            if node.id.split(".")[0] != "detectar":
+                found.append(f"{node.id} reads a KPI outside detectar; an alert reads its measure through {VIGENTE}")
+        elif STATE_PATH.match(predicate.lee) and predicate.lee not in STATE_FIELDS:
+            found.append(f"{node.id} reads {predicate.lee}, which the alert's state does not declare")
+    return found
+
+
+def threshold_problems(tree: Tree, grounds: Grounds) -> list[str]:
+    found: list[str] = []
+    for node in tree.nodos:
+        predicate = node.predicado
+        if predicate is None or predicate.umbral is None:
+            continue
+        match = KPI_PATH.match(predicate.lee)
+        if match is None:
+            continue
+        metric, column = match.groups()
+        named = thresholds_named(predicate.umbral, grounds.metrics, grounds.catalog)
+        if named is None:
+            found.append(f"{node.id} names umbral {predicate.umbral}, absent from metricas.yaml and from the approved KPIs")
+            continue
+        if column not in named:
+            found.append(f"{node.id} names umbral {predicate.umbral}, which sets no threshold for {column}")
+            continue
+        spec = named[column]
+        shape = threshold_shape_problem(spec)
+        if shape is not None:
+            found.append(f"{node.id}: the threshold of {predicate.umbral} for {column} {shape}")
+            continue
+        referenced = (spec.get("columna") or spec.get("por")) if isinstance(spec, dict) else None
+        kpi = grounds.catalog.kpis.get(metric)
+        if referenced is not None and (kpi is None or referenced not in kpi.columns):
+            found.append(f"{node.id}: the threshold of {predicate.umbral} for {column} reads {referenced}, which kpi.{metric} does not build")
+    return found
+
+
+def leaf_problems(tree: Tree, skills: Path) -> list[str]:
+    found: list[str] = []
+    root = skills.resolve()
+    for node in tree.nodos:
+        leaf = node.hoja
+        if leaf is None:
+            continue
+        allowed = AGENT_DECISIONS.get(leaf.agente)
+        if allowed is None:
+            found.append(f"{node.id} names agent {leaf.agente}, outside vigia, analista, estratega and ejecutor")
+        elif leaf.decision not in allowed:
+            found.append(f"{node.id} takes {leaf.decision}, outside the decisions of {leaf.agente}")
+        path = (skills / leaf.skill).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            found.append(f"{node.id} loads {leaf.skill}, which is no file under packages/agents/skills")
+    return found
+
+
+def coverage_problems(tree: Tree, grounds: Grounds) -> list[str]:
+    read = {
+        KPI_PATH.match(node.predicado.lee).group(1)
+        for node in tree.nodos
+        if node.predicado is not None
+        and KPI_PATH.match(node.predicado.lee)
+        and node.id.split(".")[0] == "detectar"
+        and level(node.id) == 3
+    }
+    listed = (grounds.skills / "estratega" / "acciones.md").read_text(encoding="utf-8").split("\n## ")[0]
+    found: list[str] = []
+    for metric in grounds.metrics.names:
+        if metric not in read:
+            found.append(f"metric {metric} has no L3 branch in detectar")
+        if not (grounds.skills / "analista" / f"{metric}.md").is_file():
+            found.append(f"metric {metric} has no skills/analista/{metric}.md")
+        if re.search(rf"^\| `{re.escape(metric)}` \|", listed, re.MULTILINE) is None:
+            found.append(f"metric {metric} has no row in skills/estratega/acciones.md")
+    return found
+
+
+def base_problems(tree: Tree, base: Tree) -> list[str]:
+    found = [] if tree.leyes == base.leyes else ["L0 differs from the base"]
+    mine = {node.id: node for node in tree.nodos if node.hoja is None and level(node.id) == 1}
+    theirs = {node.id: node for node in base.nodos if node.hoja is None and level(node.id) == 1}
+    found += [f"L1 node {node_id} differs from the base" for node_id in sorted(theirs) if mine.get(node_id) != theirs[node_id]]
+    found += [f"L1 node {node_id} is absent from the base" for node_id in sorted(set(mine) - set(theirs))]
+    return found
