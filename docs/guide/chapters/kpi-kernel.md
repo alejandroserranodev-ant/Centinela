@@ -1,19 +1,19 @@
 # The KPI kernel
 
-The kernel is a **workbench with a closed language**: it defines every KPI from the same
-primitives, compiles each to SQL in code, refuses anything it cannot bound in cost or in time, and
-is the one place an agent reads a business measure from. A fact it does not measure, such as a
-supplier or a purchase order, still comes from a `v_*` cause view. The language is [data](../../../data/AGENTS.md)'s, and the compiler, its guards and its tools are [packages/tools](../../../packages/tools/AGENTS.md)'s; this chapter draws them and owns the one part still to be built.
-
-> **Decided, not implemented.** No agent calls the kernel's tools yet, and no KPI is born at runtime. The last section is what remains.
-
-## Where the kernel is stated
-
-The language, its date roles, its joins and its `fuga` columns are in [data](../../../data/AGENTS.md), under "The kernel's language". The kinds of KPI, the guards, the four tools and their contract are in [packages/tools](../../../packages/tools/AGENTS.md), under "The KPI kernel".
-
-No role an agent's tools hold can write, which makes the grants the gate of the law that no agent changes a database.
+The kernel is the one place an agent reads a business measure from; a fact it does not measure,
+such as a supplier or a purchase order, comes from a `v_*` cause view. Its language, with its date
+roles, its joins and its `fuga` columns, is [data](../../../data/AGENTS.md), *The kernel's
+language*. The kinds of KPI, the guards, the tools and their contract are
+[packages/tools](../../../packages/tools/AGENTS.md), *The KPI kernel*. Why no role a tool holds can
+write is [data](../../../data/AGENTS.md), *Rules of this level*. This chapter draws them, and owns
+the one part of the design no level page states: how a new KPI is born.
 
 ## The tools, and who consults the kernel at each stage
+
+> **Decided, not built.** In this diagram, approved KPIs and `apps/api`'s catalogue, the calls of
+> `Analista` and `calcular_impacto`, `kpi_dry_run` for `proponer_kpi`, and `kpi_catalogo` for a
+> person. What runs is the generation of the base KPIs, `kpi_consultar` in `detectar` and in
+> `ejecutar.vigente`, and `kpi_catalogo` for the tree's validator.
 
 ```mermaid
 flowchart TB
@@ -32,18 +32,17 @@ flowchart TB
   CATL["kpi_catalogo"] --> per["any stage · a person, through apps/api"]
 ```
 
-*Draws: `packages/tools/AGENTS.md` § The KPI kernel*
+*Draws: `packages/tools/AGENTS.md` § The KPI kernel; `packages/agents/arbol/AGENTS.md` § The stages*
 
-`Ejecutor`'s model consults nothing; `ejecutar.vigente` consults for it.
+## The base KPIs and their views
 
-## Rebuilding the current metrics
-
-Every metric of `metricas.yaml` is a base KPI of the kernel, checked against its view in two
-halves; [data](../../../data/AGENTS.md) states it under "The base KPIs".
+Every metric of `data/metricas.yaml` is a base KPI, [data](../../../data/AGENTS.md), *The base
+KPIs*. How each is held to the view the kit delivers for it is
+[packages/tools](../../../packages/tools/AGENTS.md), *Base-KPI parity*.
 
 ## How a new KPI is born
 
-> **Decided, not implemented.** No `kpi_gap`, proposal, catalogue or endpoint below exists.
+> **Decided, not built.** No `kpi_gap`, proposal, catalogue or endpoint below exists.
 
 The current metrics may not suffice: the customer 6 days late in
 [the decision tree](./decision-tree.md) fires none. Centinela must notice a missing measure,
@@ -94,4 +93,4 @@ stateDiagram-v2
 | a proposal asks for an unbounded window or a cross join | the language has no such construct, and `EXPLAIN` caps the cost |
 | a person posts a `kernel:` block | no endpoint accepts one |
 | an approved KPI's SQL is altered after approval | the hash no longer matches |
-| a compiled query tries to write | `centinela_kernel` holds no write grant, and the transaction is read-only |
+| a compiled query tries to write | the roles of [data](../../../data/AGENTS.md) hold no write grant |

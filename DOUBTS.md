@@ -57,12 +57,3 @@ It costs a requirement that nobody can check against its source, and a missing s
 hold the criteria the jury scores. It is paid when the complete deck replaces the PDF and the
 challenge page is re-read against it. Re-derive it with
 `pdftotext -layout docs/challenge/hackathon-brief.pdf - | grep -n "Evaluación\|Criterios\|oculto\|Escenarios"`.
-
-**The guide's code inventory names its parts in code.** `docs/guide/publish.py:inventory(stamp)`
-counts the code, configuration, documents and data of each part from a list written in the
-function, not from the tree, so a part missing from that list is missing from the inventory
-Docmost shows, and nothing fails. `scripts/check` is such a part. It costs a reader of the guide a
-wrong picture of where code lives, and a new part costs an edit to `docs/guide/publish.py` that
-nothing asks for. It is paid when the function derives the parts from the tree. Re-derive the gap
-by comparing the list in the function with the tree's directories that hold code:
-`grep -n 'parts = ' docs/guide/publish.py; git ls-files '*.py' '*.ts' '*.tsx' | cut -d/ -f1-2 | sort -u`.
