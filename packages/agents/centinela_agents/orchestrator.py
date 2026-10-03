@@ -95,6 +95,9 @@ class CentinelaOrchestrator:
             ("estratega", "proponer"): lambda state: propose_actions(
                 provider, state, state.get("cause"), tools
             ),
+            ("estratega", "revision_manual"): lambda state: propose_actions(
+                provider, state, state.get("cause"), tools
+            ),
             ("ejecutor", "ejecutar"): lambda state: execute_action(
                 provider, state.get("action"), state.get("decision"), tools
             ),

@@ -5,7 +5,7 @@ import pytest
 
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.validator import InvalidTree, checked_base, load_base, load_registry, problems
-from support import ARBOL, METRICAS, SKILLS, VIEW_CATALOG, base_data, grounds, node_of
+from support import ARBOL, METRICAS, SKILLS, KERNEL_CATALOG, base_data, grounds, node_of
 
 
 def set_key(node_id, key, value):
@@ -151,12 +151,12 @@ def test_a_metric_with_no_branch_skill_or_action_row_is_refused():
 
 
 def test_load_base_returns_the_base_from_its_files():
-    assert load_base(ARBOL, METRICAS, SKILLS, VIEW_CATALOG).version == 1
+    assert load_base(ARBOL, METRICAS, SKILLS, KERNEL_CATALOG).version == 1
 
 
 def test_checked_base_raises_with_every_problem():
     data = base_data()
     node_of(data, "explicar.con_evidencia").pop("no")
     with pytest.raises(InvalidTree) as refused:
-        checked_base(data, load_registry(ARBOL / "fundamentos.yaml"), load_metrics(METRICAS), VIEW_CATALOG, SKILLS)
+        checked_base(data, load_registry(ARBOL / "fundamentos.yaml"), load_metrics(METRICAS), KERNEL_CATALOG, SKILLS)
     assert "explicar.con_evidencia lacks its no" in refused.value.problems

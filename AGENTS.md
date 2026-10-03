@@ -9,13 +9,15 @@ clock** is the day the operation lives, which replaces `fecha_corte()`; the **ag
 approval); the **`bitácora`** is the append-only log of every decision; the **decision tree** is
 the data in `packages/agents/arbol/` the orchestrator walks, atomic rules whose leaves are an
 agent's decisions; the **kernel** is the closed language every KPI is defined in and compiled to
-SQL over the semantic layer, the one place an agent reads a business measure. The challenge in
-full is [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
+SQL over the dataset's tables, those `data/kernel/fuentes.yaml` grants and never the `v_*` views,
+the one place an agent reads a business measure. The challenge in full is
+[`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo of two apps, two packages and their inputs: `apps/web`, `apps/api`,
-`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold and
-`packages/agents` holds the decision tree's validator and interpreter; the other parts hold no code
-yet. Each page states the decisions its code is written against.
+`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold,
+`packages/agents` holds the decision tree's validator and interpreter, and `packages/tools` holds
+the KPI kernel; the other parts hold no code yet. Each page states the decisions its code is written
+against.
 
 **This file routes. Read only what your task needs.**
 
@@ -49,10 +51,10 @@ answers against `data`. *No gate holds this.*
 **An alert walks the chain like this.** Advancing the simulated clock in `apps/api` starts the
 orchestrator in `packages/agents` for the new day. The orchestrator walks the decision tree of
 `packages/agents`, whose stages follow ISO 31000 and ISO 9001 §10.2, and each agent reads its
-measures from the kernel, which `packages/tools` compiles over the views. `Vigía` reads the views
-through `packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and raises one
-alert per cause. `Analista` finds the cause by querying views and searching the policies, and
-`Estratega` proposes actions with their impact in pesos, every figure coming from a tool call. The
+measures from the kernel, which `packages/tools` compiles over the dataset's tables. `Vigía` reads
+the views through `packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and
+raises one alert per cause. `Analista` finds the cause by querying views and searching the policies,
+and `Estratega` proposes actions with their impact in pesos, every figure coming from a tool call. The
 graph then pauses, and `apps/api` stores the alert as `propuesta` and streams it to `apps/web`. A
 person approves, edits or rejects it on screen; `apps/api` records the decision and resumes the
 graph. On approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Every step
@@ -67,7 +69,9 @@ reach the MCP servers. Whoever settles one writes the decision on the page of th
 There is no root manifest. Each part that has one names its commands on its own page, spelled as
 its manifest declares them. On a fresh clone, the first steps are `npm install` in `apps/web`,
 whose commands are in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md), and `uv sync` in
-`packages/agents`, whose commands are in [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md).
+`packages/agents` and in `packages/tools`, whose commands are in
+[`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md) and
+[`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md).
 The database setup and the generator are in [`data/AGENTS.md`](./data/AGENTS.md).
 
 ## Rules every change follows
@@ -80,7 +84,9 @@ and the verification list at the end is where each is asked.
 - **No action without a recorded human approval**, and every action is a draft or a sandbox effect.
   *No gate holds this.*
 - **No agent changes a database**: not the dataset, not a KPI definition, not the API's state.
-  An agent returns outputs; `apps/api` persists its own. *No gate holds this.*
+  An agent returns outputs; `apps/api` persists its own. *For the database, the grants of the
+  roles in [`data/AGENTS.md`](./data/AGENTS.md) hold this: no role a tool holds can write. For
+  `apps/api`'s state, no gate holds it yet.*
 - **A node of the decision tree rests on one entry of the registry**,
   [`packages/agents/arbol/fundamentos.yaml`](./packages/agents/arbol/fundamentos.yaml); a standard
   founds structure, a policy founds a threshold, and only a person adds to the registry.

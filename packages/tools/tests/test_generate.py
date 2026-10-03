@@ -1,0 +1,75 @@
+# The generator of data/sql/05_kpis.generated.sql: the committed file is exactly what it writes from
+# the tree, so a hand edit fails here; the roles, the column grants and a function are written as
+# the kernel's page says; and a KPI over the planner's cap is refused by the guard costo. Against the
+# scratch database, the file applies over a k_ function whose columns changed, inside a rolled-back
+# transaction.
+import pytest
+
+from centinela_tools.generate import render, view_names
+from centinela_tools.paths import GENERATED, METRICAS, SQL_DIR
+from centinela_tools.refusal import Refused
+from centinela_tools.settings import Settings
+from centinela_tools.sources import load_sources
+from centinela_tools.tools import catalogue_of, load_entries
+
+from support import fixture_entries
+
+SOURCES = load_sources()
+
+
+def no_database(query):
+    raise AssertionError("an empty metricas.yaml estimates no cost")
+
+
+def any_cost(query):
+    return 0.0
+
+
+def test_the_committed_file_is_what_the_generator_writes():
+    assert GENERATED.read_text() == render(SOURCES, load_entries(METRICAS), view_names(SQL_DIR), any_cost, Settings())
+
+
+def test_the_view_names_come_from_both_view_files():
+    names = view_names(SQL_DIR)
+    assert "v_ventas" in names and "v_costo_sku" in names and len(names) == len(set(names))
+
+
+def test_the_file_opens_with_its_banner_and_grants_column_by_column():
+    text = render(SOURCES, {}, view_names(SQL_DIR), no_database, Settings())
+    assert text.startswith("-- Written by `uv run python -m centinela_tools.generate`")
+    assert 'GRANT SELECT ("vendedor_id", "region") ON "centinela"."vendedores" TO centinela_kernel, centinela_propietario;' in text
+    assert "CREATE ROLE centinela_propietario NOLOGIN;" in text
+    assert "REVOKE EXECUTE ON FUNCTION lo_create(oid), lo_creat(integer), lo_from_bytea(oid, bytea), lo_put(oid, bigint, bytea) FROM PUBLIC;" in text
+    assert "ALTER ROLE centinela_lector SET default_transaction_read_only = on;" in text
+    assert "ALTER ROLE centinela_kernel SET default_transaction_read_only = on;" in text
+    assert 'GRANT SELECT ON "centinela"."v_ventas" TO centinela_lector;' in text
+    assert "ALTER FUNCTION centinela.fecha_corte() SECURITY DEFINER" in text
+    assert "CREATE FUNCTION" not in text
+
+
+def test_a_fixture_kpi_becomes_a_function():
+    text = render(SOURCES, fixture_entries(), view_names(SQL_DIR), lambda query: 1.0, Settings())
+    assert text.count("CREATE FUNCTION") == 3
+
+
+def test_a_kpi_over_the_cost_cap_is_refused():
+    with pytest.raises(Refused) as refused:
+        render(SOURCES, fixture_entries(), view_names(SQL_DIR), lambda query: 2.0, Settings(max_cost=1.0))
+    assert refused.value.guard == "costo"
+
+
+def test_the_settings_read_the_environment():
+    settings = Settings.from_env({"CENTINELA_KERNEL_COSTO_MAX": "10", "CENTINELA_KERNEL_TIMEOUT_MS": "20", "CENTINELA_KERNEL_GRUPOS_MAX": "30", "CENTINELA_KERNEL_MUESTRA": "4"})
+    assert settings == Settings(10.0, 20, 30, 4)
+
+
+@pytest.mark.db
+def test_the_file_replaces_a_function_whose_columns_changed(superuser):
+    entries = load_entries(METRICAS)
+    with superuser.transaction(force_rollback=True):
+        superuser.execute("DROP FUNCTION centinela.k_saldo_vencido(date)")
+        superuser.execute("CREATE FUNCTION centinela.k_saldo_vencido(dia date) RETURNS TABLE (otra integer) LANGUAGE sql AS 'SELECT 1'")
+        superuser.execute(render(SOURCES, entries, view_names(SQL_DIR), any_cost, Settings()))
+        cursor = superuser.execute("SELECT * FROM centinela.k_saldo_vencido('2026-03-02') LIMIT 0")
+        returned = [column.name for column in cursor.description]
+    assert returned == [name for name, _ in catalogue_of(entries, SOURCES).kpis["saldo_vencido"].columns]

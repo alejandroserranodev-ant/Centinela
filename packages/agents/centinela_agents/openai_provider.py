@@ -65,11 +65,22 @@ class OpenAIProvider(LLMProvider):
         self.client = OpenAI(api_key=api_key)
         logger.info(f"OpenAI provider initialized with model: {config.model}")
 
-        if not skip_health_check:
-            self.health_check()
+        if not skip_health_check and not self._health_check():
+            raise ValueError(
+                "OpenAI API health check failed.\n"
+                "Possible causes:\n"
+                "  - Invalid API key\n"
+                "  - API key revoked or expired\n"
+                "  - Network connectivity issue\n"
+                "  - Org/project not configured correctly"
+            )
 
     def health_check(self) -> bool:
         """Check that OpenAI API is reachable and API key is valid."""
+        return self._health_check()
+
+    def _health_check(self) -> bool:
+        """Internal health check implementation."""
         try:
             # List models to verify API access
             self.client.models.list()

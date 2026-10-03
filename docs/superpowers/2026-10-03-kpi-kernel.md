@@ -1,6 +1,6 @@
 # Spec 4 of 6: the KPI kernel
 
-**Status:** pending its plan. **Depends on:** spec 1, `normative-foundations`, for the KPI
+**Status:** executed; kept while specs 5 and 6 build on it. **Depends on:** spec 1, `normative-foundations`, for the KPI
 description fields (ISO 22400-2), the role of `Vigía` as owner of measurement (ISO 9001 §9.1), the
 law that no agent changes a database, and the stage at which each agent consults the kernel.
 
@@ -121,7 +121,7 @@ All four are read-only; the kernel has no action.
 | `kpi_catalogo` | every agent the tree gives the SQL tool | lists the client's KPIs, base and approved, with their ISO 22400-2 fields and whether each is descriptive |
 
 The model names a KPI by id and never passes its SQL: the orchestrator, which is code, hands the
-client's approved KPIs (id, stored SQL, hash) to the kernel's server as context of the run, as
+client's approved KPIs (id, stored SQL, hash) to the kernel as context of the run, as
 `apps/api` hands them to the orchestrator.
 
 ## Generated file
@@ -139,7 +139,7 @@ banner naming the command that writes it. It is never edited by hand; the defect
 | `data/AGENTS.md`, "Rules of this level" | "Tools connect as a read-only database user granted only the `v_*` views" gains "and `EXECUTE` on `centinela.k_*`"; a sentence names `centinela_kernel`, its column grants, and that no role a tool holds may write |
 | `data/AGENTS.md`, "Setting up the database" | a step: `psql -d centinela -f sql/05_kpis.generated.sql`, and the grants of both roles |
 | `data/AGENTS.md`, "The simulated clock" | a paragraph: a kernel KPI takes the simulated day as its argument, so the leaks this section lists do not reach it |
-| `packages/tools/AGENTS.md`, "Decisions" | the kernel in the list of servers, its four read-only tools, and the sentence "The kernel has no action: a KPI becomes active by `apps/api`'s record of an approval, never by a change to a database" |
+| `packages/tools/AGENTS.md`, "Decisions" | the kernel as Python functions behind a JSON Schema contract, not a server, its four read-only tools, and the sentence "The kernel has no action: a KPI becomes active by `apps/api`'s record of an approval, never by a change to a database" |
 | `GENERATED.md`, "What writes today" | a row: the kernel's compiler writes `data/sql/05_kpis.generated.sql` from `data/metricas.yaml`; its name says so |
 | `data/docker-compose.yml` | the role `centinela_kernel` and the setup step for `05_kpis.generated.sql` |
 | `docs/guide/chapters/kpi-kernel.md` | the sections on the language, the kinds of KPI, the guards, the roles and the tools shrink to a link to the level page this spec writes them into; the diagrams stay in the chapter, each captioned `Draws:` with that page's new section, and the chapter's warning box drops what this spec implements |
@@ -154,3 +154,24 @@ banner naming the command that writes it. It is never edited by hand; the defect
 - `centinela_kernel` cannot read a column absent from `fuentes.yaml`'s readable list, and every
   `INSERT`, `UPDATE`, `DELETE` or `CREATE` it attempts fails.
 - `kpi_consultar` refuses an approved KPI whose stored SQL does not match its hash.
+
+## Amendments made while planning
+
+Each item supersedes the line of this spec it names; the plan builds the amended version.
+
+- **Scope is infrastructure only.** The plan builds the language, `fuentes.yaml`, the compiler, the guards, the roles, the generator, the four tools and their JSON Schema contract, and tests them with fixture blocks in `packages/tools/tests/fixtures/metricas.yaml`. No entry of `data/metricas.yaml` gains a `kernel:` block, because the table's metrics need primitives the language lacks: conditional sums (`saldo_vencido`), lag (`variacion_costo_pct`, `veces_intervalo_habitual`), `CASE` (`dias_retraso`) and a column-to-column comparison (`descuento_en_exceso`). Spec 5 adds each with its bound. The `DOUBTS.md` debt stays filed and says that `kpi_catalogo` exists and serves no base metric yet.
+- **Each date column has a role in `fuentes.yaml`**, because applying `dia` to every date column breaks `fecha_vencimiento` and `fecha_esperada`, which are future by nature. `evento`: the row exists from that day, and the compiler adds `<= dia`. `plazo`: a promised date, read as is. `cierre`: an event that closes the row, such as `fecha_recibida`, read as `CASE WHEN c <= dia THEN c END`. `ventana`, `linea_base` and `abierto_al_dia.desde` take only an `evento` date; `agrupar ... por` takes an `evento` or a `plazo` date.
+- **Only many-to-one joins.** A join reaches the whole primary key of its target along a `REFERENCES` of `01_esquema.sql`, or the PK of a `ref_*` table (`ref_topes_descuento` by `segmento`, `ref_margen_minimo_linea` by `linea`), which have no FK. Joins are `LEFT JOIN`, so a null FK (`clientes.vendedor_id`) never drops a row. A child table, such as `pagos` of an invoice, reaches a KPI only as a closing (`cierres:` of the source), and only inside `abierto_al_dia.hasta`, compiled to `NOT EXISTS (... fecha_pago <= dia)`. That is the spec's "a payment joins only when `fecha_pago <= dia`". The data holds one full payment per invoice, so "open" means no payment up to `dia`.
+- **A source with no date of its own names the join that dates it.** `pedidos_detalle` declares `fechada_por: pedidos`, and a KPI over it without `unir: [pedidos]` is refused by `reloj`. The join's bound goes in `WHERE`, so its `LEFT JOIN` behaves as an inner one.
+- **`pedidos.estado` is `fuga` except for values known when the row is created.** The generator decides `Cancelado` at creation (4% at random, never invoiced), and only `Pendiente de despacho` holds the end of the dataset. `fuga: {estado: {razon, conocidos_al_crear: [Cancelado]}}` admits `=`, `!=` or `en` on those values in a `filtro` and nothing else. `ordenes_compra.estado` has no known value, so no filter reads it. Without this, spec 5's parity with `v_ventas` breaks on every sales metric.
+- **The base functions, and `fecha_corte()`, belong to `centinela_propietario`**, a `NOLOGIN` role that holds the same column-by-column `SELECT` grants as `centinela_kernel`, because an owner can drop or alter its functions and `centinela_kernel` is a login role a tool uses. They are `SECURITY DEFINER` with `SET search_path = pg_catalog, pg_temp` and fully qualified names, so a base KPI reads only the readable columns too. The setup superuser creates them and changes their owner with `ALTER FUNCTION ... OWNER TO`, which needs no `CREATE` for the owner role. `EXECUTE` is revoked from `PUBLIC` and granted to `centinela_lector`.
+- **The read-only user is `centinela_lector`**, because `data/AGENTS.md` named no role and none existed. Both roles are `LOGIN` with the password equal to the name, the posture of the compose's `centinela/centinela` for the local dataset, and are created in an idempotent `DO` block.
+- **`fecha_corte()` becomes `SECURITY DEFINER`, owned by `centinela_propietario`**, in `05`, because a view's function runs with the caller's privileges and `centinela_lector` reading `v_cartera_cliente` would fail on `inventario_diario`. The kit file `03` is not touched.
+- **`05_kpis.generated.sql` holds the roles, the grants and the functions**, one file written by one command from `fuentes.yaml`, `metricas.yaml` and the view names of `03` and `04`, because the function needs the role and its grants first and the spec names one setup step. A test compares the committed file with what the generator writes.
+- **The entity of a KPI is its `agrupar`** (one to three items). `salida` names only `valor`, plus `base` and `delta` with a `linea_base`, so one row per entity holds by construction. `dia` and `periodo` are reserved names.
+- **One time frame per KPI**: at most one of `ventana`, `abierto_al_dia` and `linea_base`. With none, the compiler bounds every event date by `<= dia`. `linea_base` measures the last complete period before `dia` (for a week, the Monday `s` with `s + 6 <= dia`; for a month, the one whose last day is `<= dia`) and compares it against the mean of the N before it.
+- **Language bounds the spec leaves open**: an `en` list of at most 20 literals; no `%` in a text literal, because psycopg would read it as a placeholder in an approved KPI's stored text; a literal of the column's type; text of at most 200 characters.
+- **ISO 22400-2 fields**: `unidad` (text), `rango` (`{min, max}`, each a number or `null`), `tendencia` (`mayor_es_mejor` or `menor_es_mejor`), `temporalidad` (`diaria`, `semanal` or `mensual`) and `audiencia` (one or more of `operacion`, `supervision`, `gerencia`). They are required only on an entry that carries `kernel:`, and are defined in `$defs/ficha` of the same schema.
+- **`kpi_validar` takes `dia`**, because `EXPLAIN` with a null day folds the plan to nothing. The generator explains each base KPI on `centinela.fecha_corte()` and needs `CENTINELA_DSN` only when an entry carries `kernel:`.
+- **The tools receive a block, never SQL.** `kpi_dry_run` compiles the block it receives and `kpi_consultar` receives an id. The approved KPIs reach the kernel as a JSON file named by `CENTINELA_KPIS_APROBADOS`, which the orchestrator writes for the run; that is code, as the spec asks. The kernel is Python functions, `centinela_tools/kernel.py:Kernel.call(name, arguments)`, which checks the arguments against each tool's JSON Schema in `CONTRACT`; code calls it in its own process and a model reaches it through native function calling, and which agent is given which tool stays undecided in `packages/agents`.
+- **Guard settings come from environment variables**, with defaults sized in the plan: `CENTINELA_KERNEL_COSTO_MAX`, `CENTINELA_KERNEL_TIMEOUT_MS`, `CENTINELA_KERNEL_GRUPOS_MAX` and `CENTINELA_KERNEL_MUESTRA`.

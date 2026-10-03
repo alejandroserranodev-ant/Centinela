@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kernel",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fuente", "agrupar", "salida"],
+  "properties": {
+    "fuente": { "$ref": "#/$defs/nombre" },
+    "unir": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/nombre" } },
+    "abierto_al_dia": {
+      "type": "object", "additionalProperties": false, "required": ["desde", "hasta"],
+      "properties": {
+        "desde": { "$ref": "#/$defs/columna" },
+        "hasta": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/nombre" }] }
+      }
+    },
+    "ventana": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "dias"],
+      "properties": { "columna": { "$ref": "#/$defs/columna" }, "dias": { "type": "integer", "minimum": 1, "maximum": 365 } }
+    },
+    "filtro": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/filtro" } },
+    "agrupar": {
+      "type": "array", "minItems": 1, "maxItems": 3,
+      "items": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/periodo" }] }
+    },
+    "medida": { "$ref": "#/$defs/medida" },
+    "razon": {
+      "type": "object", "additionalProperties": false, "required": ["numerador", "denominador"],
+      "properties": { "numerador": { "$ref": "#/$defs/medida" }, "denominador": { "$ref": "#/$defs/medida" } }
+    },
+    "linea_base": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "periodo", "n", "salida"],
+      "properties": {
+        "columna": { "$ref": "#/$defs/columna" },
+        "periodo": { "enum": ["semana", "mes"] },
+        "n": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "salida": { "enum": ["delta", "delta_pct", "caida"] }
+      }
+    },
+    "columnas": { "type": "object", "maxProperties": 8, "propertyNames": { "$ref": "#/$defs/nombre" }, "additionalProperties": { "$ref": "#/$defs/medida" } },
+    "tomar": {
+      "type": "object", "maxProperties": 2, "propertyNames": { "$ref": "#/$defs/nombre" },
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false, "required": ["kpi", "por"],
+        "properties": {
+          "kpi": { "$ref": "#" },
+          "por": { "type": "object", "minProperties": 1, "maxProperties": 3, "propertyNames": { "$ref": "#/$defs/nombre" }, "additionalProperties": { "$ref": "#/$defs/columna" } }
+        }
+      }
+    },
+    "derivadas": { "type": "object", "maxProperties": 6, "propertyNames": { "$ref": "#/$defs/nombre" }, "additionalProperties": { "$ref": "#/$defs/derivada" } },
+    "decimales": { "type": "object", "maxProperties": 12, "propertyNames": { "$ref": "#/$defs/nombre" }, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 4 } },
+    "tener": {
+      "type": "array", "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["columna", "op", "valor"],
+        "properties": { "columna": { "$ref": "#/$defs/nombre" }, "op": { "$ref": "#/$defs/comparacion" }, "valor": { "type": "number" } }
+      }
+    },
+    "salida": {
+      "type": "object", "additionalProperties": false, "required": ["valor"],
+      "properties": { "valor": { "$ref": "#/$defs/nombre" }, "base": { "$ref": "#/$defs/nombre" }, "delta": { "$ref": "#/$defs/nombre" } }
+    }
+  },
+  "oneOf": [{ "required": ["medida"] }, { "required": ["razon"] }],
+  "not": {
+    "anyOf": [
+      { "required": ["ventana", "abierto_al_dia"] },
+      { "required": ["ventana", "linea_base"] },
+      { "required": ["abierto_al_dia", "linea_base"] }
+    ]
+  },
+  "if": { "required": ["linea_base"] },
+  "then": { "properties": { "salida": { "required": ["valor", "base", "delta"] } } },
+  "else": { "properties": { "salida": { "properties": { "base": false, "delta": false } } } },
+  "$defs": {
+    "nombre": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,62}$" },
+    "columna": { "type": "string", "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$" },
+    "comparacion": { "enum": ["=", "!=", "<", "<=", ">", ">="] },
+    "periodo": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "por"],
+      "properties": { "columna": { "$ref": "#/$defs/columna" }, "por": { "enum": ["semana", "mes"] } }
+    },
+    "literal": {
+      "anyOf": [
+        { "type": "string", "maxLength": 200, "pattern": "^[^%\\u0000]*$" },
+        { "type": "number" },
+        { "type": "boolean" }
+      ]
+    },
+    "filtro": {
+      "if": { "required": ["contra"] },
+      "then": { "$ref": "#/$defs/filtro_contra" },
+      "else": { "$ref": "#/$defs/filtro_valor" }
+    },
+    "filtro_valor": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "op", "valor"],
+      "properties": {
+        "columna": { "$ref": "#/$defs/columna" },
+        "op": { "enum": ["=", "!=", "<", "<=", ">", ">=", "en"] },
+        "valor": true
+      },
+      "if": { "properties": { "op": { "const": "en" } } },
+      "then": { "properties": { "valor": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/literal" } } } },
+      "else": { "properties": { "valor": { "$ref": "#/$defs/literal" } } }
+    },
+    "filtro_contra": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "op", "contra"],
+      "properties": {
+        "columna": { "$ref": "#/$defs/columna" },
+        "op": { "$ref": "#/$defs/comparacion" },
+        "contra": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "const": "dia" }] },
+        "menos_dias": { "type": "integer", "minimum": 1, "maximum": 365 },
+        "menos_meses": { "type": "integer", "minimum": 1, "maximum": 12 }
+      },
+      "not": { "required": ["menos_dias", "menos_meses"] }
+    },
+    "operando": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "type": "number" }, { "const": "dia" }] },
+    "operacion_1": {
+      "type": "object", "additionalProperties": false, "required": ["op", "izq", "der"],
+      "properties": { "op": { "enum": ["+", "-", "*", "/"] }, "izq": { "$ref": "#/$defs/operando" }, "der": { "$ref": "#/$defs/operando" } }
+    },
+    "operacion_2": {
+      "type": "object", "additionalProperties": false, "required": ["op", "izq", "der"],
+      "properties": {
+        "op": { "enum": ["+", "-", "*", "/"] },
+        "izq": { "anyOf": [{ "$ref": "#/$defs/operando" }, { "$ref": "#/$defs/operacion_1" }] },
+        "der": { "anyOf": [{ "$ref": "#/$defs/operando" }, { "$ref": "#/$defs/operacion_1" }] }
+      }
+    },
+    "operacion_3": {
+      "type": "object", "additionalProperties": false, "required": ["op", "izq", "der"],
+      "properties": {
+        "op": { "enum": ["+", "-", "*", "/"] },
+        "izq": { "anyOf": [{ "$ref": "#/$defs/operando" }, { "$ref": "#/$defs/operacion_1" }, { "$ref": "#/$defs/operacion_2" }] },
+        "der": { "anyOf": [{ "$ref": "#/$defs/operando" }, { "$ref": "#/$defs/operacion_1" }, { "$ref": "#/$defs/operacion_2" }] }
+      }
+    },
+    "expresion": {
+      "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/operacion_1" }, { "$ref": "#/$defs/operacion_2" }, { "$ref": "#/$defs/operacion_3" }]
+    },
+    "medida": {
+      "type": "object", "additionalProperties": false, "required": ["agregado"],
+      "properties": {
+        "agregado": { "enum": ["sum", "avg", "count", "min", "max", "mediana", "ultimo", "anterior"] },
+        "de": { "$ref": "#/$defs/expresion" },
+        "por": { "$ref": "#/$defs/columna" },
+        "si": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "$ref": "#/$defs/filtro" } }
+      },
+      "allOf": [
+        { "if": { "properties": { "agregado": { "not": { "const": "count" } } } }, "then": { "required": ["de"] } },
+        {
+          "if": { "properties": { "agregado": { "enum": ["ultimo", "anterior"] } } },
+          "then": { "required": ["por"] },
+          "else": { "not": { "required": ["por"] } }
+        }
+      ]
+    },
+    "derivada": {
+      "anyOf": [
+        { "$ref": "#/$defs/nombre" },
+        { "type": "number" },
+        { "type": "object", "additionalProperties": false, "required": ["umbral"], "properties": { "umbral": { "$ref": "#/$defs/nombre" } } },
+        {
+          "type": "object", "additionalProperties": false, "required": ["op", "izq", "der"],
+          "properties": { "op": { "enum": ["+", "-", "*", "/"] }, "izq": { "$ref": "#/$defs/derivada" }, "der": { "$ref": "#/$defs/derivada" } }
+        },
+        { "type": "object", "additionalProperties": false, "required": ["mayor"], "properties": { "mayor": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/derivada" } } } },
+        { "type": "object", "additionalProperties": false, "required": ["menor"], "properties": { "menor": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/derivada" } } } },
+        {
+          "type": "object", "additionalProperties": false, "required": ["dias_habiles"],
+          "properties": {
+            "dias_habiles": {
+              "type": "object", "additionalProperties": false, "required": ["desde", "hasta"],
+              "properties": { "desde": { "$ref": "#/$defs/derivada" }, "hasta": { "$ref": "#/$defs/derivada" } }
+            }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["compara"],
+          "properties": {
+            "compara": {
+              "type": "object", "additionalProperties": false, "required": ["izq", "op", "der"],
+              "properties": { "izq": { "$ref": "#/$defs/derivada" }, "op": { "$ref": "#/$defs/comparacion" }, "der": { "$ref": "#/$defs/derivada" } }
+            }
+          }
+        },
+        { "type": "object", "additionalProperties": false, "required": ["existe"], "properties": { "existe": { "$ref": "#/$defs/nombre" } } },
+        { "type": "object", "additionalProperties": false, "required": ["participacion"], "properties": { "participacion": { "$ref": "#/$defs/nombre" } } },
+        { "type": "object", "additionalProperties": false, "required": ["periodo_anterior"], "properties": { "periodo_anterior": { "$ref": "#/$defs/nombre" } } },
+        {
+          "type": "object", "additionalProperties": false, "required": ["si"],
+          "properties": {
+            "si": {
+              "type": "object", "additionalProperties": false, "required": ["cuando", "entonces", "sino"],
+              "properties": { "cuando": { "$ref": "#/$defs/derivada" }, "entonces": { "$ref": "#/$defs/derivada" }, "sino": { "$ref": "#/$defs/derivada" } }
+            }
+          }
+        }
+      ]
+    },
+    "ficha": {
+      "type": "object",
+      "required": ["descripcion", "unidad", "rango", "tendencia", "temporalidad", "audiencia"],
+      "properties": {
+        "descripcion": { "type": "string", "minLength": 1 },
+        "unidad": { "type": "string", "minLength": 1 },
+        "rango": {
+          "type": "object", "additionalProperties": false, "required": ["min", "max"],
+          "properties": { "min": { "type": ["number", "null"] }, "max": { "type": ["number", "null"] } }
+        },
+        "tendencia": { "enum": ["mayor_es_mejor", "menor_es_mejor"] },
+        "temporalidad": { "enum": ["diaria", "semanal", "mensual"] },
+        "audiencia": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["operacion", "supervision", "gerencia"] } }
+      }
+    }
+  }
+}

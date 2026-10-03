@@ -225,7 +225,6 @@ data/generator/csv/
 !docs/guide/.env
 
 # Secrets and API Keys
-.env
 .env.local
 .env.*.local
 *.key

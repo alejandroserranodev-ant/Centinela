@@ -1,0 +1,42 @@
+from . import ciclo_vida
+from .modelos import Alert, Decision, DecisionApprove, DecisionEdit, LogEventType
+
+
+class ConflictoEstado(Exception):
+    pass
+
+
+class DecisionInvalida(Exception):
+    pass
+
+
+def aplicar(alerta: Alert, decision: Decision) -> tuple[Alert, list[tuple[LogEventType, str]]]:
+    if alerta.status != "proposed":
+        raise ConflictoEstado("Esta alerta ya no espera una decisión")
+
+    if decision.kind == "reject":
+        motivo = decision.reason.strip()
+        if not motivo:
+            raise DecisionInvalida("Para rechazar hace falta un motivo")
+        ciclo_vida.transicionar(alerta.status, "rejected")
+        nueva = alerta.model_copy(update={"status": "rejected"})
+        return nueva, [("decision", f"Rechazada. Motivo: {motivo}")]
+
+    accion = next((a for a in alerta.actions if a.id == decision.action_id), None)
+    if accion is None:
+        raise DecisionInvalida("La acción elegida no pertenece a esta alerta")
+
+    acciones = list(alerta.actions)
+    if isinstance(decision, DecisionEdit):
+        indice = acciones.index(accion)
+        accion = accion.model_copy(update={"parameters": {**accion.parameters, **decision.parameters}})
+        acciones[indice] = accion
+
+    ciclo_vida.transicionar(alerta.status, "approved")
+    nueva = alerta.model_copy(update={"status": "approved", "actions": acciones})
+    detalle = (
+        f"Aprobada: {accion.title}"
+        if isinstance(decision, DecisionApprove)
+        else f"Aprobada con cambios: {accion.title}"
+    )
+    return nueva, [("decision", detalle)]
