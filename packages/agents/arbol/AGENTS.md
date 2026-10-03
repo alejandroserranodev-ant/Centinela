@@ -245,6 +245,8 @@ Each list is in the order the change is made. `uv run pytest`, from `packages/ag
 5. Its rows in both tables of `skills/estratega/acciones.md`: its actions, and the owner of its
    manual review.
 6. A row of `tests/test_detect.py:FIRING` per KPI node, holding only columns its KPI returns.
+7. Its name in `apps/web/src/api/types.ts:Metric`, and its `alerta` case, as
+   [`evals/AGENTS.md`](../../../evals/AGENTS.md#adding-a-case) orders.
 
 **A node or a predicate.** A new state field a `lee` names joins
 `centinela_agents/state.py:STATE_FIELDS`, and `centinela_agents/state.py:AlertState` when a step

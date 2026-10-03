@@ -24,7 +24,8 @@ screens on a simulated API, `packages/agents` holds the tree's validator, walk a
 | I am here because | Start at |
 |---|---|
 | an alert is missing, wrong, duplicated or fires on the wrong day | [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md), then [`packages/agents/arbol/AGENTS.md`](./packages/agents/arbol/AGENTS.md), then the clock in [`data/AGENTS.md`](./data/AGENTS.md#the-simulated-clock) |
-| a number in an answer or on screen disagrees with SQL | [`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md#the-kpi-kernel), then the base KPIs in [`data/AGENTS.md`](./data/AGENTS.md#the-base-kpis) |
+| a number on screen disagrees with SQL | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md), whose screens read fixtures, then the totals in [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-inbox-totals) |
+| a number in an agent's answer or an alert disagrees with SQL | [`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md#the-kpi-kernel), then the base KPIs in [`data/AGENTS.md`](./data/AGENTS.md#the-base-kpis) |
 | something happened without approval, or the log is missing a step | [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#decisions-and-roles) |
 | a screen renders or behaves wrong | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md) |
 | `npm run check` failed, or I am adding a gate | [`scripts/check/AGENTS.md`](./scripts/check/AGENTS.md) |

@@ -14,7 +14,8 @@ export const ENTRIES = new Map<string, Budget>([
 
 export const ROUTES = new Map<string, Budget>([
   ["an alert is missing, wrong, duplicated or fires on the wrong day", [68500, "the agents, the tree and the clock are the three places a detection is decided"]],
-  ["a number in an answer or on screen disagrees with SQL", [47000, "a figure comes from the compiler and from the base KPI it compiles"]],
+  ["a number on screen disagrees with SQL", [24500, "a screen's figure comes from its fixtures or from the totals the API computes"]],
+  ["a number in an agent's answer or an alert disagrees with SQL", [47000, "a figure comes from the compiler and from the base KPI it compiles"]],
   ["something happened without approval, or the log is missing a step", [10000, "the decision checks and the bitácora are stated on one page"]],
   ["a screen renders or behaves wrong", [14500, "the screens' decisions and their person-run check are one page"]],
   ["`npm run check` failed, or I am adding a gate", [5500, "one page names every gate and the maps that excuse a case"]],
