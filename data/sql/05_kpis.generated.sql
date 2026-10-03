@@ -16,6 +16,9 @@ BEGIN
   EXECUTE format('GRANT CONNECT ON DATABASE %I TO centinela_lector, centinela_kernel', current_database());
 END
 $roles$;
+ALTER ROLE centinela_lector SET default_transaction_read_only = on;
+ALTER ROLE centinela_kernel SET default_transaction_read_only = on;
+REVOKE EXECUTE ON FUNCTION lo_create(oid), lo_creat(integer), lo_from_bytea(oid, bytea), lo_put(oid, bigint, bytea) FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA centinela TO centinela_lector, centinela_kernel, centinela_propietario;
 GRANT SELECT ("vendedor_id", "region") ON "centinela"."vendedores" TO centinela_kernel, centinela_propietario;

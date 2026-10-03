@@ -33,6 +33,9 @@ def test_the_file_opens_with_its_banner_and_grants_column_by_column():
     assert text.startswith("-- Written by `uv run python -m centinela_tools.generate`")
     assert 'GRANT SELECT ("vendedor_id", "region") ON "centinela"."vendedores" TO centinela_kernel, centinela_propietario;' in text
     assert "CREATE ROLE centinela_propietario NOLOGIN;" in text
+    assert "REVOKE EXECUTE ON FUNCTION lo_create(oid), lo_creat(integer), lo_from_bytea(oid, bytea), lo_put(oid, bigint, bytea) FROM PUBLIC;" in text
+    assert "ALTER ROLE centinela_lector SET default_transaction_read_only = on;" in text
+    assert "ALTER ROLE centinela_kernel SET default_transaction_read_only = on;" in text
     assert 'GRANT SELECT ON "centinela"."v_ventas" TO centinela_lector;' in text
     assert "ALTER FUNCTION centinela.fecha_corte() SECURITY DEFINER" in text
     assert "CREATE OR REPLACE FUNCTION" not in text

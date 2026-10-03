@@ -1,5 +1,8 @@
 # The gate of the law that no agent changes a database: what centinela_lector and centinela_kernel
-# can read and run, that every write either role attempts fails, and that neither can become
+# can read and run, and that every write either role attempts in a plain session fails, whether
+# refused by a missing privilege (tables, schemas, functions, large objects) or by the session's
+# read-only default (ALTER ROLE, ALTER DEFAULT PRIVILEGES). That default is a role setting a session
+# could turn off; what holds without it is the privileges. Neither role can become
 # centinela_propietario, the NOLOGIN owner of the functions. Needs the scratch database.
 import psycopg
 import pytest
@@ -17,6 +20,10 @@ WRITES = [
     "DROP FUNCTION centinela.k_oc_abiertas(date)",
     "ALTER FUNCTION centinela.fecha_corte() SECURITY INVOKER",
     "GRANT SELECT ON centinela.pedidos TO centinela_lector",
+    "SELECT lo_create(0)",
+    "SELECT lo_from_bytea(0, 'x')",
+    "ALTER ROLE CURRENT_USER SET work_mem = '1GB'",
+    "ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO PUBLIC",
 ]
 
 
@@ -64,3 +71,9 @@ def test_every_write_of_either_role_fails(connect, superuser, role, statement):
 def test_neither_login_role_can_become_the_owner(connect, role):
     with connect(role) as conn:
         fails(conn, "SET ROLE centinela_propietario")
+
+
+@pytest.mark.parametrize("role", ["lector", "kernel"])
+def test_a_fresh_session_of_either_role_is_read_only(connect, role):
+    with connect(role) as conn:
+        assert conn.execute("SHOW default_transaction_read_only").fetchone()[0] == "on"
