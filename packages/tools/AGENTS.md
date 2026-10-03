@@ -1,8 +1,8 @@
 # packages/tools: the closed list of tools
 
-This level holds the MCP servers the agents call. **The list of tools is closed**: an agent can do
+This level holds the tools the agents call. **The list of tools is closed**: an agent can do
 exactly what a tool here exposes and nothing else, which is what makes an acting agent safe to
-buy. It holds the KPI kernel as code; the other servers hold none yet, and this page states the
+buy. It holds the KPI kernel as code; the other tools hold none yet, and this page states the
 decisions all of them are written against.
 
 ## Why each file exists
@@ -13,7 +13,7 @@ decisions all of them are written against.
 | `centinela_tools/compiler.py` | a `kernel:` block → SQL composed with `psycopg.sql`, the `k_` function, the hash |
 | `centinela_tools/tools.py` | the catalogue and the kernel's four tools |
 | `centinela_tools/generate.py` | writes `data/sql/05_kpis.generated.sql` |
-| `centinela_tools/server.py` | the kernel's MCP server |
+| `centinela_tools/kernel.py` | the kernel's contract: the JSON Schema of each of its four tools, and the one call that checks arguments against it and dispatches |
 | `centinela_tools/refusal.py`, `settings.py`, `paths.py` | the closed list of guards, the settings read from the environment, and where the files of `data/` are |
 | `tests/` | planted violations of every bound, rule of `fuentes.yaml` and guard; `tests/fixtures/metricas.yaml` holds the KPIs they compile; the tests marked `db` need the scratch database |
 | `pyproject.toml`, `uv.lock` | the package and its pinned dependencies; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
@@ -27,7 +27,6 @@ Run from this directory, with [uv](https://docs.astral.sh/uv/):
 | `uv sync` | installs the package and its dependencies into `.venv` |
 | `uv run pytest` | runs every test; those marked `db` are skipped, with the reason, unless `CENTINELA_TEST_DSN` is set |
 | `uv run python -m centinela_tools.generate` | writes `data/sql/05_kpis.generated.sql`; with a metric that carries `kernel:`, `CENTINELA_DSN` names a database loaded with `data/sql/01` to `04`, for the planner's cost |
-| `uv run python -m centinela_tools.server` | serves the kernel over stdio, with `CENTINELA_LECTOR_DSN`, `CENTINELA_KERNEL_DSN` and, optionally, `CENTINELA_KPIS_APROBADOS` |
 
 The scratch database for the `db` tests is a disposable container on port 55432, never the
 compose's volume:
@@ -50,20 +49,22 @@ itself. `docker stop centinela-kernel-test` removes the container.
 
 ## Decisions
 
-- **Tools are MCP servers**, one per concern:
-  - **the KPI kernel**, four read-only tools over the closed language of
-    [`../../data/AGENTS.md`](../../data/AGENTS.md) ([below](#the-kpi-kernel)); **the kernel has no
-    action: a KPI becomes active by `apps/api`'s record of an approval, never by a change to a
-    database**;
+- **The KPI kernel is Python functions behind a JSON Schema contract, not a server**: four
+  read-only tools over the closed language of [`../../data/AGENTS.md`](../../data/AGENTS.md)
+  ([below](#the-kpi-kernel)). Most of its callers are code, the tree's nodes and
+  `calcular_impacto`, which a process boundary would only slow; a model reaches it through native
+  function calling, which takes the contract as it stands. What closes the list is the contract,
+  exactly four tools and none taking SQL, not a transport. **The kernel has no action: a KPI
+  becomes active by `apps/api`'s record of an approval, never by a change to a database.**
+- **The other tools are MCP servers**, one per concern:
   - **read-only SQL** over the `v_*` views of the semantic layer
     ([`../../data/AGENTS.md`](../../data/AGENTS.md)), connected as `centinela_lector`;
   - **policy search** over [`../../data/policies/`](../../data/policies/), embedded in pgvector;
   - **the impact calculator**, `calcular_impacto`, which `Estratega` calls for every amount it proposes;
   - **actions**, each producing a draft or a sandbox effect: `email_draft`, `task`,
     `purchase_order_draft`, `price_change_draft`.
-- **A server speaks stdio**, one process per concern. Which agent reaches which server, and how, is
-  [`../agents/AGENTS.md`](../agents/AGENTS.md)'s. The kernel's server is built on the `mcp` 2.x SDK,
-  `mcp.server.mcpserver.MCPServer`, which 1.x lacks, so `pyproject.toml` pins `mcp>=2,<3`.
+- **A server speaks stdio**, one process per concern. Which agent reaches which tool, and how, is
+  [`../agents/AGENTS.md`](../agents/AGENTS.md)'s.
 - **Every SQL tool takes the simulated day** and filters by it, because not every view does. The
   cause views of `data/sql/04_vistas_causa.sql` are read like any other view; `Analista` needs them
   because supplier costs, list prices and purchase orders reach no kit view.
@@ -156,8 +157,11 @@ itself, against the database `CENTINELA_DSN` names, on its `fecha_corte()`.
 
 A refusal returns as `{"rechazado": {"guarda", "detalle"}}`, so the model reads which guard
 refused. A database error that is no guard, such as an approved KPI whose stored text writes,
-surfaces as a tool error. The model names a KPI by id and never passes SQL. The server builds the
-catalogue when it starts, from the entries of `metricas.yaml` with a `kernel:` block and from the
+surfaces as a tool error. The model names a KPI by id and never passes SQL.
+`centinela_tools/kernel.py:Kernel.call(name, arguments)` checks the arguments against the tool's
+schema in `centinela_tools/kernel.py:CONTRACT` before it runs, so arguments out of contract return
+as a `lenguaje` refusal, and a name outside the contract is an error.
+`centinela_tools/kernel.py:kernel_from_env(env)` builds the catalogue, from the entries of `metricas.yaml` with a `kernel:` block and from the
 JSON file `CENTINELA_KPIS_APROBADOS` names, so a base entry the language refuses stops it, and so
 does an approved id that repeats or that a base KPI holds. The
 orchestrator, which is code, writes that file as `apps/api` hands it the client's approved KPIs,

@@ -9,7 +9,7 @@ price or a cost in force, still comes from a `v_*` cause view. The language is [
 
 ## Where the kernel is stated
 
-The language, its date roles, its joins and its `fuga` columns are in [data](../../../data/AGENTS.md), under "The kernel's language". The kinds of KPI, the guards, the four tools and the server are in [packages/tools](../../../packages/tools/AGENTS.md), under "The KPI kernel".
+The language, its date roles, its joins and its `fuga` columns are in [data](../../../data/AGENTS.md), under "The kernel's language". The kinds of KPI, the guards, the four tools and their contract are in [packages/tools](../../../packages/tools/AGENTS.md), under "The KPI kernel".
 
 No role an agent's tools hold can write, which makes the grants the gate of the law that no agent changes a database.
 
