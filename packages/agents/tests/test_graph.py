@@ -1,0 +1,72 @@
+import pytest
+from langgraph.checkpoint.memory import InMemorySaver
+
+from centinela_agents.graph import BOUND_NODES, Compiler, MissingLeaf, ResumeRefused, awaiting_decision, compile_tree, resume, start_alert
+from centinela_agents.metrics import load_metrics
+from centinela_agents.schema import ENDS, branches, index
+from support import DAY, DECISION_DAY, EMAIL, METRICAS, VIEW_CATALOG, Recorder, approve, base_tree, compiled, leaves, reader_from, saldo_detection, statuses
+
+
+def test_an_alert_pauses_at_the_gate_and_executes_on_approval():
+    recorder = Recorder()
+    graph = compiled(recorder)
+    state = start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    assert awaiting_decision(graph, "A1")
+    assert statuses(state) == ["nueva", "en análisis", "propuesta"]
+    assert recorder.count("ejecutor", "ejecutar") == 0
+    final = resume(graph, "A1", approve())
+    assert final["fin"] == "fin.ejecutada"
+    assert final["status"] == "ejecutada"
+    assert statuses(final) == ["nueva", "en análisis", "propuesta", "ejecutada"]
+    assert ["aprobar.decision", "si"] in final["camino"]
+    assert ["ejecutar.vigente", "si"] in final["camino"]
+
+
+def test_ejecutor_receives_the_approved_action_and_the_decision_only():
+    recorder = Recorder()
+    graph = compiled(recorder)
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    resume(graph, "A1", approve())
+    received = recorder.received[("ejecutor", "ejecutar")]
+    assert set(received) == {"alert_id", "action", "decision"}
+    assert received["action"] == EMAIL
+
+
+def test_an_edit_replaces_the_parameters_ejecutor_receives():
+    recorder = Recorder()
+    graph = compiled(recorder)
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    edit = {"id": "dec-1", "kind": "edit", "actionId": "act-email", "parameters": {"recipient": "CLI-001", "vendedor_id": "VEN-02"}, "simulated_day": DECISION_DAY}
+    resume(graph, "A1", edit)
+    assert recorder.received[("ejecutor", "ejecutar")]["action"]["parameters"] == {"recipient": "CLI-001", "vendedor_id": "VEN-02"}
+
+
+def test_a_leaf_with_no_function_is_refused_at_compile():
+    recorder = Recorder()
+    functions = leaves(recorder)
+    functions.pop(("ejecutor", "nota_manual"))
+    with pytest.raises(MissingLeaf, match="hoja.ejecutor.nota_manual"):
+        compile_tree(base_tree(), leaves=functions, metrics=load_metrics(METRICAS), catalog=VIEW_CATALOG, reader=reader_from({}), classify=lambda state: "ninguno", checkpointer=InMemorySaver())
+
+
+def test_a_resume_when_nothing_awaits_is_refused():
+    graph = compiled(Recorder())
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    resume(graph, "A1", approve())
+    with pytest.raises(ResumeRefused, match="awaits no decision"):
+        resume(graph, "A1", approve(decision_id="dec-2"))
+
+
+def test_the_compiler_caches_a_graph_by_version():
+    recorder = Recorder()
+    compiler = Compiler(leaves=leaves(recorder), metrics=load_metrics(METRICAS), catalog=VIEW_CATALOG, reader=reader_from({}), classify=lambda state: "ninguno", checkpointer=InMemorySaver())
+    tree = base_tree()
+    assert compiler.graph(tree) is compiler.graph(tree)
+    assert compiler.graph(tree.model_copy(update={"version": 2})) is not compiler.graph(tree)
+
+
+def test_every_node_the_interpreter_binds_a_write_to_is_in_the_base():
+    nodes = index(base_tree())
+    assert BOUND_NODES <= set(nodes)
+    ends = {target for node in nodes.values() for _, target in branches(node) if target.startswith("fin.")}
+    assert ends <= ENDS
