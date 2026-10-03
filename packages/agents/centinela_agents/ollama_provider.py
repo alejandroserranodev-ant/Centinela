@@ -35,7 +35,11 @@ class OllamaProvider(LLMProvider):
             ValueError: if OLLAMA_BASE_URL is not set or unreachable
         """
         super().__init__(config)
-        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.base_url = (
+            os.getenv("OLLAMA_API_URL")
+            or os.getenv("OLLAMA_BASE_URL")
+            or "http://localhost:11434"
+        ).rstrip("/")
         self.timeout = config.timeout_seconds
 
         if not self.health_check():
