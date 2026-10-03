@@ -6,7 +6,7 @@ The entity is a `cliente_id`. The symptom starts on its `ultima_compra` in `v_ac
 |---|---|---|---|---|
 | H1 | the customer was already buying less | `v_ventas` where `cliente_id` = the entity and `fecha <= :dia`, `sum(valor_neto)` by month | the three months before `ultima_compra` are below the mean of the six before them | they are not |
 | H2 | it dropped specific lines first | `v_ventas` where `cliente_id` = the entity and `fecha <= :dia`, `sum(valor_neto)` by `linea` and month | a `linea` it bought every month stops before `ultima_compra` | no line stops early |
-| H3 | it is blocked by debt | `v_cartera_cliente` where `cliente_id` = the entity | `max_dias_vencido` breaks the `umbral_alerta` of `saldo_vencido` in `metricas.yaml`, or `saldo_abierto` > `cupo_credito` | neither |
+| H3 | it is blocked by debt | `v_cartera_cliente` where `cliente_id` = the entity | `max_dias_vencido` breaks the `umbral_alerta` of `saldo_vencido` in `data/metricas.yaml`, or `saldo_abierto` > `cupo_credito` | neither |
 | H4 | it was served worse | `v_descuentos_fuera_politica` and `v_ventas` where `cliente_id` = the entity, the last six months | its mean `descuento_pct` fell before `ultima_compra` | it did not |
 | H5 | it stopped at once | `v_ventas` where `cliente_id` = the entity and `fecha <= :dia`, count of `pedido_id` by month | H1 and H2 are refuted and the customer ordered in each of the six months before `ultima_compra` | it skipped one of those months |
 

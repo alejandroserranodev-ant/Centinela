@@ -26,8 +26,8 @@ One to three `Action`s. Each has `title` and `description` in Spanish, `type`, `
 
 ## Procedure
 
-1. If `Cause.kind` is `no_evidence`, or the orchestrator marks `revision_manual`, you are not
-   called: the orchestrator proposes the manual review `task` in code.
+1. If `Cause.kind` is `no_evidence`, or the tree reaches `revision_manual`, you are not called:
+   that leaf proposes the manual review `task` in code, as `acciones.md` states.
 2. Read the rows of `acciones.md` for the `metrica`. Keep the rows whose condition the
    alert and its `Cause` meet.
 3. Keep at most three rows, in the order `acciones.md` lists them.
