@@ -4,7 +4,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from centinela_agents.graph import BOUND_NODES, Compiler, MissingLeaf, ResumeRefused, awaiting_decision, compile_tree, resume, start_alert
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import ENDS, Tree, branches, index
-from support import DAY, DECISION_DAY, EMAIL, METRICAS, SALDO_ROW, VIEW_CATALOG, Recorder, approve, base_data, base_tree, compiled, leaves, reader_from, saldo_detection, statuses
+from support import DAY, DECISION_DAY, EMAIL, METRICAS, SALDO_ROW, VIEW_CATALOG, Recorder, approve, base_data, base_tree, compiled, leaves, node_of, reader_from, saldo_detection, statuses
 
 
 def test_an_alert_pauses_at_the_gate_and_executes_on_approval():
@@ -64,6 +64,17 @@ def test_the_compiler_caches_a_graph_by_version():
     assert compiler.graph(tree) is compiler.graph(tree)
     assert compiler.graph(tree.model_copy(update={"version": 2})) is not compiler.graph(tree)
 
+
+
+def test_the_compiler_keeps_apart_two_trees_of_one_version_with_different_content():
+    compiler = Compiler(leaves=leaves(Recorder()), metrics=load_metrics(METRICAS), catalog=VIEW_CATALOG, reader=reader_from({}), classify=lambda state: "ninguno", checkpointer=InMemorySaver())
+    data = base_data()
+    data["nodos"].append({"id": "hoja.vigia.otra", "hoja": {"agente": "vigia", "decision": "titular", "skill": "vigia/contrato.md"}, "sigue": "hoja.analista.explicar"})
+    node_of(data, "detectar.cartera.saldo_vencido.cupo")["no"] = "hoja.vigia.otra"
+    other = Tree.model_validate(data)
+    assert other.version == base_tree().version
+    assert compiler.graph(other) is not compiler.graph(base_tree())
+    assert compiler.graph(Tree.model_validate(base_data())) is compiler.graph(base_tree())
 
 def test_every_node_the_interpreter_binds_a_write_to_is_in_the_base():
     nodes = index(base_tree())

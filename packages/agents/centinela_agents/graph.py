@@ -1,3 +1,4 @@
+import hashlib
 import re
 from typing import Any, Callable, Mapping
 
@@ -229,12 +230,13 @@ def compile_tree(
 class Compiler:
     def __init__(self, *, leaves, metrics: Metrics, catalog: Catalog, reader: KpiReader, classify: Classifier, checkpointer: Any, owners: Mapping[str, str] | None = None):
         self._dependencies = {"leaves": leaves, "metrics": metrics, "catalog": catalog, "reader": reader, "classify": classify, "checkpointer": checkpointer, "owners": owners}
-        self._graphs: dict[int, Any] = {}
+        self._graphs: dict[tuple[int, str], Any] = {}
 
     def graph(self, tree: Tree):
-        if tree.version not in self._graphs:
-            self._graphs[tree.version] = compile_tree(tree, **self._dependencies)
-        return self._graphs[tree.version]
+        key = (tree.version, hashlib.sha256(tree.model_dump_json().encode()).hexdigest())
+        if key not in self._graphs:
+            self._graphs[key] = compile_tree(tree, **self._dependencies)
+        return self._graphs[key]
 
 
 def thread(alert_id: str) -> dict[str, Any]:

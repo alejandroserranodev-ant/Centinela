@@ -217,8 +217,9 @@ with no clause number is refused there, because no reader can check it.
 raises with every problem. `centinela_agents/graph.py:compile_tree(tree, *, leaves, metrics,
 catalog, reader, classify, checkpointer, owners)` makes a graph node of each leaf, each predicate node and
 each end reachable from a `vigia` leaf that `detectar.raiz` reaches, and a conditional edge out of
-each predicate node. Each run compiles the version `apps/api` hands in, cached by its `version`, by
-`centinela_agents/graph.py:Compiler`.
+each predicate node. Each run compiles the version `apps/api` hands in, cached by its `version` and
+a hash of its content, by `centinela_agents/graph.py:Compiler`, because two clients may hold
+different trees under one version number.
 
 **A predicate node is a graph node, not only the function of an edge.** It evaluates its
 predicate, records its id and branch in `camino`, applies the write bound to that branch, and its
