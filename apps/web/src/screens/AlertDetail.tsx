@@ -209,7 +209,7 @@ export function AlertDetail({ id }: { id: string }) {
             </ArenaSection>
           ) : null}
 
-          {pending ? (
+          {pending && alert.actions.length > 0 ? (
             <ArenaSection
               title="Acciones propuestas"
               headingLevel="h3"
