@@ -1,8 +1,33 @@
 # apps/web: the decision inbox
 
-This level is Centinela's interface: a **decision inbox, not a dashboard**. It holds the scaffold
-the screens are built on and the skin they wear. Which screens exist and what each shows is
+This level is Centinela's interface: a **decision inbox, not a dashboard**. Its screens run whole
+on a simulated API, built from illustrative fixtures, until `apps/api` serves the real one. Which
+screens the challenge asks for and what each shows is
 [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its screens section.
+
+## Why each file exists
+
+| Path | Why it exists |
+|---|---|
+| `src/main.tsx` | mounts the app with the Spanish locale strings of Arena's components, the theme and the router, and imports the generated stylesheets |
+| `src/App.tsx` | the web's routes, each a screen inside the shell |
+| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
+| `src/shell/` | what wraps every route: the bar with the simulated day, the navigation, and the agents' current step |
+| `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog, the series chart |
+| `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
+| `src/api/client.ts` | the simulated API, one function per endpoint |
+| `src/api/types.ts` | the draft contract the client and the screens share |
+| `src/api/fixtures/` | the illustrative data the simulated API serves: alerts, chat answers, the clock and its user, the queries behind each figure, the settings |
+| `src/format.ts` | every number and date as a person reads it: pesos, percentages, points, days and units in `es-CO`, dates in the time zone of Bogotá |
+| `src/actionParameters.ts` | the Spanish name of each key of an action's `parameters`, for the proposal, the edit dialog and the `bitácora` |
+| `src/app.css` | the layout Arena does not ship, written in Arena's tokens only: the shell's grid, the inbox's two columns, the alert row, the totals, the chat bubbles |
+| `index.html` | the page shell; its inline script puts the stored or preferred palette's class on the document before React loads, so the first paint wears the right theme. Its palette list matches `arena.config.json` and the call to `initArenaTheme` in `src/main.tsx` |
+| `vite.config.ts` | Vite with the React plugin and nothing else |
+| `tsconfig.json` | strict TypeScript over `src/` and the Vite config, with no emit, because Vite builds and `tsc` only checks |
+| `arena.config.json` | Centinela's palettes, light and dark, its fonts, and the style plugin Arena reads |
+| `design/centinela/plugin.tokens.json` | the style plugin: Centinela's answer to every role Arena's style kernel asks |
+| `design/identity.html` | the approved appearance, each choice with its reason |
+| `package.json`, `package-lock.json` | the app's manifest and its pinned dependencies; the lockfile is written by npm ([`../../GENERATED.md`](../../GENERATED.md)) |
 
 ## Decisions
 
@@ -19,15 +44,22 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   `arena:design` skill before building or changing a screen. Charts follow the `dataviz` skill.
 - **`design/identity.html` is the approved appearance**: palette, faces, character, air and page
   shape, each with its reason. A change to the config or the plugin starts there and is approved
-  there. Serve it over HTTP, because opened from `file://` its stylesheet does not load.
-- **Agent progress arrives by SSE** from the API, so the screen shows the step in course while the
-  agents work.
-- **The screens run on a simulated API until `apps/api` serves one.** `src/api/client.ts` mirrors
-  the minimal API with one function per endpoint, streams agent progress and chat as async
-  iterators shaped like SSE events, and reveals each alert when the simulated day reaches its date.
-  It is replaced by a fetch client without touching a screen. `src/api/types.ts` is a draft
-  contract: `apps/api`'s Pydantic models are the source, and these types follow them. Every number
-  travels as a `Figure` with its `queryId`, so the type itself asks each figure for its query.
+  there. It reads the stylesheet `arena-to-prod` writes, which imports Arena's sheets by package
+  name, so it is opened through `npm run dev` at `/design/identity.html`, never from `file://`.
+- **The screens run on a simulated API until `apps/api` serves one.** `src/api/client.ts` exports
+  one function per endpoint: `advanceDay`, `listAlerts`, `getAlert`, `decide`, `chat` and
+  `listBitacora` for the brief's minimal API, and `getSimulationState`, `getInboxSummary`,
+  `getSettings`, `saveSettings` and `getQuery` for what the screens need beyond it. Each endpoint,
+  its route and what it refuses are [`../api/AGENTS.md`](../api/AGENTS.md), its endpoint table.
+  The client streams agent progress and chat as async iterators shaped like SSE events, reveals
+  each alert when the simulated day reaches its date, and refuses what the API refuses with the
+  same status. It is replaced by a fetch client without touching a screen.
+- **`src/api/types.ts` is a draft contract**: `apps/api`'s Pydantic models are the source, and
+  these types follow them. Every number travels as a `Figure` with its `queryId`, so the type
+  itself asks each figure for its query.
+- **The agents' current step is on screen while they work.** `src/shell/CurrentStep.tsx:CurrentStep()`
+  renders the `step` events of the day run, which `apps/api` streams by SSE
+  ([`../api/AGENTS.md`](../api/AGENTS.md)).
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
   including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
@@ -37,34 +69,33 @@ the screens are built on and the skin they wear. Which screens exist and what ea
 - **The draft contract is English except its routes.** Field names and values in
   `src/api/types.ts` are English (`status: 'proposed'`, `severity: 'critical'`), so the
   `apps/api` models and the web read one vocabulary of code. The endpoint paths and their query
-  string stay as the brief writes them (`/simulacion/avanzar`, `/alertas?estado=propuesta`,
-  `/alertas/{id}/decision`, `/chat`, `/bitacora`), because the jury calls them by those names;
-  where the brief's query string carries a lifecycle value, the fetch client sends the brief's
-  spelling.
+  string stay as the brief writes them, because the jury calls them by those names; where the
+  brief's query string carries a lifecycle value, the fetch client sends the brief's spelling.
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
-- **Fixture files and ids are English** (`alerts.json`, `alert-hogar-margin`, `q-hogar-drop`); the
-  line name stays as the data spells it. An id never reaches a manager's screen.
+- **Fixture files and ids are English** (`src/api/fixtures/alerts.json`, `alert-hogar-margin`,
+  `q-hogar-drop`); the line name stays as the data spells it. An id never reaches a manager's
+  screen.
 - **The fixtures in `src/api/fixtures/` are illustrative.** They are built from the brief's public
   example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
   examples, never from the dataset, because figures read from `data/csv/` would name the seeded
   scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
   figure cites an example query against a real `v_*` view, so "how I got here" has something to
   show; the queries are not run.
-- **The screen computes no figure.** The inbox totals (money at risk today, decisions pending,
-  recoverable per month) are sums over alerts rather than a `v_*` view, so the API computes them
-  and sends each as a `Figure` whose query reads the alerts table, which is why `Query.source`
-  also takes `alertas`. A sum taken on screen would be a figure with no query behind it.
+- **The screen computes no figure.** The inbox totals arrive from `getInboxSummary` as `Figure`s
+  the API computes ([`../api/AGENTS.md`](../api/AGENTS.md)), and their queries read the alerts
+  table, which is why `src/api/types.ts:QuerySource` also takes `alertas`. A sum taken on screen
+  would be a figure with no query behind it.
 - **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's
   rule `arenaToastDelay`, which `src/state/Simulation.tsx:useToasts()` applies with the shorter
   interval.
-- **Each chart sits in a box that clips sideways.** `ArenaLineChart` hides its accessible table in
-  a one-pixel box, but a table lays out to its content anyway, and at phone width that box widened
-  the page. Clipping the inline axis alone keeps the tooltip whole.
-
+- **Each chart sits in a box that clips sideways**, the `chart` class of `src/app.css`.
+  `ArenaLineChart` hides its accessible table in a one-pixel box, but a table lays out to its
+  content anyway and would widen the page at phone width. Clipping the inline axis alone keeps the
+  tooltip whole.
 - **The chat is a non-modal `ArenaSheet`, so it handles focus itself.** The sheet takes no focus
   and traps none, and Escape reaches it only from inside. Opening moves focus to the question
   field, and closing returns it to the control that opened the chat. On a desktop the shell gives
@@ -79,9 +110,9 @@ the screens are built on and the skin they wear. Which screens exist and what ea
 - **A Bitácora filter returns the reader to page 1.** `ArenaTable` returns to page 1 only when
   the page falls out of range, and it does not slice rows, so the screen keeps the page, slices
   ten rows and resets the page whenever a criterion changes.
-- **The settings screen has one save action for its three tabs.** A change in any tab is a draft
-  until "Guardar cambios", so the three tabs never save half a configuration. "Ejecuta" is
-  disabled in every autonomy group, and the API rejects it again with a 422.
+- **The settings screen has one save action for all its tabs.** A change in any tab is a draft
+  until "Guardar cambios", so no tab saves half a configuration. "Ejecuta" is disabled in every
+  autonomy group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md)).
 
 ## Commands
 
@@ -99,14 +130,34 @@ names them. Its contrast and chart-ramp warnings are reported, not failed: the l
 ramp has three slots under 3:1 against white, which is why every chart carries direct labels and
 a table view.
 
+## Adding a screen
+
+1. Write the component in `src/screens/`, built from Arena components after loading the
+   `arena:design` skill.
+2. Give it a Spanish route in `src/App.tsx`, inside the shell. A screen the navigation reaches
+   also gets an entry in `src/shell/Shell.tsx:DESTINATIONS`.
+3. Read its data through a new function of `src/api/client.ts`, backed by a fixture in
+   `src/api/fixtures/`, with its shapes in `src/api/types.ts`. Every number is a `Figure` with a
+   query in `src/api/fixtures/queries.json`. The endpoint behind the function is a row in
+   [`../api/AGENTS.md`](../api/AGENTS.md) before the function exists.
+4. Place each piece by who renders it: a piece only this screen renders stays in `src/screens/`
+   beside it; a piece another screen or the shell also renders goes in `src/common/`; what wraps
+   every route goes in `src/shell/`.
+5. Run `npm run typecheck` and `npm run arena:audit`, then the person-run check below.
+
 ## Rules of this level
 
 - **A figure on screen carries its source.** Every number links, or expands, to the logged query
-  behind it: "how I got here" is the third level of every explanation. *No gate holds this.*
-- **Severity is never told by colour alone**: a label or an icon carries it too.
-- **Money is Colombian pesos, dates are explicit, and the wording is business language.** No
-  agent, model or SQL vocabulary reaches a manager's screen.
-- **Reject asks for a reason**, and the reason is sent with the decision.
+  behind it, through `src/common/SentenceWithFigures.tsx:LinkedFigure()` or a sentence whose
+  figures `src/common/SentenceWithFigures.tsx:SentenceWithFigures()` links: "how I got here" is
+  the third level of every explanation. *No gate holds this.*
+- **Severity is a badge with its word**: `src/common/Badges.tsx:Severity()` pairs each tone with
+  its Spanish label, so no screen tells severity by colour alone.
+- **Every amount and date goes through `src/format.ts`**: pesos as `COP` in `es-CO`, dates spelled
+  out in the time zone of Bogotá. The wording is business language; no agent, model or SQL
+  vocabulary reaches a manager's screen.
+- **A rejection and a request for changes go through `src/screens/ReasonDialog.tsx:ReasonDialog()`**,
+  which sends nothing without a reason, and the reason travels in the `Decision`.
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.
 - **Arena's rules hold in every source file**: tokens only, no class of ours on an Arena
   component, one primary action per view, danger as outline. `npm run arena:audit` holds the ones
@@ -114,5 +165,5 @@ a table view.
 
 ## Verified by a person
 
-Until a gate exists: open each screen at phone width, walk it by keyboard only, and check that one
-figure per screen traces back to its query. Do it in both themes.
+Open each screen at phone width, walk it by keyboard only, and check that one figure per screen
+traces back to its query. Do it in both themes. *No gate holds this.*
