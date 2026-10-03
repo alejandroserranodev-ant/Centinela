@@ -1,5 +1,6 @@
 # One planted violation per rule of the validator, each on a copy of the base, so a rule that
-# never fires fails here. The base itself must pass with no problem.
+# never fires fails here. The base itself must pass with no problem. A plant that needs other
+# grounds, a threshold of metricas.yaml, returns them as keywords of grounds().
 import pytest
 
 from centinela_agents.metrics import Metrics, load_metrics
@@ -55,6 +56,21 @@ def add_return(data):
 
 
 
+
+def add_node(node):
+    def plant(data):
+        data["nodos"].append(dict(node))
+    return plant
+
+
+def set_threshold(metric, column, spec):
+    def plant(data):
+        real = load_metrics(METRICAS)
+        return {"metrics": Metrics(real.descriptions, {**real.thresholds, metric: {**real.thresholds[metric], column: spec}})}
+    return plant
+
+
+ANY_STATE = {"fundamento": "iso31000.6.6", "predicado": {"lee": "estado.actions", "op": "existe"}, "si": "fin.sin_alerta", "no": "fin.sin_alerta"}
 ORPHAN = {"id": "hoja.vigia.huerfana", "hoja": {"agente": "vigia", "decision": "titular", "skill": "vigia/contrato.md"}, "sigue": "hoja.ejecutor.ejecutar"}
 
 
@@ -93,6 +109,17 @@ PLANTED = [
     ("L0 changed", set_law(0, "iso31000.6.6"), "L0 differs from the base"),
     ("L1 changed", set_predicate("aprobar.decision", valor=["approve"]), "L1 node aprobar.decision differs from the base"),
     ("base leaf redirected", set_key("hoja.vigia.titular", "sigue", "explicar.con_evidencia"), "leaf hoja.vigia.titular differs from the base"),
+    ("leaf without sigue", drop_key("hoja.vigia.titular", "sigue"), "hoja.vigia.titular lacks its sigue"),
+    ("leaf with a branch", set_key("hoja.vigia.titular", "si", "fin.sin_alerta"), "hoja.vigia.titular is a leaf and holds a predicate or a branch"),
+    ("node with sigue", set_key("explicar.con_evidencia", "sigue", "fin.sin_alerta"), "explicar.con_evidencia is a node, and only a leaf has sigue"),
+    ("id with no stage", add_node({"id": "revisar.x", **ANY_STATE}), "revisar.x names no stage"),
+    ("leaf id without hoja", add_node({"id": "detectar.titular", "hoja": {"agente": "vigia", "decision": "titular", "skill": "vigia/contrato.md"}, "sigue": "fin.sin_alerta"}), "detectar.titular is a leaf, so its id starts with hoja"),
+    ("existe with a value", set_predicate("proponer.con_acciones", valor=1), "proponer.con_acciones tests existe and compares a value too"),
+    ("list without en", set_predicate("aprobar.decision", op="="), "aprobar.decision compares with a list without en"),
+    ("threshold of no shape", set_threshold("saldo_vencido", "max_dias_vencido", "quince"), "which is no number, boolean, columna or por with valores"),
+    ("threshold on a column the kpi lacks", set_threshold("saldo_vencido", "saldo_abierto", {"columna": "cupo_inventado"}), "reads cupo_inventado, which kpi.saldo_vencido does not build"),
+    ("L1 node absent from the base", add_node({"id": "explicar.nuevo", **ANY_STATE}), "L1 node explicar.nuevo is absent from the base"),
+    ("law on an unregistered id", set_law(0, "iso9999.1"), "law cifra_de_consulta rests on iso9999.1, absent from fundamentos.yaml"),
     ("orphan entry", add_orphan, "hoja.vigia.huerfana is unreachable from detectar.raiz"),
     ("base leaf decision changed", set_leaf("hoja.vigia.titular", decision="detectar"), "leaf hoja.vigia.titular differs from the base"),
     ("return the interpreter does not count", add_return, "cycle"),
@@ -107,8 +134,8 @@ def test_the_base_passes():
 @pytest.mark.parametrize("name, plant, expected", PLANTED, ids=[name for name, _, _ in PLANTED])
 def test_the_validator_refuses_each_planted_violation(name, plant, expected):
     data = base_data()
-    plant(data)
-    found = problems(data, grounds())
+    overrides = plant(data) or {}
+    found = problems(data, grounds(**overrides))
     assert any(expected in problem for problem in found), found
 
 
