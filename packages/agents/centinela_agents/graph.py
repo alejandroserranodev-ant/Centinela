@@ -6,7 +6,7 @@ from langgraph.types import Command, interrupt
 from .catalog import Catalog, KpiReader
 from .failures import SchemaRefused, StepTimeout, TokenCapReached
 from .metrics import Metrics
-from .schema import ENDS, GATE, Leaf, Node, Tree, reachable
+from .schema import ENDS, GATE, ROOT, Leaf, Node, Tree, reachable
 from .state import AlertState, approved_action
 from .walk import Context, Detection, state_holds
 
@@ -182,7 +182,8 @@ def compile_tree(
     checkpointer: Any,
 ):
     ctx = Context.of(tree, metrics, catalog, reader)
-    entries = sorted(node.id for node in tree.nodos if node.hoja is not None and node.hoja.agente == "vigia")
+    rooted = reachable(ctx.nodes, [ROOT])
+    entries = sorted(node.id for node in tree.nodos if node.id in rooted and node.hoja is not None and node.hoja.agente == "vigia")
     graph = StateGraph(AlertState)
     for name in sorted(reachable(ctx.nodes, entries)):
         node = ctx.nodes.get(name)

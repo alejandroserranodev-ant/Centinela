@@ -216,8 +216,8 @@ with no clause number is refused there, because no reader can check it.
 `centinela_agents/validator.py:load_base(arbol, metricas, skills, catalog)` validates the base and
 raises with every problem. `centinela_agents/graph.py:compile_tree(tree, *, leaves, metrics,
 catalog, reader, classify, checkpointer)` makes a graph node of each leaf, each predicate node and
-each end reachable from a `vigia` leaf, and a conditional edge out of each predicate node. Each run
-compiles the version `apps/api` hands in, cached by its `version`, by
+each end reachable from a `vigia` leaf that `detectar.raiz` reaches, and a conditional edge out of
+each predicate node. Each run compiles the version `apps/api` hands in, cached by its `version`, by
 `centinela_agents/graph.py:Compiler`.
 
 **A predicate node is a graph node, not only the function of an edge.** It evaluates its
@@ -316,7 +316,8 @@ return, `centinela_agents/graph.py:LEAF_OUTPUTS`, so a second proposal never kee
 - the graph has a cycle other than the two capped returns, the `si` of
   `proponer.retorno_disponible` to `explicar` and of `aprobar.recarga_disponible` to `proponer`,
   each reading the counter `effects` counts equal to 0;
-- a branch names no node, leaf or end of the closed list, or a node reaches no end;
+- a branch names no node, leaf or end of the closed list, a node reaches no end, or `detectar.raiz`
+  does not reach a node or leaf, because an orphan `vigia` leaf would be an entry no walk checks;
 - a `lee` names a KPI column the catalogue does not hold, a state field `STATE_FIELDS` does not
   declare, or a KPI outside `detectar`, because an alert reads its measure only through
   `ejecutar.vigente`;

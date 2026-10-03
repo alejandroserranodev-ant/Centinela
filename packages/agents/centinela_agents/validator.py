@@ -55,6 +55,7 @@ def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
         *approval_problems(nodes),
         *cycle_problems(nodes),
         *end_problems(nodes),
+        *reach_problems(nodes),
         *operand_problems(tree, grounds.catalog),
         *candidate_problems(nodes, grounds.catalog),
         *threshold_problems(tree, grounds),
@@ -221,6 +222,13 @@ def end_problems(nodes: Mapping[str, Node]) -> list[str]:
                 finishing.add(node_id)
                 grown = True
     return [f"{node_id} reaches no fin" for node_id in sorted(reachable(nodes, [ROOT])) if node_id in nodes and node_id not in finishing]
+
+
+def reach_problems(nodes: Mapping[str, Node]) -> list[str]:
+    if ROOT not in nodes:
+        return []
+    reached = reachable(nodes, [ROOT])
+    return [f"{node_id} is unreachable from {ROOT}" for node_id in sorted(nodes) if node_id not in reached]
 
 
 def operand_problems(tree: Tree, catalog: Catalog) -> list[str]:

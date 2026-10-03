@@ -3,8 +3,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from centinela_agents.graph import BOUND_NODES, Compiler, MissingLeaf, ResumeRefused, awaiting_decision, compile_tree, resume, start_alert
 from centinela_agents.metrics import load_metrics
-from centinela_agents.schema import ENDS, branches, index
-from support import DAY, DECISION_DAY, EMAIL, METRICAS, SALDO_ROW, VIEW_CATALOG, Recorder, approve, base_tree, compiled, leaves, reader_from, saldo_detection, statuses
+from centinela_agents.schema import ENDS, Tree, branches, index
+from support import DAY, DECISION_DAY, EMAIL, METRICAS, SALDO_ROW, VIEW_CATALOG, Recorder, approve, base_data, base_tree, compiled, leaves, reader_from, saldo_detection, statuses
 
 
 def test_an_alert_pauses_at_the_gate_and_executes_on_approval():
@@ -107,3 +107,10 @@ def test_a_leaf_that_runs_again_clears_the_outputs_it_does_not_return():
     assert recorder.count("estratega", "revision_manual") == 0
     assert state["actions"] == [EMAIL]
     assert awaiting_decision(graph, "A1")
+
+
+def test_a_vigia_leaf_the_root_does_not_reach_is_no_entry_of_the_graph():
+    data = base_data()
+    data["nodos"].append({"id": "hoja.vigia.huerfana", "hoja": {"agente": "vigia", "decision": "titular", "skill": "vigia/contrato.md"}, "sigue": "hoja.ejecutor.ejecutar"})
+    graph = compiled(Recorder(), tree=Tree.model_validate(data))
+    assert "hoja.vigia.huerfana" not in graph.get_graph().nodes
