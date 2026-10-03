@@ -1,4 +1,5 @@
 from typing import Annotated, Literal, Union
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -18,6 +19,16 @@ FigureUnit = Literal["COP", "points", "percent", "days", "units"]
 ActionType = Literal["email_draft", "task", "purchase_order_draft", "price_change_draft"]
 Agent = Literal["vigia", "analista", "estratega", "ejecutor"]
 LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result"]
+
+
+class AlertEstadoEnum(str, Enum):
+    """Valid alert estado values (Spanish names for API contract)."""
+    NUEVA = "nueva"
+    EN_ANALISIS = "en_analisis"
+    PROPUESTA = "propuesta"
+    APROBADA = "aprobada"
+    RECHAZADA = "rechazada"
+    EJECUTADA = "ejecutada"
 
 
 class Esquema(BaseModel):
@@ -97,7 +108,7 @@ class Alert(Esquema):
     confidence: Confidence
     simulated_date: str
     cause: Cause
-    actions: list[Action] = Field(min_length=1, max_length=3)
+    actions: list[Action] = Field(default_factory=list, min_length=0, max_length=3)
     executed_action: ExecutedAction | None = None
 
 
@@ -148,7 +159,11 @@ class ChatMessage(Esquema):
 
 class ChatQuestion(Esquema):
     question: str
-    alert_id: str | None = None
+
+
+class SimulatedDay(Esquema):
+    """Current simulated day in ISO 8601 format."""
+    dia: str = Field(..., description="Current simulated day (YYYY-MM-DD)", example="2026-10-03")
 
 
 class DecisionApprove(Esquema):
@@ -170,3 +185,48 @@ class DecisionReject(Esquema):
 Decision = Annotated[
     Union[DecisionApprove, DecisionEdit, DecisionReject], Field(discriminator="kind")
 ]
+
+
+class AgentAlertInput(Esquema):
+    """Entrada de Vigía: una nueva alerta detectada."""
+
+    severity: Severity
+    metric: Metric
+    title: Sentence
+    pesos_at_risk: Figure
+    recoverable_per_month: Figure | None = None
+    confidence: Confidence
+    simulated_date: str
+
+
+class AgentCauseInput(Esquema):
+    """Entrada de Analista: causa e evidencia de una alerta."""
+
+    cause: Cause
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class AgentProposalInput(Esquema):
+    """Entrada de Estratega: acciones propuestas para una alerta."""
+
+    actions: list[Action] = Field(min_length=1, max_length=3)
+
+
+class AgentExecutionInput(Esquema):
+    """Entrada de Ejecutor: resultado de ejecutar una acción."""
+
+    action_id: str
+    status: Literal["success", "failed", "partial"]
+    result: str
+    error: str | None = None
+
+
+class CostoAgente(Esquema):
+    """Registro de costo: tokens, modelo, latencia por paso."""
+
+    agent: Agent
+    step: str
+    modelo: str
+    tokens_entrada: int
+    tokens_salida: int
+    latencia_ms: int

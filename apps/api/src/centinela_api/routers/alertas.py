@@ -1,22 +1,29 @@
 from urllib.parse import unquote
+from typing import Annotated
 
 import psycopg
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from .. import alertas as alertas_repo
 from .. import bitacora, decisiones, simulacion
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..config import ROLES_CON_DECISION
 from ..db import obtener_conexion
-from ..modelos import ActorPerson, Alert, Decision
+from ..modelos import ActorPerson, Alert, Decision, AlertEstadoEnum
 
-router = APIRouter()
+router = APIRouter(tags=["alerts"])
 
 
 @router.get("/alertas", response_model=list[Alert])
 async def listar(
-    estado: str | None = None, conn: psycopg.Connection = Depends(obtener_conexion)
+    estado: Annotated[AlertEstadoEnum | None, Query(description="Filter by alert estado (Spanish name for status)")] = None,
+    conn: psycopg.Connection = Depends(obtener_conexion)
 ) -> list[Alert]:
+    """
+    List all alerts, optionally filtered by estado.
+
+    Valid valores: nueva, en_analisis, propuesta, aprobada, rechazada, ejecutada
+    """
     status = None
     if estado is not None:
         status = ESTADO_A_STATUS.get(estado)
