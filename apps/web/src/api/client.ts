@@ -84,6 +84,7 @@ let currentSettings = settingsJson as Settings;
 let simulatedDay = clock.initialDay;
 const alerts = new Map<string, Alert>();
 const logEvents: LogEvent[] = [];
+const changesRequested = new Set<string>();
 let sequence = 0;
 
 for (const fixture of fixtures.filter((f) => f.simulatedDate <= simulatedDay)) {
@@ -167,6 +168,21 @@ export async function decide(id: string, decision: Decision): Promise<Alert> {
     }
     alert.status = 'rejected';
     log(alert.id, 'decision', person, `Rechazada. Motivo: ${reason}`);
+    return copy(alert);
+  }
+
+  if (decision.kind === 'request_changes') {
+    const reason = decision.reason.trim();
+    if (!reason) {
+      throw new ApiError(422, 'Para pedir cambios hace falta un motivo');
+    }
+    if (changesRequested.has(alert.id)) {
+      throw new ApiError(422, 'Esta alerta ya pidió cambios una vez');
+    }
+    changesRequested.add(alert.id);
+    log(alert.id, 'decision', person, `Cambios solicitados. Motivo: ${reason}`);
+    await wait(STEP_DELAY_MS);
+    log(alert.id, 'proposal', { kind: 'agent', agent: 'estratega' }, `Propuesta revisada con el motivo: ${reason}`);
     return copy(alert);
   }
 

@@ -4,11 +4,20 @@ import { ApiError } from '../api/client';
 
 interface Props {
   open: boolean;
+  eyebrow: string;
+  title: string;
+  hint: string;
+  label: string;
+  missing: string;
+  failure: string;
+  confirm: string;
+  variant: 'danger' | 'primary';
+  icon: string;
   onClose: () => void;
-  onReject: (reason: string) => Promise<void>;
+  onSend: (reason: string) => Promise<void>;
 }
 
-export function RejectDialog({ open, onClose, onReject }: Props) {
+export function ReasonDialog({ open, eyebrow, title, hint, label, missing, failure, confirm, variant, icon, onClose, onSend }: Props) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [sending, setSending] = useState(false);
@@ -19,18 +28,18 @@ export function RejectDialog({ open, onClose, onReject }: Props) {
     onClose();
   };
 
-  const reject = async () => {
+  const send = async () => {
     if (!reason.trim()) {
-      setError('Escribe el motivo del rechazo para continuar.');
+      setError(missing);
       return;
     }
     setSending(true);
     try {
-      await onReject(reason.trim());
+      await onSend(reason.trim());
       setReason('');
       setError(undefined);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'No se pudo registrar el rechazo. Inténtalo de nuevo.');
+      setError(e instanceof ApiError ? e.message : failure);
     } finally {
       setSending(false);
     }
@@ -39,8 +48,8 @@ export function RejectDialog({ open, onClose, onReject }: Props) {
   return (
     <ArenaDialog
       open={open}
-      eyebrow="Rechazar"
-      title="¿Por qué rechazas la propuesta?"
+      eyebrow={eyebrow}
+      title={title}
       fillBelow="sm"
       onClose={close}
       footer={
@@ -48,16 +57,16 @@ export function RejectDialog({ open, onClose, onReject }: Props) {
           <ArenaButton variant="ghost" onClick={close}>
             Cancelar
           </ArenaButton>
-          <ArenaButton variant="danger" icon="ph-bold ph-x" loading={sending} onClick={reject}>
-            Rechazar
+          <ArenaButton variant={variant} icon={icon} loading={sending} onClick={send}>
+            {confirm}
           </ArenaButton>
         </>
       }
     >
       <div className="arena-stack arena-stack--group">
-        <p>El motivo queda en la bitácora junto a tu nombre.</p>
+        <p>{hint}</p>
         <ArenaTextarea
-          label="Motivo del rechazo"
+          label={label}
           required
           rows={4}
           maxLength={500}
