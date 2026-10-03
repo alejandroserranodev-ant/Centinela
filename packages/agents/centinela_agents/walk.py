@@ -84,7 +84,7 @@ def detect(ctx: Context, day: str) -> list[Detection]:
 
 def still_breaks(state: Mapping[str, Any], ctx: Context) -> bool:
     detection = state["detection"]
-    day = (state.get("decision") or {}).get("simulated_day") or state["simulated_day"]
+    day = state["decision"]["simulated_day"]
     kpi = ctx.catalog.kpis[detection["metric"]]
     entity = list(detection["entity"])
     rows = [row for row in ctx.reader(detection["metric"], day) if [row.get(column) for column in kpi.entity] == entity]

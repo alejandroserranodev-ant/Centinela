@@ -165,9 +165,9 @@ step runs. It is code, except one step that classifies a rejection reason.
 
 - **Input:** from `apps/api`, one of three: the simulated day with the metric, entity, severity and
   state of every earlier alert; a recorded decision (the `Decision`, its id, the role that made it
-  and when) to resume one alert; or a `ChatQuestion` with its anchored `Alert`, if any. With the
-  first two, the rejection reasons `apps/api` keeps for the alert's metric. With each, the version
-  of the tree to walk.
+  and the simulated day it was made) to resume one alert; or a `ChatQuestion` with its anchored
+  `Alert`, if any. With the first two, the rejection reasons `apps/api` keeps for the alert's
+  metric. With each, the version of the tree to walk.
 - **Tools: none.** Each step that might want one reads its input instead: the order reads
   `pesosAtRisk`, which `Vigía` computed in SQL; the check on `same_cause_as` reads the earlier
   alerts `apps/api` hands in; the classifier reads the reason, the `Cause` with its evidence, and
@@ -295,7 +295,9 @@ request. `explicar.destino_nuevo` on `si` absorbs the named alert into this one 
 counts a return to `Analista`. `aprobar.recarga_disponible` on `si` counts the `request_changes`,
 keeps its reason in `proposal_rejections`, and clears the decision, so the gate waits again.
 Entering an `analista` leaf from `nueva` proposes `en análisis`, and entering `aprobar.decision`
-proposes `propuesta` once.
+proposes `propuesta` once. A leaf that runs again clears the outputs of its decision it does not
+return, `centinela_agents/graph.py:LEAF_OUTPUTS`, so a second proposal never keeps the first's
+`insufficient_cause`.
 
 #### The validator
 
@@ -306,12 +308,15 @@ proposes `propuesta` once.
 - a node lacks its `fundamento`, its `si` or its `no`, or rests on an id absent from the registry;
 - a path from `detectar.raiz` reaches an `Ejecutor` leaf without passing `aprobar.decision` and
   `ejecutar.vigente`;
-- the graph has a cycle other than the two capped returns, `proponer` → `explicar` and
-  `aprobar.recargar` → `proponer`, each the `si` of a node that reads its counter equal to 0;
+- the graph has a cycle other than the two capped returns, the `si` of
+  `proponer.retorno_disponible` to `explicar` and of `aprobar.recarga_disponible` to `proponer`,
+  each reading the counter `effects` counts equal to 0;
 - a branch names no node, leaf or end of the closed list, or a node reaches no end;
 - a `lee` names a KPI column the catalogue does not hold, a state field `STATE_FIELDS` does not
   declare, or a KPI outside `detectar`, because an alert reads its measure only through
   `ejecutar.vigente`;
+- a KPI node of `detectar` is reached where the candidate may be another metric, because the walk
+  would read one metric's column on another's row;
 - an `umbral` names a metric absent from `metricas.yaml` and from the approved KPIs, or one with no
   threshold for the column `lee` reads;
 - a leaf's `skill` is no file under `skills/`, or its `decision` is outside its agent's list;
@@ -336,9 +341,12 @@ entity, ends at `fin.ya_no_aplica`. It is code, so `Ejecutor` keeps no discretio
 The fallback of a failed step, the token cap, the retry and the order of a day's alerts are
 settings of the interpreter, not nodes, because they decide how a step runs, not which step runs.
 
-**A resume is refused** without a recorded decision id, with a kind outside `approve`, `edit`,
-`reject` and `request_changes`, with a reject or a `request_changes` that carries no reason, or with
-a second `request_changes`, by `centinela_agents/graph.py:resume(graph, alert_id, decision)`. The
+**A resume is refused** without a recorded decision id or the simulated day of the decision, with a
+kind outside `approve`, `edit`, `reject` and `request_changes`, with a reject or a `request_changes`
+that carries no reason, with an approval or an edit whose `actionId` names no proposed action, with
+an edit that carries no `parameters`, or with a second `request_changes`, by
+`centinela_agents/graph.py:resume(graph, alert_id, decision)`. `ejecutar.vigente` reads the KPI on
+the day the decision names. The
 graph never passes the gate on a decision `apps/api` did not record.
 
 **A transition `apps/api` refuses ends that alert's run**, because the record wins over the

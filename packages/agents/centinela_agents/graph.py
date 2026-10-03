@@ -22,6 +22,14 @@ REASONS = {
     "schema": "El análisis no terminó: el modelo no devolvió una respuesta válida.",
 }
 BOUND_NODES = frozenset({"explicar.destino_nuevo", "proponer.retorno_disponible", "aprobar.recarga_disponible", GATE})
+LEAF_OUTPUTS = {
+    ("vigia", "titular"): ("title",),
+    ("analista", "explicar"): ("cause", "same_cause_as"),
+    ("estratega", "proponer"): ("actions", "insufficient_cause"),
+    ("estratega", "revision_manual"): ("actions", "insufficient_cause"),
+    ("ejecutor", "ejecutar"): ("executed_action",),
+    ("ejecutor", "nota_manual"): ("executed_action",),
+}
 
 
 class MissingLeaf(Exception):
@@ -105,10 +113,11 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context):
             if leaf.agente == "ejecutor"
             else state
         )
+        cleared = {key: None for key in LEAF_OUTPUTS.get((leaf.agente, leaf.decision), ())}
         try:
-            update, failures = dict(function(given)), []
+            update, failures = {**cleared, **function(given)}, []
         except Exception as error:
-            update, failures = fallback(leaf, state, error, ctx), [{"step": node.id, "kind": failure_kind(error)}]
+            update, failures = {**cleared, **fallback(leaf, state, error, ctx)}, [{"step": node.id, "kind": failure_kind(error)}]
         return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures})
 
     return run
@@ -242,8 +251,14 @@ def decision_problem(decision: Mapping[str, Any], state: Mapping[str, Any]) -> s
     kind = decision.get("kind")
     if kind not in DECISION_KINDS:
         return f"{kind} is no decision"
+    if not decision.get("simulated_day"):
+        return "the decision carries no simulated day"
     if kind in ("reject", "request_changes") and not str(decision.get("reason", "")).strip():
         return f"{kind} carries no reason"
+    if kind in ("approve", "edit") and decision.get("actionId") not in [action["id"] for action in state.get("actions") or []]:
+        return f"{decision.get('actionId')} names no proposed action"
+    if kind == "edit" and not isinstance(decision.get("parameters"), Mapping):
+        return "the edit carries no parameters"
     if kind == "request_changes" and (state.get("proposal_returns") or 0) >= 1:
         return "the alert already requested changes once"
     return None

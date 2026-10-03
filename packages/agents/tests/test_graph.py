@@ -4,7 +4,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from centinela_agents.graph import BOUND_NODES, Compiler, MissingLeaf, ResumeRefused, awaiting_decision, compile_tree, resume, start_alert
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import ENDS, branches, index
-from support import DAY, DECISION_DAY, EMAIL, METRICAS, VIEW_CATALOG, Recorder, approve, base_tree, compiled, leaves, reader_from, saldo_detection, statuses
+from support import DAY, DECISION_DAY, EMAIL, METRICAS, SALDO_ROW, VIEW_CATALOG, Recorder, approve, base_tree, compiled, leaves, reader_from, saldo_detection, statuses
 
 
 def test_an_alert_pauses_at_the_gate_and_executes_on_approval():
@@ -70,3 +70,40 @@ def test_every_node_the_interpreter_binds_a_write_to_is_in_the_base():
     assert BOUND_NODES <= set(nodes)
     ends = {target for node in nodes.values() for _, target in branches(node) if target.startswith("fin.")}
     assert ends <= ENDS
+
+
+def test_a_decision_with_no_simulated_day_is_refused():
+    graph = compiled(Recorder(), rows={DECISION_DAY: {"saldo_vencido": [{**SALDO_ROW, "max_dias_vencido": 0}]}, DAY: {"saldo_vencido": [SALDO_ROW]}})
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    with pytest.raises(ResumeRefused, match="no simulated day"):
+        resume(graph, "A1", {"id": "dec-1", "kind": "approve", "actionId": "act-email"})
+    assert awaiting_decision(graph, "A1")
+
+
+@pytest.mark.parametrize(
+    "decision, message",
+    [
+        ({"id": "dec-1", "kind": "approve", "actionId": "act-otra", "simulated_day": DECISION_DAY}, "names no proposed action"),
+        ({"id": "dec-1", "kind": "edit", "actionId": "act-email", "simulated_day": DECISION_DAY}, "carries no parameters"),
+    ],
+    ids=["unknown action", "edit without parameters"],
+)
+def test_an_approval_the_walk_cannot_carry_out_is_refused(decision, message):
+    recorder = Recorder()
+    graph = compiled(recorder)
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    with pytest.raises(ResumeRefused, match=message):
+        resume(graph, "A1", decision)
+    assert awaiting_decision(graph, "A1")
+    assert recorder.count("ejecutor", "nota_manual") == 0
+
+
+def test_a_leaf_that_runs_again_clears_the_outputs_it_does_not_return():
+    answers = iter([{"insufficient_cause": "Falta el SKU", "actions": None}, {"actions": [EMAIL]}])
+    recorder = Recorder()
+    graph = compiled(recorder, overrides={("estratega", "proponer"): lambda state: next(answers)})
+    state = start_alert(graph, saldo_detection(), alert_id="A1", day=DAY)
+    assert recorder.count("estratega", "proponer") == 2
+    assert recorder.count("estratega", "revision_manual") == 0
+    assert state["actions"] == [EMAIL]
+    assert awaiting_decision(graph, "A1")

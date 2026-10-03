@@ -13,8 +13,8 @@ from .state import STATE_FIELDS
 from .yaml_loader import load_yaml
 
 CAPPED_RETURNS = (
-    ("proponer", "explicar", "estado.analyst_returns"),
-    ("aprobar", "proponer", "estado.proposal_returns"),
+    ("proponer.retorno_disponible", "explicar", "estado.analyst_returns"),
+    ("aprobar.recarga_disponible", "proponer", "estado.proposal_returns"),
 )
 
 
@@ -56,6 +56,7 @@ def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
         *cycle_problems(nodes),
         *end_problems(nodes),
         *operand_problems(tree, grounds.catalog),
+        *candidate_problems(nodes, grounds.catalog),
         *threshold_problems(tree, grounds),
         *leaf_problems(tree, grounds.skills),
         *coverage_problems(tree, grounds),
@@ -178,10 +179,10 @@ def capped_return(node: Node, branch: str, target: str, nodes: Mapping[str, Node
     predicate = node.predicado
     if branch != "si" or predicate is None:
         return False
-    source, goal = stage_of(node.id, nodes), stage_of(target, nodes)
+    goal = stage_of(target, nodes)
     return any(
-        source == start and goal == end and predicate.lee == counter and predicate.op == "=" and predicate.valor == 0
-        for start, end, counter in CAPPED_RETURNS
+        node.id == bound and goal == end and predicate.lee == counter and predicate.op == "=" and predicate.valor == 0
+        for bound, end, counter in CAPPED_RETURNS
     )
 
 
@@ -239,6 +240,28 @@ def operand_problems(tree: Tree, catalog: Catalog) -> list[str]:
         elif STATE_PATH.match(predicate.lee) and predicate.lee not in STATE_FIELDS:
             found.append(f"{node.id} reads {predicate.lee}, which the alert's state does not declare")
     return found
+
+
+def candidate_problems(nodes: Mapping[str, Node], catalog: Catalog) -> list[str]:
+    found: set[str] = set()
+    seen: set[tuple[str, frozenset[str]]] = set()
+    stack = [(ROOT, frozenset(catalog.kpis))]
+    while stack:
+        node_id, candidates = stack.pop()
+        node = nodes.get(node_id)
+        if not candidates or node is None or node.predicado is None or (node_id, candidates) in seen:
+            continue
+        seen.add((node_id, candidates))
+        predicate = node.predicado
+        admitted, refused = candidates, candidates
+        match = KPI_PATH.match(predicate.lee)
+        if match is not None and candidates != {match.group(1)}:
+            found.add(f"{node_id} reads {match.group(1)} where the candidate may be {', '.join(sorted(candidates - {match.group(1)}))}")
+        if predicate.lee == "estado.candidato.metrica" and predicate.op in ("=", "en"):
+            named = frozenset(predicate.valor if predicate.op == "en" else [predicate.valor])
+            admitted, refused = candidates & named, candidates - named
+        stack += [(node.si, admitted), (node.no, refused)]
+    return sorted(found)
 
 
 def threshold_problems(tree: Tree, grounds: Grounds) -> list[str]:

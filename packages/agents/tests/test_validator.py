@@ -49,6 +49,11 @@ def both_branches(node_id, target):
     return plant
 
 
+def add_return(data):
+    data["nodos"].append({"id": "proponer.cartera.otra", "fundamento": "iso9001.10.2.1.b.2", "predicado": {"lee": "estado.analyst_returns", "op": "=", "valor": 0}, "si": "hoja.analista.explicar", "no": "proponer.causa_insuficiente"})
+    node_of(data, "hoja.estratega.proponer")["sigue"] = "proponer.cartera.otra"
+
+
 PLANTED = [
     ("schema", set_key("explicar.misma_causa", "color", "rojo"), "schema:"),
     ("two values", set_predicate("detectar.cartera.saldo_vencido.dias", valor=15), "compares with an umbral and a valor at once"),
@@ -79,6 +84,8 @@ PLANTED = [
     ("unknown agent", set_leaf("hoja.vigia.titular", agente="orquestador"), "outside vigia, analista, estratega and ejecutor"),
     ("L0 changed", set_law(0, "iso31000.6.6"), "L0 differs from the base"),
     ("L1 changed", set_predicate("aprobar.decision", valor=["approve"]), "L1 node aprobar.decision differs from the base"),
+    ("return the interpreter does not count", add_return, "cycle"),
+    ("kpi read on another metric's row", set_key("detectar.cartera.concentracion_vencida_pct.participacion", "no", "detectar.cartera.saldo_vencido.cupo"), "reads saldo_vencido where the candidate may be concentracion_vencida_pct"),
 ]
 
 
