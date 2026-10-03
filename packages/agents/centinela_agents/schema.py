@@ -1,6 +1,6 @@
 from typing import Any, Iterable, Literal, Mapping
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 STAGES = ("detectar", "explicar", "proponer", "aprobar", "ejecutar", "cerrar", "medir")
 FAMILIES = ("cartera", "margen", "inventario", "comercial", "abastecimiento", "clientes")
@@ -104,3 +104,145 @@ def reachable(nodes: Mapping[str, Node], starts: Iterable[str], without: frozens
         if node is not None:
             stack.extend(target for _, target in branches(node) if target not in without)
     return seen
+
+
+# Agent Output Schemas (Cause, Action, ExecutedAction, Decision)
+
+
+class Figure(BaseModel):
+    """
+    A single numeric or text figure from a tool query.
+
+    Every figure in agent output (Cause, Action, ExecutedAction) must have:
+    - value: the actual value (int, float, str)
+    - unit: unit of measure (COP, %, days, units, etc.) or None for dimensionless
+    - queryId: unique identifier of the query that produced this figure
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    value: int | float | str
+    unit: str | None = None
+    queryId: str
+
+
+class Evidence(BaseModel):
+    """
+    One piece of evidence supporting a cause.
+
+    claim: Spanish text describing what the evidence shows
+    figures: list of Figure objects referenced in the claim (matched by placeholder {0}, {1}, etc.)
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    claim: str
+    figures: list[Figure] = Field(default_factory=list)
+
+
+class Confidence(BaseModel):
+    """
+    Confidence assessment of an agent's output.
+
+    level: high (two views or formulas support it)
+           medium (one view or formula)
+           low (passes tests but incomplete or no formula)
+    assumptions: list of limitations, clock constraints, or missing evidence
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    level: Literal["high", "medium", "low"]
+    assumptions: list[str] = Field(default_factory=list)
+
+
+class CauseIdentified(BaseModel):
+    """Cause that Analista identified with evidence."""
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["identified"]
+    sentence: str  # Spanish text describing the cause
+    evidence: list[Evidence] = Field(min_length=1)
+    same_cause_as: str | None = None  # alert_id of another alert with same cause
+
+
+class CauseNoEvidence(BaseModel):
+    """Cause could not be identified due to insufficient evidence."""
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["no_evidence"]
+    reason: str  # Spanish text explaining why no cause was found
+    queriesReviewed: list[str] = Field(default_factory=list)  # queryIds examined
+
+
+# Union of both cause types
+Cause = CauseIdentified | CauseNoEvidence
+
+
+class Action(BaseModel):
+    """
+    Action proposed by Estratega for an alert.
+
+    type: one of the closed list (email_draft, task, purchase_order_draft, price_change_draft)
+    parameters: dict of action-specific parameters (cliente_id, sku, owner, etc.)
+    impact: figure showing the impact of this action (null if no formula)
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    id: str  # Unique action ID within this proposal
+    title: str  # Spanish title
+    description: str  # Spanish description, must cite policy section
+    type: Literal["email_draft", "task", "purchase_order_draft", "price_change_draft"]
+    parameters: dict[str, str | int | float]  # Action-specific parameters
+    impact: Figure | None = None  # Null if no formula
+    confidence: Confidence
+
+
+class InsufficientCause(BaseModel):
+    """Estratega found no action that the cause supports."""
+    model_config = ConfigDict(extra="forbid")
+
+    insufficient_cause: bool = True
+
+
+class ExecutedAction(BaseModel):
+    """
+    Result of executing an approved action (Ejecutor output).
+
+    Either a draft (email_draft, price_change_draft, purchase_order_draft)
+    or a manual task (task, manual note).
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    actionId: str  # Links to the approved Action
+    type: Literal["email_draft", "task", "purchase_order_draft", "price_change_draft", "nota_manual"]
+    result: str | dict[str, Any]  # Draft text or task details
+    parameters: dict[str, str | int | float]  # Exactly as approved
+
+
+class Decision(BaseModel):
+    """
+    Human decision on an alert (recorded by API, used to resume).
+
+    kind: approve (execute this action)
+          edit (execute with modified parameters)
+          reject (refuse and end the alert)
+          request_changes (ask Estratega to propose again)
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["approve", "edit", "reject", "request_changes"]
+    actionId: str | None = None  # For approve/edit (which action to execute)
+    parameters: dict[str, str | int | float] | None = None  # For edit only (new values)
+    reason: str | None = None  # For reject/request_changes (why)
+
+
+class RejectionClassifierOutput(BaseModel):
+    """
+    Orquestador classifier output: where to route the rejection reason.
+
+    destino: causa (route to Analista)
+             propuesta (route to Estratega)
+             ambos (route to both)
+             ninguno (keep in log, no agent action)
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    destino: Literal["causa", "propuesta", "ambos", "ninguno"]
