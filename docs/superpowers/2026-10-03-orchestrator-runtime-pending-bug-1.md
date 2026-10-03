@@ -7,6 +7,13 @@ spec writes. **Depends on:** spec 2, `decision-tree`, for the interpreter it com
 `unidad` of each metric; spec 5 for the base KPIs the detection reads, with their
 `pesos_en_riesgo` and `pedidos_pendientes` columns.
 
+**Executed specs.** Specs 1, 2, 4 and 5 are executed and deleted, and a reference below to one of them
+reads as a reference to the page that now states it: spec 1, the foundations and the scope of growth,
+is [`packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md); spec 2, the tree, is
+the same page; spec 4, the kernel, is the language in [`data/AGENTS.md`](../../data/AGENTS.md) and the
+tools in [`packages/tools/AGENTS.md`](../../packages/tools/AGENTS.md); spec 5, the base KPIs, is
+[`data/AGENTS.md`](../../data/AGENTS.md).
+
 ## Why
 
 `packages/agents/AGENTS.md` states the orchestrator's design, and its interpreter implements the
