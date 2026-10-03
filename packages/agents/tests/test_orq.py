@@ -6,7 +6,7 @@ import pytest
 
 from centinela_agents.catalog import Catalog, Kpi
 from centinela_agents.failures import StepTimeout
-from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, resume, start_alert
+from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, manual_owners, resume, start_alert
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import Tree
 from centinela_agents.validator import InvalidTree, checked_base, load_registry, problems
@@ -163,6 +163,26 @@ def test_orq_a_tool_or_connection_error_gives_its_own_reason_not_the_schema_one(
     graph, state = started(Recorder(), overrides={("analista", "explicar"): broken})
     assert state["cause"]["reason"] == "El análisis no terminó: falló una herramienta o la conexión."
     assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error"}]
+
+
+def test_orq_a_failed_manual_review_still_proposes_its_task_to_its_owner():
+    def timeout(state):
+        raise StepTimeout("ollama")
+
+    def broken(state):
+        raise RuntimeError("revision")
+
+    owners = manual_owners((SKILLS / "estratega" / "acciones.md").read_text(encoding="utf-8"))
+    graph, state = started(Recorder(), overrides={("analista", "explicar"): timeout, ("estratega", "revision_manual"): broken}, owners=owners)
+    assert state["actions"] == [{"id": "act-revision-manual", "title": "Revisión manual de la alerta", "type": "task", "impact": None, "parameters": {"owner": "Analista de cartera"}}]
+    assert {"step": "hoja.estratega.revision_manual", "kind": "error"} in state["failures"]
+    assert awaiting_decision(graph, "A1")
+
+
+def test_orq_every_metric_has_the_owner_of_its_manual_review():
+    owners = manual_owners((SKILLS / "estratega" / "acciones.md").read_text(encoding="utf-8"))
+    assert set(owners) == set(load_metrics(METRICAS).names)
+    assert owners["margen_pct"] == "Comercial"
 
 def test_orq_a_failed_execution_leaves_the_alert_aprobada():
     def broken(state):

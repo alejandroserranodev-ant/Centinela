@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from .catalog import Catalog, KpiReader, thresholds_named
@@ -14,10 +14,11 @@ class Context:
     metrics: Metrics
     catalog: Catalog
     reader: KpiReader
+    owners: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
-    def of(cls, tree: Tree, metrics: Metrics, catalog: Catalog, reader: KpiReader) -> "Context":
-        return cls(index(tree), metrics, catalog, reader)
+    def of(cls, tree: Tree, metrics: Metrics, catalog: Catalog, reader: KpiReader, owners: Mapping[str, str] | None = None) -> "Context":
+        return cls(index(tree), metrics, catalog, reader, dict(owners or {}))
 
 
 @dataclass(frozen=True)

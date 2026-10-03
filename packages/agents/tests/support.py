@@ -106,7 +106,7 @@ def reader_from(rows_by_day):
     return lambda metric, day: list(rows_by_day.get(day, {}).get(metric, []))
 
 
-def compiled(recorder, *, overrides=None, rows=None, classify=None, tree=None, catalog=VIEW_CATALOG):
+def compiled(recorder, *, overrides=None, rows=None, classify=None, tree=None, catalog=VIEW_CATALOG, owners=None):
     return compile_tree(
         tree or base_tree(),
         leaves=leaves(recorder, overrides),
@@ -115,6 +115,7 @@ def compiled(recorder, *, overrides=None, rows=None, classify=None, tree=None, c
         reader=reader_from({DECISION_DAY: {"saldo_vencido": [SALDO_ROW]}} if rows is None else rows),
         classify=classify or (lambda state: "propuesta"),
         checkpointer=InMemorySaver(),
+        owners=owners,
     )
 
 

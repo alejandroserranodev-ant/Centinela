@@ -215,7 +215,7 @@ with no clause number is refused there, because no reader can check it.
 **The tree compiles to the LangGraph graph; an invalid base stops the start.**
 `centinela_agents/validator.py:load_base(arbol, metricas, skills, catalog)` validates the base and
 raises with every problem. `centinela_agents/graph.py:compile_tree(tree, *, leaves, metrics,
-catalog, reader, classify, checkpointer)` makes a graph node of each leaf, each predicate node and
+catalog, reader, classify, checkpointer, owners)` makes a graph node of each leaf, each predicate node and
 each end reachable from a `vigia` leaf that `detectar.raiz` reaches, and a conditional edge out of
 each predicate node. Each run compiles the version `apps/api` hands in, cached by its `version`, by
 `centinela_agents/graph.py:Compiler`.
@@ -372,7 +372,11 @@ listed action, which is the case manual review exists for.
 run on the one loaded model.
 
 **A fallback writes a value, never a route**: the metric's `descripcion` and the entity for the
-title, `no_evidence` for the cause, no actions for the proposal, no executed action for `Ejecutor`.
+title, `no_evidence` for the cause, no actions for the proposal, the manual review's one `task` for
+`revision_manual`, and no executed action for `Ejecutor`. The manual review's owner comes from the
+table of `skills/estratega/acciones.md`, read by `centinela_agents/graph.py:manual_owners(acciones)`
+and handed to `compile_tree` as `owners`, so a failed `revision_manual` still reaches the gate with
+its task and the alert never stalls.
 The tree routes each one, at `explicar.con_evidencia`, `proponer.con_acciones` and
 `ejecutar.resultado`.
 

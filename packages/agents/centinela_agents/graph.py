@@ -1,3 +1,4 @@
+import re
 from typing import Any, Callable, Mapping
 
 from langgraph.graph import END, START, StateGraph
@@ -22,6 +23,7 @@ REASONS = {
     "schema": "El análisis no terminó: el modelo no devolvió una respuesta válida.",
     "error": "El análisis no terminó: falló una herramienta o la conexión.",
 }
+MANUAL_REVIEW_OWNERS = "## The owner of a manual review"
 BOUND_NODES = frozenset({"explicar.destino_nuevo", "proponer.retorno_disponible", "aprobar.recarga_disponible", GATE})
 LEAF_OUTPUTS = {
     ("vigia", "titular"): ("title",),
@@ -89,6 +91,23 @@ def failure_kind(error: Exception) -> str:
     return "error"
 
 
+def manual_owners(acciones: str) -> dict[str, str]:
+    section = acciones.split(MANUAL_REVIEW_OWNERS, 1)[1].split("\n## ")[0]
+    rows = re.split(r"^\|(?:---\|)+$", section, maxsplit=1, flags=re.MULTILINE)[1]
+    return dict(re.findall(r"^\| `([a-z0-9_]+)` \| `([^`]+)` \|", rows, re.MULTILINE))
+
+
+def manual_review(metric: str, ctx: Context) -> dict[str, Any]:
+    owner = ctx.owners.get(metric)
+    return {
+        "id": "act-revision-manual",
+        "title": "Revisión manual de la alerta",
+        "type": "task",
+        "impact": None,
+        "parameters": {} if owner is None else {"owner": owner},
+    }
+
+
 def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Context) -> dict[str, Any]:
     key = (leaf.agente, leaf.decision)
     if key == ("vigia", "titular"):
@@ -100,6 +119,8 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
         return {"cause": {"kind": "no_evidence", "reason": reason, "queriesReviewed": list(state.get("queries") or [])}, "same_cause_as": None}
     if key == ("estratega", "proponer"):
         return {"actions": None, "insufficient_cause": None}
+    if key == ("estratega", "revision_manual"):
+        return {"actions": [manual_review(state["detection"]["metric"], ctx)], "insufficient_cause": None}
     if leaf.agente == "ejecutor":
         return {"executed_action": None}
     raise error
@@ -181,8 +202,9 @@ def compile_tree(
     reader: KpiReader,
     classify: Classifier,
     checkpointer: Any,
+    owners: Mapping[str, str] | None = None,
 ):
-    ctx = Context.of(tree, metrics, catalog, reader)
+    ctx = Context.of(tree, metrics, catalog, reader, owners)
     rooted = reachable(ctx.nodes, [ROOT])
     entries = sorted(node.id for node in tree.nodos if node.id in rooted and node.hoja is not None and node.hoja.agente == "vigia")
     graph = StateGraph(AlertState)
@@ -205,8 +227,8 @@ def compile_tree(
 
 
 class Compiler:
-    def __init__(self, *, leaves, metrics: Metrics, catalog: Catalog, reader: KpiReader, classify: Classifier, checkpointer: Any):
-        self._dependencies = {"leaves": leaves, "metrics": metrics, "catalog": catalog, "reader": reader, "classify": classify, "checkpointer": checkpointer}
+    def __init__(self, *, leaves, metrics: Metrics, catalog: Catalog, reader: KpiReader, classify: Classifier, checkpointer: Any, owners: Mapping[str, str] | None = None):
+        self._dependencies = {"leaves": leaves, "metrics": metrics, "catalog": catalog, "reader": reader, "classify": classify, "checkpointer": checkpointer, "owners": owners}
         self._graphs: dict[int, Any] = {}
 
     def graph(self, tree: Tree):

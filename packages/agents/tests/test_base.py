@@ -47,3 +47,7 @@ def test_the_approved_action_carries_the_edited_parameters():
     assert approved_action({"actions": actions, "decision": edit})["parameters"] == {"vendedor_id": "VEN-02"}
     assert approved_action({"actions": actions, "decision": {"kind": "approve", "actionId": "a1"}})["type"] == "email_draft"
     assert approved_action({"actions": actions, "decision": {"kind": "reject", "reason": "no"}}) is None
+
+
+def test_the_manual_review_loads_the_table_that_names_its_owner():
+    assert index(base())["hoja.estratega.revision_manual"].hoja.skill == "estratega/acciones.md"
