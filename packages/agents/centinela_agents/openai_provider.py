@@ -88,7 +88,14 @@ class OpenAIProvider(LLMProvider):
             return True
         except (APIError, APIConnectionError, APITimeoutError) as e:
             logger.error(f"OpenAI API health check failed: {e}")
-            return False
+            raise ValueError(
+                "OpenAI API health check failed.\n"
+                "Possible causes:\n"
+                "  - Invalid API key\n"
+                "  - API key revoked or expired\n"
+                "  - Network connectivity issue\n"
+                "  - Org/project not configured correctly"
+            ) from e
 
     def generate_text(self, request: LLMRequest) -> LLMResponse:
         """
