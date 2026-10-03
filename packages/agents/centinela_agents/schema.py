@@ -125,6 +125,14 @@ class Figure(BaseModel):
     queryId: str
 
 
+class Sentence(BaseModel):
+    """Natural language statement with optional supporting figures."""
+    model_config = ConfigDict(extra="forbid")
+
+    text: str
+    figures: list[Figure] = Field(default_factory=list)
+
+
 class Evidence(BaseModel):
     """
     One piece of evidence supporting a cause.

@@ -174,17 +174,8 @@ class ChatMessage(Esquema):
 
 
 class ChatQuestion(Esquema):
-<<<<<<< HEAD
-<<<<<<< HEAD
     """User question for Centinela (Analista)."""
     question: str = Field(..., description="Natural language question about alert or metric")
-=======
-    question: str
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-=======
-    """User question for Centinela (Analista)."""
-    question: str = Field(..., description="Natural language question about alert or metric")
->>>>>>> 2becda8 (feat: Comprehensive schema documentation — Field descriptions for all domain models)
 
 
 class SimulatedDay(Esquema):
@@ -217,10 +208,6 @@ Decision = Annotated[
 
 
 class AgentAlertInput(Esquema):
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 2becda8 (feat: Comprehensive schema documentation — Field descriptions for all domain models)
     """Vigía input: new alert detected from metric anomaly."""
     severity: Severity = Field(..., description="Alert severity (critical, high, medium, low)")
     metric: Metric = Field(..., description="Metric that triggered alert")
@@ -229,7 +216,6 @@ class AgentAlertInput(Esquema):
     recoverable_per_month: Figure | None = Field(None, description="Monthly recovery potential")
     confidence: Confidence = Field(..., description="Confidence in the alert detection")
     simulated_date: str = Field(..., description="Simulated date of detection (ISO 8601)")
-<<<<<<< HEAD
 
 
 class AgentCauseInput(Esquema):
@@ -259,56 +245,3 @@ class CostoAgente(Esquema):
     tokens_entrada: int = Field(..., description="Input tokens consumed")
     tokens_salida: int = Field(..., description="Output tokens generated")
     latencia_ms: int = Field(..., description="Total latency in milliseconds")
-=======
-    """Entrada de Vigía: una nueva alerta detectada."""
-
-    severity: Severity
-    metric: Metric
-    title: Sentence
-    pesos_at_risk: Figure
-    recoverable_per_month: Figure | None = None
-    confidence: Confidence
-    simulated_date: str
-=======
->>>>>>> 2becda8 (feat: Comprehensive schema documentation — Field descriptions for all domain models)
-
-
-class AgentCauseInput(Esquema):
-    """Analista input: root cause explanation with evidence."""
-    cause: Cause = Field(..., description="Root cause (identified or no_evidence)")
-    evidence: list[Evidence] = Field(default_factory=list, description="Additional evidence queries run by Analista")
-
-
-class AgentProposalInput(Esquema):
-    """Estratega input: proposed mitigation actions."""
-    actions: list[Action] = Field(..., min_length=1, max_length=3, description="1-3 proposed actions with impact and parameters")
-
-
-class AgentExecutionInput(Esquema):
-    """Ejecutor input: result of executing an approved action."""
-    action_id: str = Field(..., description="ID of the action executed")
-    status: Literal["success", "failed", "partial"] = Field(..., description="Execution result")
-    result: str = Field(..., description="Human-readable result or error message")
-    error: str | None = Field(None, description="Detailed error if status != success")
-
-
-class CostoAgente(Esquema):
-<<<<<<< HEAD
-    """Registro de costo: tokens, modelo, latencia por paso."""
-
-    agent: Agent
-    step: str
-    modelo: str
-    tokens_entrada: int
-    tokens_salida: int
-    latencia_ms: int
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-=======
-    """Agent cost tracking: tokens, model, and latency."""
-    agent: Agent = Field(..., description="Agent that ran (vigia, analista, estratega, ejecutor)")
-    step: str = Field(..., description="Step name (e.g., search_policies, generate_actions)")
-    modelo: str = Field(..., description="Model used (e.g., claude-opus-5)")
-    tokens_entrada: int = Field(..., description="Input tokens consumed")
-    tokens_salida: int = Field(..., description="Output tokens generated")
-    latencia_ms: int = Field(..., description="Total latency in milliseconds")
->>>>>>> 2becda8 (feat: Comprehensive schema documentation — Field descriptions for all domain models)

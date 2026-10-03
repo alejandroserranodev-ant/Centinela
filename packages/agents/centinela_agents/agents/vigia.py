@@ -138,7 +138,3 @@ Solo el hecho."""
         }
 
 
-# Type alias for Sentence (for return type hint)
-class Sentence(dict):
-    """Title sentence with figures (simple dict for now)."""
-    pass
