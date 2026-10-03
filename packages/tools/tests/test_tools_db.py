@@ -1,6 +1,8 @@
 # The tools against the scratch database: each fixture KPI agrees with a hand-written as-of query on
 # several simulated days, facturas_abiertas agrees with the kit's v_cartera_cliente on fecha_corte(),
 # and each guard that needs a database (costo, tiempo, cardinalidad, the read-only transaction) holds.
+# The latest value ignores a row whose ordering date, read through a join, the day masks; the rows
+# it plants are rolled back. tener filters the unrounded value, so a row at -0.3 rounded to 0 stays.
 from datetime import date
 
 import psycopg
@@ -120,3 +122,40 @@ def test_an_approved_kpi_that_writes_fails_and_changes_nothing(connect, superuse
     with pytest.raises(psycopg.Error):
         kpi_consultar("malicioso", date(2026, 3, 2), catalogue_of({}, SOURCES, [record]), connect, Settings())
     assert superuser.execute("SELECT count(*) FROM centinela.pedidos").fetchone()[0] == before
+
+
+def test_the_latest_value_skips_a_row_whose_ordering_date_the_day_masks(superuser):
+    day = date(2026, 3, 2)
+    block = {
+        "fuente": "pedidos_detalle",
+        "unir": ["pedidos", "clientes"],
+        "agrupar": ["pedidos.vendedor_id"],
+        "medida": {"agregado": "ultimo", "de": "pedidos_detalle.valor_neto", "por": "clientes.fecha_alta"},
+        "salida": {"valor": "ultimo_valor"},
+    }
+    with superuser.transaction(force_rollback=True):
+        seller, sku = superuser.execute(
+            "SELECT p.vendedor_id, d.sku FROM centinela.pedidos p JOIN centinela.pedidos_detalle d USING (pedido_id) WHERE p.fecha <= %s LIMIT 1", (day,)
+        ).fetchone()
+        superuser.execute(
+            "INSERT INTO centinela.clientes SELECT 'CLI-T1', nombre, segmento, ciudad, region, vendedor_id, plazo_dias, cupo_credito, %s FROM centinela.clientes LIMIT 1",
+            (date(2026, 3, 3),),
+        )
+        superuser.execute("INSERT INTO centinela.pedidos VALUES ('PED-T1', %s, 'CLI-T1', %s, 'X', 'X', 'Entregado')", (day, seller))
+        superuser.execute("INSERT INTO centinela.pedidos_detalle VALUES ('PED-T1', 1, %s, 1, 0, 0, 0, 'N', -1, 0)", (sku,))
+        found = dict(superuser.execute(compile_kpi(block, SOURCES).query, {"dia": day}).fetchall())
+    assert found[seller] is not None and found[seller] != -1
+
+
+def test_having_reads_the_value_before_it_is_rounded(superuser):
+    block = {
+        "fuente": "facturas",
+        "agrupar": ["facturas.cliente_id"],
+        "medida": {"agregado": "sum", "de": "facturas.valor_total"},
+        "derivadas": {"casi_cero": {"op": "-", "izq": {"op": "*", "izq": "saldo", "der": 0}, "der": 0.3}},
+        "decimales": {"casi_cero": 0},
+        "tener": [{"columna": "casi_cero", "op": "<", "valor": 0}],
+        "salida": {"valor": "saldo"},
+    }
+    found = superuser.execute(compile_kpi(block, SOURCES).query, {"dia": date(2026, 3, 2)}).fetchall()
+    assert found and all(row[-1] == 0 for row in found)

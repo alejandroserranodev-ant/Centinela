@@ -15,7 +15,7 @@ decisions all of them are written against.
 | `centinela_tools/generate.py` | writes `data/sql/05_kpis.generated.sql` |
 | `centinela_tools/kernel.py` | the kernel's contract: the JSON Schema of each of its four tools, and the one call that checks arguments against it and dispatches |
 | `centinela_tools/refusal.py`, `settings.py`, `paths.py` | the closed list of guards, the settings read from the environment, and where the files of `data/` are |
-| `tests/` | planted violations of every bound, rule of `fuentes.yaml` and guard; `tests/fixtures/metricas.yaml` holds the KPIs they compile; the tests marked `db` need the scratch database |
+| `tests/` | planted violations of every bound, rule of `fuentes.yaml` and guard; `tests/fixtures/metricas.yaml` holds the KPIs they compile; `tests/test_parity.py` checks every base KPI against its view and an as-of query; the tests marked `db` need the scratch database |
 | `pyproject.toml`, `uv.lock` | the package and its pinned dependencies; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
 
 ## Commands
@@ -76,19 +76,19 @@ itself. `docker stop centinela-kernel-test` removes the container.
 
 ## The impact calculator
 
-`calcular_impacto` takes a formula name, the alert's entity and the simulated day, runs its queries
-over the views, and returns each figure with its query. The formula, not the model, chooses every
-percentage and quantity. Every formula assumes volume holds, and returns that assumption.
+`calcular_impacto` takes a formula name, the alert's entity and the simulated day, runs
+`kpi_consultar` on the KPIs below, and returns each figure with its query. The formula, not the
+model, chooses every percentage and quantity. Every formula assumes volume holds, and returns that assumption.
 
 | Formula | Returns | Computed as |
 |---|---|---|
-| `traslado_costo` | `price_increase_pct`, impact per month | the cost increase over the list price in force, from `v_costo_sku` and `v_precio_sku`; times the SKU's mean monthly units over the last three months in `v_ventas` |
-| `precio_a_margen_minimo` | `price_increase_pct`, impact per month | the price change that takes the line's `margen_pct` to `margen_minimo_pct`; the margin gap times the line's mean monthly `valor_neto` |
-| `cartera_vencida` | impact once | the customer's `saldo_vencido` in `v_cartera_cliente` |
-| `ventas_protegidas` | `units`, impact once | `demanda_prom_30d` times the class minimum coverage of `OPE-POL-007 §2` minus `existencia`; those units times the list price in force |
-| `descuento_recuperado` | impact per month | the seller's `sum(descuento_en_exceso)` over the last four weeks |
-| `venta_bajo_costo` | impact per month | `-sum(margen_bruto)` of the SKU's lines below cost over the last four weeks |
-| `compra_recuperada` | impact per month | the customer's mean monthly `valor_neto` over the six months before `ultima_compra` |
+| `traslado_costo` | `price_increase_pct`, impact per month | the increase from `costo_anterior` to `costo_unitario` over `precio_lista`, the list price in force, all of `k_variacion_costo_pct`; times its `unidades_mes_prom`, the SKU's mean monthly units over the last 90 days |
+| `precio_a_margen_minimo` | `price_increase_pct`, impact per month | the price change that takes the line's `margen_pct` to `margen_minimo_pct`, both of `k_margen_pct`; the margin gap times its `ventas_mes_prom`, the line's mean monthly `valor_neto` over the last 90 days |
+| `cartera_vencida` | impact once | the customer's `saldo_vencido` in `k_saldo_vencido` |
+| `ventas_protegidas` | `units`, impact once | `demanda_prom_30d` of `k_cobertura_dias` times the class minimum coverage of `OPE-POL-007 §2` minus its `existencia`; those units times its `precio_lista`, the list price in force |
+| `descuento_recuperado` | impact per month | the seller's `sum(descuento_en_exceso)` over the rows of `k_descuento_en_exceso` whose `semana` falls in the last four weeks |
+| `venta_bajo_costo` | impact per month | `-sum(margen_bruto)` of the SKU's rows of `k_margen_bruto_negativo` whose `fecha` falls in the last four weeks |
+| `compra_recuperada` | impact per month | the customer's `pesos_en_riesgo` in `k_veces_intervalo_habitual`, its mean monthly `valor_neto` over the six months up to `ultima_compra` |
 
 ## Rules of this level
 
@@ -107,9 +107,9 @@ percentage and quantity. Every formula assumes volume holds, and returns that as
 The kernel is a **workbench with a closed language**: it compiles a `kernel:` block to SQL with
 `psycopg.sql` composition, never by interpolation, and refuses anything it cannot bound in cost or
 in time. No path, for a person or a model, takes free SQL: a tool receives a block or an id, so
-what cannot be written cannot be injected. `centinela_tools/compiler.py:compile_kpi(block, sources, day)`
+what cannot be written cannot be injected. `centinela_tools/compiler.py:compile_kpi(block, sources, day, thresholds)`
 takes `dia` and applies it to every date column the KPI reaches, so a KPI is correct on any
-simulated day by construction.
+simulated day by construction; `thresholds`, the entry's `umbrales`, answers an `umbral` operand.
 
 | Kind | Defined in | Reaches the database | Runs as |
 |---|---|---|---|
@@ -136,11 +136,30 @@ Every refusal names its guard, from `centinela_tools/refusal.py:GUARDS`:
 | `hash` | an approved KPI whose stored SQL changed | on every call | |
 | `catalogo` | an id in no catalogue | on every call | |
 
-**The cost cap is a measurement.** The planner's total cost on the official dataset is 25632.92 for
-`v_cartera_cliente`, 5258.55 for `v_cobertura_inventario` and 2966.31 for `v_actividad_cliente`, and
-79009.95 for a weekly baseline over eight weeks. Ten times `v_cartera_cliente`'s is about 256000;
-the default of 1000000 leaves room for a baseline KPI. The rows a dry run returns are capped by
-`CENTINELA_KERNEL_MUESTRA`, 20. The settings are sized to the machine, as Ollama's model is. Every
+**The cost cap is a measurement.** This command, run from this directory against a database loaded
+with the official dataset, prints the planner's total cost on `fecha_corte()` of three of the kit's
+views and of every base KPI of `data/metricas.yaml`:
+
+```bash
+CENTINELA_DSN=postgresql://centinela:centinela@localhost:55432/centinela uv run python -c '
+import os
+from psycopg import sql
+from centinela_tools.compiler import compile_kpi
+from centinela_tools.generate import database_cost
+from centinela_tools.paths import METRICAS
+from centinela_tools.sources import load_sources
+from centinela_tools.tools import load_entries
+cost = database_cost(os.environ["CENTINELA_DSN"])
+for view in ("v_cartera_cliente", "v_cobertura_inventario", "v_actividad_cliente"):
+    print(view, round(cost(sql.SQL("SELECT * FROM {}").format(sql.Identifier("centinela", view)))))
+for metric, entry in load_entries(METRICAS).items():
+    print(metric, round(cost(compile_kpi(entry["kernel"], load_sources(), thresholds=entry.get("umbrales")).query)))
+'
+```
+
+The default of 1000000 is well over ten times `v_cartera_cliente`'s, the costliest of the three
+views, and leaves room above the costliest base KPI, a baseline. The rows a dry run returns are
+capped by `CENTINELA_KERNEL_MUESTRA`, 20. The settings are sized to the machine, as Ollama's model is. Every
 run is a transaction opened `READ ONLY` with its `statement_timeout`,
 `centinela_tools/tools.py:guarded(conn, settings)`, inside the roles of
 [`../../data/AGENTS.md`](../../data/AGENTS.md).

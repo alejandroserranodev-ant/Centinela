@@ -62,7 +62,7 @@ def catalogue_of(entries: Mapping[str, Mapping[str, Any]], sources: Sources, app
         if "kernel" not in entry:
             continue
         check_card(entry)
-        compiled = compile_kpi(entry["kernel"], sources)
+        compiled = compile_kpi(entry["kernel"], sources, thresholds=entry.get("umbrales"))
         kpis[named(kpi_id)] = Kpi(kpi_id, "base", {key: entry[key] for key in CARD}, not entry.get("fuente_umbral"), compiled.entity, compiled.columns)
     approved_ids = set()
     for record in approved:

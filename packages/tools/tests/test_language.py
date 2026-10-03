@@ -37,7 +37,7 @@ def test_every_fixture_block_and_card_is_in_the_language(metric):
         pytest.param(with_(lambda b: (b.pop("linea_base"), b["salida"].pop("base"), b["salida"].pop("delta"), b.update(ventana={"columna": "pedidos.fecha", "dias": 366}))), "ventana/dias", id="window-past-365"),
         pytest.param(with_(lambda b: b.update(filtro=[{"columna": "pedidos_detalle.cantidad", "op": ">", "valor": i} for i in range(6)])), "filtro", id="six-filters"),
         pytest.param(with_(lambda b: b.update(agrupar=["productos.linea", "productos.clase_abc", "pedidos.canal", "pedidos.ciudad"])), "agrupar", id="four-groups"),
-        pytest.param(with_(lambda b: b.update(medida={"agregado": "sum", "de": op(op(op(COL, COL), COL), COL)})), "medida/de", id="expression-depth-three"),
+        pytest.param(with_(lambda b: b.update(medida={"agregado": "sum", "de": op(op(op(op(COL, COL), COL), COL), COL)})), "medida/de", id="expression-depth-four"),
         pytest.param(with_(lambda b: (b.pop("medida"), b.update(razon={"numerador": {"razon": {}}, "denominador": {"agregado": "count"}}))), "razon/numerador", id="ratio-of-a-ratio"),
         pytest.param(with_(lambda b: b["linea_base"].update(n=13)), "linea_base/n", id="baseline-past-12"),
         pytest.param(with_(lambda b: b["salida"].pop("valor")), "salida", id="no-output-value"),

@@ -66,10 +66,10 @@ def render(sources: Sources, entries: Mapping[str, Mapping[str, Any]], views: li
         if "kernel" not in entry:
             continue
         check_card(entry)
-        estimated = cost(compile_kpi(entry["kernel"], sources).query)
+        estimated = cost(compile_kpi(entry["kernel"], sources, thresholds=entry.get("umbrales")).query)
         if estimated > settings.max_cost:
             raise Refused("costo", f"{metric}: the planner estimates {estimated:.0f}, over the cap of {settings.max_cost:.0f}")
-        parts.append(function_definition(metric, entry["kernel"], sources).as_string())
+        parts.append(function_definition(metric, entry["kernel"], sources, entry.get("umbrales")).as_string())
     return "".join(parts)
 
 
