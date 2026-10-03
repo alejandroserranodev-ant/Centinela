@@ -1,6 +1,6 @@
 # Spec 5 of 6: the current metrics, built by the kernel
 
-**Status:** planned in `2026-10-03-current-kpis-in-kernel-plan.md`. **Depends on:** spec 4, `kpi-kernel`, for the language, the compiler
+**Status:** executed; kept while spec 6 and bug spec 1 build on it. **Depends on:** spec 4, `kpi-kernel`, for the language, the compiler
 and the tools.
 
 ## Why
