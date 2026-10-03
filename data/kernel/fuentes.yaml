@@ -1,0 +1,105 @@
+version: 1
+tablas:
+  vendedores:
+    clave: [vendedor_id]
+    columnas: { vendedor_id: text, region: text }
+    excluidas: { nombre: "el nombre de una persona; ante un agente un vendedor es su vendedor_id" }
+  clientes:
+    clave: [cliente_id]
+    columnas: { cliente_id: text, nombre: text, segmento: text, ciudad: text, region: text, vendedor_id: text, plazo_dias: integer, cupo_credito: bigint, fecha_alta: date }
+    fechas: { fecha_alta: evento }
+  proveedores:
+    clave: [proveedor_id]
+    columnas: { proveedor_id: text, nombre: text, lead_time_dias: integer, pais: text }
+  productos:
+    clave: [sku]
+    columnas: { sku: text, nombre: text, linea: text, proveedor_id: text, clase_abc: text, unidad: text }
+  bodegas:
+    clave: [bodega_id]
+    columnas: { bodega_id: text, nombre: text, ciudad: text }
+  lista_precios:
+    clave: [sku, fecha_vigencia]
+    columnas: { sku: text, fecha_vigencia: date, precio_lista: numeric }
+    fechas: { fecha_vigencia: evento }
+  costos_proveedor:
+    clave: [sku, fecha_vigencia]
+    columnas: { sku: text, proveedor_id: text, fecha_vigencia: date, costo_unitario: numeric }
+    fechas: { fecha_vigencia: evento }
+  ordenes_compra:
+    clave: [oc_id]
+    columnas: { oc_id: text, proveedor_id: text, sku: text, bodega_id: text, fecha_oc: date, fecha_esperada: date, fecha_recibida: date, cantidad: integer, costo_unitario: numeric, estado: text }
+    fechas: { fecha_oc: evento, fecha_esperada: plazo, fecha_recibida: cierre }
+    fuga:
+      estado: { razon: "guarda cómo terminó la orden al final del dataset, no su estado en el día simulado", conocidos_al_crear: [] }
+  pedidos:
+    clave: [pedido_id]
+    columnas: { pedido_id: text, fecha: date, cliente_id: text, vendedor_id: text, ciudad: text, canal: text, estado: text }
+    fechas: { fecha: evento }
+    fuga:
+      estado: { razon: "Pendiente de despacho es el estado al final del dataset; Cancelado se decide al crear el pedido", conocidos_al_crear: [Cancelado] }
+  pedidos_detalle:
+    clave: [pedido_id, linea_n]
+    columnas: { pedido_id: text, linea_n: integer, sku: text, cantidad: integer, precio_lista: numeric, precio_unitario: numeric, descuento_pct: numeric, aprobacion_especial: text, valor_neto: numeric, costo_unitario: numeric }
+  facturas:
+    clave: [factura_id]
+    columnas: { factura_id: text, pedido_id: text, cliente_id: text, fecha_factura: date, fecha_vencimiento: date, valor_neto: numeric, iva: numeric, valor_total: numeric }
+    fechas: { fecha_factura: evento, fecha_vencimiento: plazo }
+  pagos:
+    clave: [pago_id]
+    columnas: { pago_id: text, factura_id: text, fecha_pago: date, valor: numeric, medio_pago: text }
+    fechas: { fecha_pago: evento }
+  inventario_diario:
+    clave: [fecha, bodega_id, sku]
+    columnas: { fecha: date, bodega_id: text, sku: text, existencia_inicial: integer, entradas: integer, salidas: integer, existencia_final: integer }
+    fechas: { fecha: evento }
+  ref_topes_descuento:
+    clave: [segmento]
+    columnas: { segmento: text, tope_descuento_pct: numeric }
+  ref_margen_minimo_linea:
+    clave: [linea]
+    columnas: { linea: text, margen_minimo_pct: numeric }
+fuentes:
+  pedidos_detalle:
+    fechada_por: pedidos
+    uniones:
+      pedidos: { desde: pedidos_detalle, tabla: pedidos, por: { pedido_id: pedido_id } }
+      productos: { desde: pedidos_detalle, tabla: productos, por: { sku: sku } }
+      clientes: { desde: pedidos, tabla: clientes, por: { cliente_id: cliente_id } }
+      vendedores: { desde: pedidos, tabla: vendedores, por: { vendedor_id: vendedor_id } }
+      topes: { desde: clientes, tabla: ref_topes_descuento, por: { segmento: segmento } }
+      margen_minimo: { desde: productos, tabla: ref_margen_minimo_linea, por: { linea: linea } }
+    dimensiones: [pedidos_detalle.pedido_id, pedidos_detalle.linea_n, pedidos_detalle.sku, pedidos.cliente_id, pedidos.vendedor_id, pedidos.canal, pedidos.ciudad, productos.linea, productos.clase_abc, clientes.segmento, clientes.region, vendedores.region]
+  pedidos:
+    uniones:
+      clientes: { desde: pedidos, tabla: clientes, por: { cliente_id: cliente_id } }
+      vendedores: { desde: pedidos, tabla: vendedores, por: { vendedor_id: vendedor_id } }
+    dimensiones: [pedidos.cliente_id, pedidos.vendedor_id, pedidos.canal, pedidos.ciudad, clientes.segmento, clientes.region]
+  facturas:
+    uniones:
+      clientes: { desde: facturas, tabla: clientes, por: { cliente_id: cliente_id } }
+    cierres:
+      pagada: { tabla: pagos, por: { factura_id: factura_id }, fecha: fecha_pago }
+    dimensiones: [facturas.factura_id, facturas.cliente_id, clientes.segmento, clientes.region, clientes.vendedor_id]
+  pagos:
+    uniones:
+      facturas: { desde: pagos, tabla: facturas, por: { factura_id: factura_id } }
+      clientes: { desde: facturas, tabla: clientes, por: { cliente_id: cliente_id } }
+    dimensiones: [facturas.cliente_id, pagos.medio_pago, clientes.segmento]
+  ordenes_compra:
+    uniones:
+      proveedores: { desde: ordenes_compra, tabla: proveedores, por: { proveedor_id: proveedor_id } }
+      productos: { desde: ordenes_compra, tabla: productos, por: { sku: sku } }
+    dimensiones: [ordenes_compra.oc_id, ordenes_compra.proveedor_id, ordenes_compra.sku, ordenes_compra.bodega_id, productos.linea, productos.clase_abc]
+  inventario_diario:
+    uniones:
+      productos: { desde: inventario_diario, tabla: productos, por: { sku: sku } }
+    dimensiones: [inventario_diario.sku, inventario_diario.bodega_id, productos.linea, productos.clase_abc]
+  costos_proveedor:
+    uniones:
+      productos: { desde: costos_proveedor, tabla: productos, por: { sku: sku } }
+      proveedores: { desde: costos_proveedor, tabla: proveedores, por: { proveedor_id: proveedor_id } }
+    dimensiones: [costos_proveedor.sku, costos_proveedor.proveedor_id, productos.linea, productos.clase_abc]
+  lista_precios:
+    uniones:
+      productos: { desde: lista_precios, tabla: productos, por: { sku: sku } }
+    dimensiones: [lista_precios.sku, productos.linea, productos.clase_abc]
