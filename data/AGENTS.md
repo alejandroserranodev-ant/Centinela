@@ -93,12 +93,18 @@ on a second database of the same cluster. The last line runs the check as the re
 
 The views are listed by `grep -o 'VIEW v_[a-z_]*' sql/0[34]_*.sql`.
 
-## The simulated clock
+### Read-only user for tools
 
-`centinela.fecha_corte()` returns the last day of the dataset (the maximum of
-`inventario_diario.fecha`). For the demo, Centinela must live any day: the clock advances one day
-at a time, the simulated day replaces `fecha_corte()`, and every query filters
-`fecha <= <simulated day>`. Who owns the clock is [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md).
+`sql/01_esquema.sql` creates `tools_reader` role:
+- **Login**: `tools_reader`
+- **Password**: `tools_reader_password` (change in production)
+- **Permissions**: SELECT-only on all tables in schema `centinela`
+
+`packages/tools/SQL` MCP server connects as `tools_reader` to ensure agents cannot write or
+delete data. The connection string for tools is:
+```
+postgresql://tools_reader:tools_reader_password@localhost:5432/centinela
+```
 
 **The three paragraphs below describe the kit's views**, which the kernel KPIs replace for
 detection; they still bind any agent that reads a view directly.
@@ -112,18 +118,39 @@ that does not filter by the simulated day reads rows from after it, and an alert
 the simulated operation has not lived yet. Re-derive the split with
 `grep -n 'fecha_corte\|CREATE OR REPLACE VIEW' sql/0[34]_*.sql`.
 
-**An `estado` column holds the state at the end of the dataset, not on the simulated day.**
-`ordenes_compra.estado` and `pedidos.estado` say how a row ended, so a view that filters on them
-reads the future. The views in `sql/04_vistas_causa.sql` derive status from dates compared with
-`fecha_corte()` instead. `v_cobertura_inventario` counts pending units with
-`estado = 'Pendiente de despacho'`, so on an earlier simulated day its `unidades_pendientes` is the
-end-of-year figure; an agent that cites it states that as an assumption.
+Store this in `packages/tools/.env` (or your environment) as `DSN_READ_ONLY`.
 
-**Two whole-year views leak even when filtered by their date column.** `v_margen_semanal_linea`
-sums whole weeks, so the week holding the simulated day includes the days after it: only weeks with
-`semana + 6 <= <simulated day>` are complete. `v_dias_pago_mensual` joins every payment of the
-year, so a month filtered by `mes_factura` still averages payments made after the simulated day;
-an agent reading it on an earlier day states that as an assumption.
+## The simulated clock and how agents use it
+
+`centinela.fecha_corte()` returns the last day of the dataset (the maximum of `inventario_diario.fecha`).
+For the demo, Centinela must live any day: the clock advances one day at a time, the simulated day
+replaces `fecha_corte()`, and every query must filter `fecha <= <simulated day>`. The clock lives in
+`api.simulacion.dia_actual` and is owned by [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md).
+
+**How Vigía uses the simulated clock:**
+
+1. Vigía calls `GET /simulacion/dia-actual` → receives `{"dia": "2026-01-15"}`
+2. Vigía passes this day to `packages/tools/SQL` when asking for metrics
+3. tools/SQL executes queries on the `v_*` views, filtering with `fecha <= '2026-01-15'`
+4. Results travel back with the query: `{"query": "SELECT ... WHERE fecha <= '2026-01-15'", "results": [...]}`
+
+**View behavior with the simulated day:**
+
+Only **some views** compute "today" from `fecha_corte()`:
+- `v_cartera_cliente` — uses `fecha_corte()` to define "overdue"
+- `v_cobertura_inventario` — uses `fecha_corte()` for inventory snapshot
+- `v_actividad_cliente` — uses `fecha_corte()` to measure inactivity
+
+Other views return the **entire year**, so they must be filtered by the caller:
+- `v_ventas` — has no fecha_corte(), contains all 2025-10-01 to 2026-09-30
+- `v_margen_semanal_linea` — aggregated by week; Vigía filters `semana <= '2026-01-15'`
+- `v_dias_pago_mensual` — aggregated by month; Vigía filters `mes_factura <= '2026-01-15'`
+- `v_descuentos_fuera_politica` — sales from all of year; Vigía filters `fecha <= '2026-01-15'`
+
+**Why?** If tools didn't filter, Vigía would see alerts firing on data from **future dates** the
+simulated operation has not lived yet. tools/SQL must receive `fecha_maxima` as a parameter.
+
+See [Key files](#key-files-and-modules) for which views feed which scenarios.
 
 **A kernel KPI takes the simulated day as its argument, so the leaks this section lists do not
 reach it.** The compiler bounds every event date it reaches by `dia`. It reads a closing date as

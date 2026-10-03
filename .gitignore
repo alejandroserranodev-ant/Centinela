@@ -223,3 +223,13 @@ node_modules/
 apps/web/src/*.generated.css
 data/generator/csv/
 !docs/guide/.env
+
+# Secrets and API Keys
+.env.local
+.env.*.local
+*.key
+*.secret
+*_SECRET
+credentials.json
+secrets.json
+~/.ssh/

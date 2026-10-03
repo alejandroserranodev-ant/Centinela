@@ -21,13 +21,15 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   shape, each with its reason. A change to the config or the plugin starts there and is approved
   there. Serve it over HTTP, because opened from `file://` its stylesheet does not load.
 - **Agent progress arrives by SSE** from the API, so the screen shows the step in course while the
-  agents work.
-- **The screens run on a simulated API until `apps/api` serves one.** `src/api/client.ts` mirrors
-  the minimal API with one function per endpoint, streams agent progress and chat as async
-  iterators shaped like SSE events, and reveals each alert when the simulated day reaches its date.
-  It is replaced by a fetch client without touching a screen. `src/api/types.ts` is a draft
-  contract: `apps/api`'s Pydantic models are the source, and these types follow them. Every number
-  travels as a `Figure` with its `queryId`, so the type itself asks each figure for its query.
+  agents work. Chat and `/simulacion/avanzar` stream events as `text/event-stream`.
+- **The screens connect to the real `apps/api` via HTTP.** `src/api/http-client.ts` implements
+  the fetch client with one function per endpoint, streams agent progress and chat as async
+  iterators, and talks to the API using Pydantic models from `apps/api`. `src/api/types.ts` is
+  the contract: synchronized with `apps/api/src/centinela_api/modelos.py`, field for field.
+  Every number travels as a `Figure` with its `queryId`. Configuration lives in `src/api/config.ts`;
+  use `VITE_API_URL` environment variable to point to a different API (`.env.example` shows how).
+  The HTTP client is drop-in compatible with the old fixture-based one: screens never knew the
+  difference.
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
   including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
@@ -44,10 +46,51 @@ the screens are built on and the skin they wear. Which screens exist and what ea
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
-- **Fixture files and ids are English** (`alerts.json`, `alert-hogar-margin`, `q-hogar-drop`); the
-  line name stays as the data spells it. An id never reaches a manager's screen.
-- **The fixtures in `src/api/fixtures/` are illustrative.** They are built from the brief's public
-  example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
+- **Ids and data keys are English** (`alert-hogar-margin`, `q-hogar-drop`, `v_margen_semanal_linea`);
+  domain words stay in Spanish as the dataset names them. An id never reaches a manager's screen.
+
+## Running the web with the API
+
+1. **Start the API** (see [`../api/AGENTS.md`](../api/AGENTS.md)):
+   ```bash
+   cd apps/api
+   pip install -e .
+   uvicorn centinela_api.main:app --reload
+   ```
+
+2. **Configure the web** to connect to the API:
+   ```bash
+   cp .env.example .env
+   # Edit .env if needed (default: http://localhost:8000)
+   ```
+
+3. **Install and run**:
+   ```bash
+   npm install
+   npm run dev
+   ```
+   Opens on http://localhost:5173
+
+4. **Use Swagger UI** to test the API directly:
+   http://localhost:8000/docs
+
+The web will:
+- Fetch simulation state on load (`GET /simulacion/dia-actual`)
+- List alerts (`GET /alertas?estado=propuesta`)
+- Stream day advances (`POST /simulacion/avanzar` with SSE)
+- Stream chat answers (`POST /chat` with SSE)
+- Post decisions (`POST /alertas/{id}/decision`)
+- Read bitácora (`GET /bitacora`)
+
+**Before Vigía is implemented**, the `/simulacion/avanzar` endpoint will move the clock but return
+no new alerts. The web can still:
+- Display existing alerts (none until seeded)
+- Decide on alerts
+- View the audit log
+- Use chat (dummy response)
+
+The fixtures in `src/api/fixtures/` are **no longer used**; they can be removed once the API
+provides test data.
   examples, never from the dataset, because figures read from `data/csv/` would name the seeded
   scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
   figure cites an example query against a real `v_*` view, so "how I got here" has something to
