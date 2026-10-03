@@ -49,9 +49,12 @@ TRUNC = {"semana": sql.SQL("date_trunc('week', {})::date"), "mes": sql.SQL("date
 LAST = {"semana": sql.SQL("date_trunc('week', {} - 6)::date"), "mes": sql.SQL("(date_trunc('month', {} + 1) - interval '1 month')::date")}
 START = {"semana": sql.SQL("({} - 7 * {})"), "mes": sql.SQL("({} - interval '1 month' * {})::date")}
 END = {"semana": sql.SQL("({} + 7)"), "mes": sql.SQL("({} + interval '1 month')::date")}
+STEP = {"semana": sql.SQL("interval '1 week'"), "mes": sql.SQL("interval '1 month'")}
+FILL = {True: sql.SQL("coalesce(({}), 0)"), False: sql.SQL("({})")}
+ZERO_WHEN_EMPTY = frozenset({"sum", "count"})
 DELTA = {
-    "delta": sql.SQL("(actual.valor - avg(previo.valor))::numeric"),
-    "delta_pct": sql.SQL("round(100 * (actual.valor / NULLIF(avg(previo.valor), 0) - 1), 2)"),
+    "delta": sql.SQL("({valor} - {base})::numeric"),
+    "delta_pct": sql.SQL("round(100 * ({valor} / NULLIF({base}, 0) - 1), 2)"),
 }
 
 
@@ -309,24 +312,37 @@ def baseline(block, scope, dims, measured, kind, conditions, source) -> Compiled
         where=sql.SQL(" AND ").join(conditions + bounds),
         group=sql.SQL(", ").join([expr for _, expr, _ in dims] + [truncated]),
     )
+    names = [name for name, _, _ in dims]
     same = sql.SQL(" AND ").join(
-        sql.SQL("{} IS NOT DISTINCT FROM {}").format(sql.Identifier("actual", name), sql.Identifier("previo", name)) for name, _, _ in dims
+        sql.SQL("{} IS NOT DISTINCT FROM {}").format(sql.Identifier("periodos", name), sql.Identifier("entidades", name)) for name in names
     )
+    filled = "medida" in block and block["medida"]["agregado"] in ZERO_WHEN_EMPTY
+    lookup = sql.SQL("SELECT periodos.valor FROM periodos WHERE {same} AND periodos.periodo = serie.periodo").format(same=same)
     out = block["salida"]
+    value_now = sql.SQL("max(marco.valor) FILTER (WHERE marco.periodo = {})::numeric").format(current)
+    base_before = sql.SQL("avg(marco.valor) FILTER (WHERE marco.periodo < {})::numeric").format(current)
     query = sql.SQL(
-        "WITH periodos AS ({inner}) SELECT {dims}, actual.valor::numeric AS {valor}, avg(previo.valor)::numeric AS {base}, {delta} AS {delta_name} "
-        "FROM periodos AS actual JOIN periodos AS previo ON {same} AND previo.periodo < actual.periodo "
-        "WHERE actual.periodo = {current} GROUP BY {group}, actual.valor"
+        "WITH periodos AS ({inner}), entidades AS (SELECT DISTINCT {entity} FROM periodos), "
+        "marco AS (SELECT {framed}, serie.periodo::date AS periodo, {fill} AS valor "
+        "FROM entidades, generate_series({first}, {current}, {step}) AS serie(periodo)) "
+        "SELECT {dims}, {value_now} AS {valor}, {base_before} AS {base}, {delta} AS {delta_name} "
+        "FROM marco GROUP BY {group}"
     ).format(
         inner=inner,
-        dims=sql.SQL(", ").join(sql.SQL("{}::{} AS {}").format(sql.Identifier("actual", name), TYPES[k], sql.Identifier(name)) for name, _, k in dims),
-        valor=sql.Identifier(out["valor"]),
-        base=sql.Identifier(out["base"]),
-        delta=DELTA[spec["salida"]],
-        delta_name=sql.Identifier(out["delta"]),
-        same=same,
+        entity=sql.SQL(", ").join(sql.Identifier(name) for name in names),
+        framed=sql.SQL(", ").join(sql.Identifier("entidades", name) for name in names),
+        fill=FILL[filled].format(lookup),
+        first=START[period].format(current, sql.Literal(spec["n"])),
         current=current,
-        group=sql.SQL(", ").join(sql.Identifier("actual", name) for name, _, _ in dims),
+        step=STEP[period],
+        dims=sql.SQL(", ").join(sql.SQL("{}::{} AS {}").format(sql.Identifier("marco", name), TYPES[k], sql.Identifier(name)) for name, _, k in dims),
+        value_now=value_now,
+        valor=sql.Identifier(out["valor"]),
+        base_before=base_before,
+        base=sql.Identifier(out["base"]),
+        delta=DELTA[spec["salida"]].format(valor=value_now, base=base_before),
+        delta_name=sql.Identifier(out["delta"]),
+        group=sql.SQL(", ").join(sql.Identifier("marco", name) for name in names),
     )
     columns = tuple((name, k) for name, _, k in dims) + ((out["valor"], "numeric"), (out["base"], "numeric"), (out["delta"], "numeric"))
     return Compiled(query, columns, tuple(name for name, _, _ in dims))

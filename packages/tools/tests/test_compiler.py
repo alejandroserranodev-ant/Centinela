@@ -68,6 +68,36 @@ def test_a_weekly_baseline_uses_only_complete_weeks():
     assert '"pedidos"."fecha" < (' in query
 
 
+def test_a_baseline_reads_every_period_of_its_window_for_every_entity():
+    query = text(fixture_block("ventas_semana_linea"))
+    assert "SELECT DISTINCT \"linea\" FROM periodos" in query
+    assert "generate_series((date_trunc('week', CAST(%(dia)s AS date) - 6)::date - 7 * 8), date_trunc('week', CAST(%(dia)s AS date) - 6)::date, interval '1 week')" in query
+    assert 'FROM periodos WHERE "periodos"."linea" IS NOT DISTINCT FROM "entidades"."linea" AND periodos.periodo = serie.periodo' in query
+
+
+def test_an_empty_period_of_a_sum_counts_as_zero():
+    query = text(fixture_block("ventas_semana_linea"))
+    assert "coalesce((SELECT periodos.valor FROM periodos WHERE" in query and "), 0) AS valor" in query
+
+
+def test_an_empty_period_of_a_count_counts_as_zero():
+    block = changed("ventas_semana_linea", lambda b: b.update(medida={"agregado": "count"}))
+    assert "), 0) AS valor" in text(block)
+
+
+def test_an_empty_period_of_an_average_stays_empty():
+    block = changed("ventas_semana_linea", lambda b: b.update(medida={"agregado": "avg", "de": "pedidos_detalle.valor_neto"}))
+    query = text(block)
+    assert "coalesce(" not in query and "(SELECT periodos.valor FROM periodos WHERE" in query
+
+
+def test_the_base_averages_the_n_previous_periods_and_the_value_is_the_current_one():
+    query = text(fixture_block("ventas_semana_linea"))
+    current = "date_trunc('week', CAST(%(dia)s AS date) - 6)::date"
+    assert f"max(marco.valor) FILTER (WHERE marco.periodo = {current})::numeric AS \"ventas\"" in query
+    assert f"avg(marco.valor) FILTER (WHERE marco.periodo < {current})::numeric AS \"ventas_base\"" in query
+
+
 def test_every_join_is_a_left_join():
     query = text(fixture_block("ventas_semana_linea"))
     assert query.count("LEFT JOIN") == 2 and " JOIN " not in query.replace("LEFT JOIN", "").replace("JOIN periodos", "")
