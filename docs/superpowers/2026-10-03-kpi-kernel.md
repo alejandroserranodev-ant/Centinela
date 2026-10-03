@@ -1,6 +1,6 @@
 # Spec 4 of 6: the KPI kernel
 
-**Status:** planned in `2026-10-03-kpi-kernel-plan.md`. **Depends on:** spec 1, `normative-foundations`, for the KPI
+**Status:** executed; kept while specs 5 and 6 build on it. **Depends on:** spec 1, `normative-foundations`, for the KPI
 description fields (ISO 22400-2), the role of `Vigía` as owner of measurement (ISO 9001 §9.1), the
 law that no agent changes a database, and the stage at which each agent consults the kernel.
 
