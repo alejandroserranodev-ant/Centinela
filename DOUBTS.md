@@ -58,9 +58,9 @@ challenge page is re-read against it. Re-derive it with
 
 **The clauses the registry cites are unverified.**
 [`packages/agents/arbol/fundamentos.yaml`](./packages/agents/arbol/fundamentos.yaml) cites clauses
-of ISO 31000, ISO 9001, ISO/IEC 42001 and ISO 22400-2, and the texts of those standards are
-licensed and not in the tree, so no reader can check that a clause says what its entry claims. The
-entries for ISO/IEC 42001 Annex A and for ISO 22400-2 name no clause number at all. It costs a
-`fundamento` that cites the wrong clause, which founds nothing. It is paid when a person with
-access to the texts confirms every entry, before the first node of the decision tree cites one.
+of ISO standards whose texts are licensed and not in the repository, so no reader can check that a
+clause says what its entry claims, and an entry that cites no clause number cannot be checked at
+all. It costs a `fundamento` that cites the wrong clause, which founds nothing. It is paid when a
+person with access to the texts confirms every entry before the first node of the decision tree
+cites one, and each entry added later is confirmed in the review of its pull request.
 Re-derive it with `grep -o 'ISO[^"]*' packages/agents/arbol/fundamentos.yaml | sort -u`.

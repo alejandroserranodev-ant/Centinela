@@ -109,7 +109,7 @@ One node the diagram does not draw enters with it: **`ejecutar.vigente`**, befor
 leaf, reads the KPI that justified the approved action on the simulated day of the execution, with
 the same `umbral`. `si` (it still breaks) → the leaf; `no` → `fin.ya_no_aplica`, and the alert
 records that the condition no longer holds. It is the point where `ejecutar` consults the kernel
-(spec 1), and it is code, so `Ejecutor` keeps no discretion. Its `fundamento` is ISO 9001 §10.2.1 c),
+(spec 1), and it is code, so `Ejecutor` keeps no discretion. Its `fundamento` is `iso9001.10.2.1.c`,
 an action that addresses the nonconformity, which a resolved one no longer has.
 
 ## The validator

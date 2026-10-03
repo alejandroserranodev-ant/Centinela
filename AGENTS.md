@@ -9,8 +9,8 @@ clock** is the day the operation lives, which replaces `fecha_corte()`; the **ag
 approval); the **`bitácora`** is the append-only log of every decision; the **decision tree** is
 the data in `packages/agents/arbol/` the orchestrator walks, atomic rules whose leaves are an
 agent's decisions; the **kernel** is the closed language every KPI is defined in and compiled to
-SQL from, the one place an agent reads a business measure. The challenge in full is
-[`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
+SQL over the semantic layer, the one place an agent reads a business measure. The challenge in
+full is [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo of two apps, two packages and their inputs: `apps/web`, `apps/api`,
 `packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold; the other
@@ -47,14 +47,14 @@ answers against `data`. *No gate holds this.*
 **An alert walks the chain like this.** Advancing the simulated clock in `apps/api` starts the
 orchestrator in `packages/agents` for the new day. The orchestrator walks the decision tree of
 `packages/agents`, whose stages follow ISO 31000 and ISO 9001 §10.2, and each agent reads its
-measures from the kernel. `Vigía` reads the views through
-`packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and raises one alert
-per cause. `Analista` finds the cause by querying views and searching the policies, and `Estratega`
-proposes actions with their impact in pesos, every figure coming from a tool call. The graph then
-pauses, and `apps/api` stores the alert as `propuesta` and streams it to `apps/web`. A person
-approves, edits or rejects it on screen; `apps/api` records the decision and resumes the graph.
-On approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Every step lands in
-the `bitácora`, which `apps/api` owns.
+measures from the kernel, which `packages/tools` compiles over the views. `Vigía` reads the views
+through `packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and raises one
+alert per cause. `Analista` finds the cause by querying views and searching the policies, and
+`Estratega` proposes actions with their impact in pesos, every figure coming from a tool call. The
+graph then pauses, and `apps/api` stores the alert as `propuesta` and streams it to `apps/web`. A
+person approves, edits or rejects it on screen; `apps/api` records the decision and resumes the
+graph. On approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Every step
+lands in the `bitácora`, which `apps/api` owns.
 
 **Still undecided, and owned by no page yet:** who embeds the policies into pgvector and when,
 whether `apps/api` runs the agents in its own process or calls them as a service, and how agents
@@ -76,9 +76,9 @@ and the verification list at the end is where each is asked.
   produced it. *No gate holds this.*
 - **No action without a recorded human approval**, and every action is a draft or a sandbox effect.
   *No gate holds this.*
-- **No agent changes a database**: not the dataset, not the kernel's catalogue, not the API's
-  state. An agent returns outputs; `apps/api` persists its own. *No gate holds this.*
-- **A node of the decision tree or a KPI rests on one entry of the registry**,
+- **No agent changes a database**: not the dataset, not a KPI definition, not the API's state.
+  An agent returns outputs; `apps/api` persists its own. *No gate holds this.*
+- **A node of the decision tree rests on one entry of the registry**,
   [`packages/agents/arbol/fundamentos.yaml`](./packages/agents/arbol/fundamentos.yaml); a standard
   founds structure, a policy founds a threshold, and only a person adds to the registry.
   *No gate holds this.*

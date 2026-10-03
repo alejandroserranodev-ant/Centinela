@@ -170,10 +170,10 @@ every entry: `grep -o 'ISO[^"]*' packages/agents/arbol/fundamentos.yaml | sort -
 
 | Page | Change |
 |---|---|
-| `AGENTS.md`, opening paragraph | the vocabulary gains two terms, each in one clause: the **decision tree** is the data in `packages/agents/arbol/` the orchestrator walks, atomic rules whose leaves are an agent's decisions; the **kernel** is the closed language every KPI is defined in and compiled to SQL from, the one place an agent reads a business measure. Specs 2 and 4 build on these definitions and do not restate them |
+| `AGENTS.md`, opening paragraph | the vocabulary gains two terms, each in one clause: the **decision tree** is the data in `packages/agents/arbol/` the orchestrator walks, atomic rules whose leaves are an agent's decisions; the **kernel** is the closed language every KPI is defined in and compiled to SQL over the semantic layer, the one place an agent reads a business measure. Specs 2 and 4 build on these definitions and do not restate them |
 | `AGENTS.md`, "How the parts connect" | the paragraph that starts "An alert walks the chain like this." gains one sentence after "Advancing the simulated clock … for the new day.": the orchestrator walks the decision tree of `packages/agents`, whose stages follow ISO 31000 and ISO 9001 §10.2, and each agent reads its measures from the kernel |
-| `AGENTS.md`, "Rules every change follows" | the rule "**No action without a recorded human approval**, and every action is a draft or a sandbox effect." gains a sibling: "**No agent changes a database**: not the dataset, not the kernel's catalogue, not the API's state. An agent returns outputs; `apps/api` persists its own." *No gate holds this* until spec 4's grants do |
-| `AGENTS.md`, "Rules every change follows" | a new rule: "**A node of the decision tree or a KPI rests on one entry of the registry**; a standard founds structure, a policy founds a threshold, and only a person adds to the registry." |
+| `AGENTS.md`, "Rules every change follows" | the rule "**No action without a recorded human approval**, and every action is a draft or a sandbox effect." gains a sibling: "**No agent changes a database**: not the dataset, not a KPI definition, not the API's state. An agent returns outputs; `apps/api` persists its own." *No gate holds this* until spec 4's grants do |
+| `AGENTS.md`, "Rules every change follows" | a new rule: "**A node of the decision tree rests on one entry of the registry**; a standard founds structure, a policy founds a threshold, and only a person adds to the registry." |
 | `AGENTS.md`, "Still undecided" | nothing removed; the tree and the kernel settle none of the three open questions |
 | `DOUBTS.md`, "Filed debts" | the debt above |
 

@@ -56,9 +56,6 @@ fundamentos:
   - id: iso42001.8
     cita: "ISO/IEC 42001:2023 §8"
     funda: "the laws that no agent changes a database and that an agent uses only the tools its label allows"
-  - id: iso42001.9
-    cita: "ISO/IEC 42001:2023 §9"
-    funda: "performance evaluation of the AI system"
   - id: iso42001.anexo-a.supervision-humana
     cita: "ISO/IEC 42001:2023 Annex A, human oversight"
     funda: "stage aprobar; the law that no action runs without a recorded human approval"
