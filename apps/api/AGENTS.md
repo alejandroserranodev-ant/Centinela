@@ -44,8 +44,12 @@ minimal API section.
   state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps
   each reason with the target the orchestrator classified it to, the metric and the entity.
 - **The API checks a decision before it resumes an alert**: the role may make it, a rejection
-  carries a reason, and an edit keeps the keys of the action's `parameters`, adding none and
-  dropping none, because `Ejecutor` passes them unchanged.
+  carries a reason, an edit keeps the keys of the action's `parameters`, adding none and dropping
+  none, because `Ejecutor` passes them unchanged, and a `request_changes` carries a reason and is
+  refused on an alert that already had one, because the return to `Estratega` is capped at one.
+- **`request_changes` adds no state to the lifecycle.** The alert stays `propuesta` while
+  `Estratega` proposes again, and its reason joins the rejection reasons `Estratega` reads, because
+  a person asking for another proposal has neither approved nor rejected the alert.
 - **The API stores the graph's checkpoints in its own schema** and injects the checkpointer into
   the graph, because no agent opens a database connection.
 - **The API owns the `bitácora`**, which is append-only: alert, evidence, proposal, decision,

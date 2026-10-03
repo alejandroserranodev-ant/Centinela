@@ -3,11 +3,13 @@
 A skill is a Markdown file the orchestrator puts in front of a model. Skills are grouped by agent,
 one directory each, and an agent is given only its own directory: `vigia/`, `analista/`,
 `estratega/`, `ejecutor/`, and `orquestador/` for the one step of the orchestrator that calls a
-model. Within it, every file is always loaded except two: a file named for a metric,
-`<metrica>.md`, is loaded only for an alert of that `metrica` or a chat question anchored to one,
-and of the table in `estratega/acciones.md` only the rows of the alert's `metrica` are loaded,
-because the token cost of each alert is recorded and judged. What each agent may and may not do
-is [`../AGENTS.md`](../AGENTS.md); a skill turns that page into orders and never widens it.
+model. A leaf of the decision tree names in `skill` the file its step starts from. Within the
+directory, every file is always loaded except three: a file named for a decision of its agent
+(`expandir.md`, `proponer_kpi.md`) is loaded only when the walk reaches that decision's leaf; a file
+named for a metric, `<metrica>.md`, is loaded only for an alert of that `metrica` or a chat question
+anchored to one; and of the table in `estratega/acciones.md` only the rows of the alert's `metrica`
+are loaded, because the token cost of each alert is recorded and judged. What each agent may and may
+not do is [`../AGENTS.md`](../AGENTS.md); a skill turns that page into orders and never widens it.
 
 ## Decisions
 
