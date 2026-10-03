@@ -3,13 +3,13 @@ from centinela_agents.metrics import load_metrics
 from centinela_agents.walk import Context, detect, still_breaks
 import pytest
 
-from support import METRICAS, VIEW_CATALOG, base_tree
+from support import METRICAS, KERNEL_CATALOG, base_tree
 
 DAY = "2026-03-02"
 LATER = "2026-03-05"
 
 
-def run(metric, row, catalog=VIEW_CATALOG):
+def run(metric, row, catalog=KERNEL_CATALOG):
     ctx = Context.of(base_tree(), load_metrics(METRICAS), catalog, lambda m, day: [row] if m == metric and day == DAY else [])
     return detect(ctx, DAY)
 
@@ -46,7 +46,7 @@ def test_each_threshold_node_fires_on_a_breaking_row(metric, row, last):
     assert detection.metric == metric
     assert detection.entry == "hoja.vigia.titular"
     assert detection.path[-1] == (last, "si")
-    assert detection.entity == tuple(row.get(column) for column in VIEW_CATALOG.kpis[metric].entity)
+    assert detection.entity == tuple(row.get(column) for column in KERNEL_CATALOG.kpis[metric].entity)
 
 
 @pytest.mark.parametrize("metric, row", QUIET)
@@ -67,8 +67,8 @@ def test_a_null_value_or_a_class_without_threshold_fires_nothing(metric, row):
 
 
 def test_a_descriptive_kpi_fires_nothing():
-    real = VIEW_CATALOG.kpis["saldo_vencido"]
-    catalog = Catalog({**VIEW_CATALOG.kpis, "saldo_vencido": Kpi(real.entity, real.columns, descriptive=True)})
+    real = KERNEL_CATALOG.kpis["saldo_vencido"]
+    catalog = Catalog({**KERNEL_CATALOG.kpis, "saldo_vencido": Kpi(real.entity, real.columns, descriptive=True)})
     assert run("saldo_vencido", {"cliente_id": "CLI-001", "max_dias_vencido": 20}, catalog) == []
 
 
@@ -77,12 +77,12 @@ def test_a_customer_six_days_late_on_a_thirty_day_habit_fires_nothing_on_the_bas
         "saldo_vencido": [{"cliente_id": "CLI-007", "max_dias_vencido": 6, "saldo_abierto": 900000, "cupo_credito": 5000000}],
         "dias_pago_prom": [{"cliente_id": "CLI-007", "mes_factura": "2026-02-01", "aumento_pct": 20.0}],
     }
-    ctx = Context.of(base_tree(), load_metrics(METRICAS), VIEW_CATALOG, lambda metric, day: rows.get(metric, []))
+    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, lambda metric, day: rows.get(metric, []))
     assert detect(ctx, DAY) == []
 
 
 def state_of(path, rows_later):
-    ctx = Context.of(base_tree(), load_metrics(METRICAS), VIEW_CATALOG, lambda metric, day: rows_later if day == LATER else [])
+    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, lambda metric, day: rows_later if day == LATER else [])
     state = {
         "simulated_day": DAY,
         "detection": {"metric": "saldo_vencido", "entity": ["CLI-001"], "path": path},

@@ -12,7 +12,7 @@ from centinela_agents.schema import Tree
 from centinela_agents.validator import InvalidTree, checked_base, load_registry, problems
 from centinela_agents.walk import Context, detect
 from support import (
-    ARBOL, DAY, DECISION_DAY, EMAIL, MANUAL_TASK, METRICAS, SALDO_ROW, SKILLS, VIEW_CATALOG,
+    ARBOL, DAY, DECISION_DAY, EMAIL, MANUAL_TASK, METRICAS, SALDO_ROW, SKILLS, KERNEL_CATALOG,
     Recorder, approve, base_data, base_tree, compiled, grounds, node_of, reader_from, saldo_detection, statuses,
 )
 
@@ -29,7 +29,7 @@ def test_orq_a_tree_with_a_missing_no_is_refused_at_startup():
     data = base_data()
     node_of(data, "explicar.con_evidencia").pop("no")
     with pytest.raises(InvalidTree) as refused:
-        checked_base(data, load_registry(ARBOL / "fundamentos.yaml"), load_metrics(METRICAS), VIEW_CATALOG, SKILLS)
+        checked_base(data, load_registry(ARBOL / "fundamentos.yaml"), load_metrics(METRICAS), KERNEL_CATALOG, SKILLS)
     assert "explicar.con_evidencia lacks its no" in refused.value.problems
 
 
@@ -216,10 +216,10 @@ def test_orq_walkthrough_a_customer_who_paid_in_30_days_is_6_days_late():
         "dias_pago_prom": [{"cliente_id": "CLI-007", "mes_factura": "2026-02-01", "aumento_pct": 20.0}],
         "retraso_habito": [{"cliente_id": "CLI-007", "dias_sobre_habito": 6}],
     }
-    base_ctx = Context.of(base_tree(), load_metrics(METRICAS), VIEW_CATALOG, reader_from({DAY: late}))
+    base_ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: late}))
     assert detect(base_ctx, DAY) == []
 
-    catalog = Catalog({**VIEW_CATALOG.kpis, "retraso_habito": RETRASO})
+    catalog = Catalog({**KERNEL_CATALOG.kpis, "retraso_habito": RETRASO})
     data = expanded()
     assert problems(data, grounds(catalog=catalog)) == []
     tree = Tree.model_validate(data)

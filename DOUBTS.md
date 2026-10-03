@@ -55,15 +55,3 @@ It costs a requirement that nobody can check against its source, and a missing s
 hold the criteria the jury scores. It is paid when the complete deck replaces the PDF and the
 challenge page is re-read against it. Re-derive it with
 `pdftotext -layout docs/challenge/hackathon-brief.pdf - | grep -n "Evaluación\|Criterios\|oculto\|Escenarios"`.
-
-**The base tree reads KPI columns no kernel builds.**
-[`packages/agents/arbol/base.yaml`](./packages/agents/arbol/base.yaml) compares columns of
-`kpi.<metric>.<column>`, and the validator checks them against the catalogue it is handed.
-`packages/tools` serves `kpi_catalogo`, but it lists only entries of `metricas.yaml` with a
-`kernel:` block, and none has one, so the only catalogue the tree is validated against is the
-tests', `packages/agents/tests/support.py:VIEW_CATALOG`, written as each metric's view columns plus
-the ones the base reads that no view has. It costs a base that loads in the tests and fails at
-startup against the real catalogue, or a detection that reads a column the kernel names otherwise.
-It is paid when every metric carries a `kernel:` block that builds every column below, and the
-startup validates against `kpi_catalogo`. Re-derive it with
-`grep -o 'kpi\.[a-z0-9_]*\.[a-z0-9_]*' packages/agents/arbol/base.yaml | sort -u`.

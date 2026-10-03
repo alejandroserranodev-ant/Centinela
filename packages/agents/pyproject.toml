@@ -9,7 +9,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["centinela-tools", "pytest>=8"]
+
+[tool.uv.sources]
+centinela-tools = { path = "../tools", editable = true }
 
 [build-system]
 requires = ["hatchling"]
