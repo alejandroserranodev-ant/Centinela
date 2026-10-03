@@ -5,7 +5,7 @@ primitives, compiles each to SQL in code, refuses anything it cannot bound in co
 is the one place an agent reads a business measure from. A fact it does not measure, such as a
 price or a cost in force, still comes from a `v_*` cause view. The language is [data](../../../data/AGENTS.md)'s, and the compiler, its guards and its tools are [packages/tools](../../../packages/tools/AGENTS.md)'s; this chapter draws them and owns the two parts still to be built.
 
-> **Decided, not implemented.** No metric of `metricas.yaml` carries a `kernel:` block yet, so `05_kpis.generated.sql` holds the roles and no function, and no agent calls the kernel's tools. The two sections below are what remains.
+> **Decided, not implemented.** No metric of `metricas.yaml` carries a `kernel:` block yet, so `05_kpis.generated.sql` holds the roles and no function, and no agent calls the kernel's tools. The last two sections are what remains.
 
 ## Where the kernel is stated
 
@@ -14,9 +14,6 @@ The language, its date roles, its joins and its `fuga` columns are in [data](../
 No role an agent's tools hold can write, which makes the grants the gate of the law that no agent changes a database.
 
 ## The tools, and who consults the kernel at each stage
-
-All four tools are read-only; the kernel has no action. The model names a KPI by id and never
-passes SQL: the orchestrator hands the client's approved KPIs to the kernel as context of the run.
 
 ```mermaid
 flowchart TB
