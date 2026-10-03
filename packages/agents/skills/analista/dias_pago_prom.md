@@ -11,7 +11,8 @@ exceeds its historical mean by the share `metricas.yaml` names.
 
 1. H1 is the main cause if it holds. If it is refuted, answer `no_evidence` with `reason`:
    "El aumento es de un solo mes."
-2. Report H2 as contributing if it holds, and set `same_cause_as` to an open
-   `veces_intervalo_habitual` alert of the same customer.
-3. If H3 holds, say in `sentence` that the customer still pays within its term.
-4. Add to `assumptions` the limit of `v_dias_pago_mensual` the clock section of `data/AGENTS.md` names.
+2. Report H2 as contributing if it holds. Otherwise, report nothing more.
+3. If the input lists an open `saldo_vencido` or `concentracion_vencida_pct` alert whose `entidad`
+   is the entity, set `same_cause_as` to its `id`. Otherwise, set none.
+4. If H3 holds, say in `sentence` that the customer still pays within its term. Otherwise, say nothing of the term.
+5. Add to `assumptions` the limit of `v_dias_pago_mensual` the clock section of `data/AGENTS.md` names.

@@ -13,8 +13,9 @@ when `fecha_recibida <= :dia` and `fecha_recibida > fecha_esperada`.
 | H1 | the supplier is late on other orders | `v_ordenes_compra` where `proveedor_id` = the order's supplier and `fecha_oc <= :dia` | another order is late on `:dia`, or was received late | no other order is |
 | H2 | the delay puts the SKU at risk | `v_cobertura_inventario` where `sku` and `bodega_id` = the order's | `cobertura_dias` < the order's delay + `lead_time_dias` | it is not |
 
-1. H1 is the main cause if it holds: the supplier is late across orders. Otherwise, the cause is
-   this order alone; say so in `sentence`.
+1. If H1 holds, report it as the main cause: the supplier is late across orders. Otherwise, answer
+   `no_evidence` with `reason`: "Los datos no registran el motivo del retraso y ninguna otra orden
+   del proveedor está retrasada."
 2. If H2 holds, report it as contributing, and if the input lists an open `cobertura_dias` alert on
    that SKU and warehouse, set `same_cause_as` to its `id`. Otherwise, report nothing more and set none.
 3. The data holds no reason for a delay. Never state one.

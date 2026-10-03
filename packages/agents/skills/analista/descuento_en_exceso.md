@@ -1,6 +1,6 @@
 # Analista: `descuento_en_exceso`
 
-The entity is a `vendedor_id` in a week. The symptom starts on the first `fecha` of its rows in
+The entity is a `vendedor_id`. The symptom starts on the first `fecha` of its rows in
 `v_descuentos_fuera_politica`.
 
 | # | Hypothesis | Query | Holds when | Refuted when |
@@ -14,3 +14,5 @@ The entity is a `vendedor_id` in a week. The symptom starts on the first `fecha`
 2. If H2 holds, cite `COM-POL-002 §5`.
 3. Cite `tope_descuento_pct` and `aprobacion_especial` from the view, never a figure from the policy text.
 4. If H1 is refuted, answer `identified` with the cause spread across sellers, and list each with its sum.
+5. If the input lists an open `descuento_en_exceso` alert whose `entidad` is the entity, set
+   `same_cause_as` to its `id`. Otherwise, set none.
