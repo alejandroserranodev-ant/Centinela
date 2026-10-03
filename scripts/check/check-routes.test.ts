@@ -21,7 +21,8 @@ test('a sound tree passes', () => {
 
 test('the router has a budget with its reason', () => {
   assert.deepEqual([...ENTRIES.keys()], ['AGENTS.md']);
-  assert.ok(ROUTES instanceof Map);
+  for (const [, [, reason]] of [...ENTRIES, ...ROUTES]) assert.doesNotMatch(reason, /\d|raised|lowered/);
+  assert.ok(ROUTES.has('adding a screen'));
 });
 
 test('a row reads its stops in order, once each', () => {
