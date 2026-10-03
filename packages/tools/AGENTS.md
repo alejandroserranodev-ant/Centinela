@@ -158,7 +158,8 @@ A refusal returns as `{"rechazado": {"guarda", "detalle"}}`, so the model reads 
 refused. A database error that is no guard, such as an approved KPI whose stored text writes,
 surfaces as a tool error. The model names a KPI by id and never passes SQL. The server builds the
 catalogue when it starts, from the entries of `metricas.yaml` with a `kernel:` block and from the
-JSON file `CENTINELA_KPIS_APROBADOS` names, so a base entry the language refuses stops it. The
+JSON file `CENTINELA_KPIS_APROBADOS` names, so a base entry the language refuses stops it, and so
+does an approved id that repeats or that a base KPI holds. The
 orchestrator, which is code, writes that file as `apps/api` hands it the client's approved KPIs,
 one record each with `id`, `ficha`, `descriptivo`, `entidad`, `columnas`, `sql`, `hash` and
 `version_compilador`.

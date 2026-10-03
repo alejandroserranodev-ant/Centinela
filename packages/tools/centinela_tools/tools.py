@@ -64,7 +64,11 @@ def catalogue_of(entries: Mapping[str, Mapping[str, Any]], sources: Sources, app
         check_card(entry)
         compiled = compile_kpi(entry["kernel"], sources)
         kpis[named(kpi_id)] = Kpi(kpi_id, "base", {key: entry[key] for key in CARD}, not entry.get("fuente_umbral"), compiled.entity, compiled.columns)
+    approved_ids = set()
     for record in approved:
+        if record["id"] in approved_ids:
+            raise ValueError(f"{record['id']} is approved twice")
+        approved_ids.add(record["id"])
         if record["id"] in kpis:
             raise ValueError(f"{record['id']} is both a base and an approved KPI")
         kpis[named(record["id"])] = Kpi(

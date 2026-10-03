@@ -50,7 +50,7 @@ and the dataset is free to use within the hackathon.
   in and holds the same column grants as `centinela_kernel`, so the reader runs them without
   reading a table and they read no column the kernel cannot. Their owner is not `centinela_kernel`,
   because an owner can drop or alter its functions and `centinela_kernel` is a login role a tool
-  uses; no login role can `SET ROLE centinela_propietario`. **One limit grants cannot close:** a
+  uses; neither tool role, `centinela_lector` nor `centinela_kernel`, can `SET ROLE centinela_propietario`. **One limit grants cannot close:** a
   session that turns `default_transaction_read_only` off on purpose can still `ALTER ROLE` itself
   (its settings, its password) or alter its default privileges; tables, schemas, functions and
   large objects stay unwritable by privilege. Both login roles' passwords are their names, like the
@@ -141,7 +141,7 @@ refused. `kernel/lenguaje.schema.json` holds the keys and the bounds; the compil
 | `unir` | names of the source's joins | at most three, each after the one it joins from |
 | `abierto_al_dia` | `desde`, an event date, and `hasta`, a closing date or a closing the source declares: the rows open on `dia` | one time frame per KPI |
 | `ventana` | an event date and a number of days back from `dia` | at most 365 days; one time frame per KPI |
-| `filtro` | a column, an operator from `=`, `!=`, `<`, `<=`, `>`, `>=`, `en`, and a literal of the column's type, a date written `YYYY-MM-DD` | at most five; an `en` list of at most 20; a text literal of at most 200 characters and no `%` |
+| `filtro` | a column, an operator from `=`, `!=`, `<`, `<=`, `>`, `>=`, `en`, and a literal of the column's type, a date written `YYYY-MM-DD` | at most five; an `en` list of at most 20; a text literal of at most 200 characters, with no `%` and no NUL character |
 | `agrupar` | dimensions the source declares, or `{columna, por}` with `semana` or `mes` over an event or term date; it is the KPI's entity, one row per entity | one to three |
 | `medida` | `sum`, `avg`, `count`, `min`, `max` or `mediana` over a column, or over one expression of `+ - * /` over columns; `count` with no column counts rows | expression depth two |
 | `razon` | a `medida` over another `medida`, in place of `medida` | one |
@@ -180,7 +180,9 @@ operand no `detectar` node may compare, because no threshold exists that a docum
 state. A measure the language cannot express is a defect of the language, fixed by a new primitive
 with its bound, never by a hand-written function. `uv run pytest tests/test_sources.py` in
 `packages/tools` checks every table, column, key and join of `fuentes.yaml` against
-`sql/01_esquema.sql`.
+`sql/01_esquema.sql`. No table of `fuentes.yaml` declares a column named `dia`, because inside a
+`k_` function a column of that name would win over the function's argument `dia`; the load
+refuses one.
 
 ## The scenarios
 

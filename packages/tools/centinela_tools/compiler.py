@@ -195,12 +195,19 @@ def clock(block: Mapping[str, Any], scope: Scope) -> list[sql.Composable]:
 def literal(value: Any, kind: str, ref: str) -> sql.Composable:
     if isinstance(value, bool) != (kind == "boolean") or not isinstance(value, LITERALS[kind]):
         raise Refused("lenguaje", f"filtro: {value!r} is not a {kind}, the type of {ref}")
-    if kind == "date":
-        try:
-            date.fromisoformat(value)
-        except ValueError as error:
-            raise Refused("lenguaje", f"filtro: {value!r} is not a date YYYY-MM-DD") from error
+    if kind == "date" and not is_date(value):
+        raise Refused("lenguaje", f"filtro: {value!r} is not a date YYYY-MM-DD")
     return sql.Literal(value)
+
+
+def is_date(value: str) -> bool:
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None:
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
 
 
 def condition(spec: Mapping[str, Any], scope: Scope) -> sql.Composable:

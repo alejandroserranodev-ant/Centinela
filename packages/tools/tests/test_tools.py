@@ -69,3 +69,8 @@ def test_a_block_outside_the_language_is_refused_before_connecting():
 def test_an_approved_id_that_clashes_with_a_base_kpi_fails_the_catalogue():
     with pytest.raises(ValueError):
         catalogue_of(fixture_entries(), SOURCES, [approved("oc_abiertas")])
+
+
+def test_a_repeated_approved_id_fails_the_catalogue():
+    with pytest.raises(ValueError, match="aprobado_oc is approved twice"):
+        catalogue_of({}, SOURCES, [approved(), approved()])

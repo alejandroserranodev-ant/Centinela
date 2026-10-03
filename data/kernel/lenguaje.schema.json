@@ -62,7 +62,7 @@
     },
     "literal": {
       "anyOf": [
-        { "type": "string", "maxLength": 200, "pattern": "^[^%]*$" },
+        { "type": "string", "maxLength": 200, "pattern": "^[^%\\u0000]*$" },
         { "type": "number" },
         { "type": "boolean" }
       ]

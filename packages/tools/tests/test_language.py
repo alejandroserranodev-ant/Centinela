@@ -49,6 +49,9 @@ def test_every_fixture_block_and_card_is_in_the_language(metric):
         pytest.param(with_(lambda b: b["filtro"][0].update(valor="50%")), "filtro/0/valor", id="percent"),
         pytest.param(with_(lambda b: b["filtro"][0].update(op="en", valor=[str(i) for i in range(21)])), "filtro/0/valor", id="list-past-20"),
         pytest.param(with_(lambda b: b["salida"].pop("base")), "salida", id="baseline-without-base"),
+        pytest.param(with_(lambda b: b["filtro"][0].update(valor="x" * 201)), "filtro/0/valor", id="text-past-200"),
+        pytest.param(with_(lambda b: b.pop("linea_base")), "salida", id="base-without-baseline"),
+        pytest.param(with_(lambda b: b.update(agrupar=[])), "agrupar", id="empty-groups"),
     ],
 )
 def test_a_bound_of_the_language_is_refused(block, path):

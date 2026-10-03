@@ -64,8 +64,12 @@ def planted(change, tmp_path):
     data = copy.deepcopy(yaml.safe_load(FUENTES.read_text()))
     change(data)
     path = tmp_path / "fuentes.yaml"
-    path.write_text(yaml.safe_dump(data, allow_unicode=True))
+    path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False))
     return path
+
+
+def test_an_unchanged_copy_of_fuentes_loads(tmp_path):
+    assert load_sources(planted(lambda d: None, tmp_path)) == SOURCES
 
 
 @pytest.mark.parametrize(
@@ -78,6 +82,7 @@ def planted(change, tmp_path):
         pytest.param(lambda d: d["fuentes"]["pedidos_detalle"].pop("fechada_por"), id="a-source-with-no-date"),
         pytest.param(lambda d: d["fuentes"]["pedidos"]["dimensiones"].append("pedidos.estado"), id="a-fuga-dimension"),
         pytest.param(lambda d: d["fuentes"]["facturas"]["cierres"]["pagada"].update(fecha="valor"), id="a-closing-without-event"),
+        pytest.param(lambda d: d["tablas"]["facturas"]["columnas"].update(dia="text"), id="a-column-named-dia"),
     ],
 )
 def test_an_inconsistent_fuentes_fails_the_load(change, tmp_path):

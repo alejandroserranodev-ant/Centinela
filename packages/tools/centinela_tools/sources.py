@@ -66,6 +66,8 @@ def table_of(name: str, spec: Mapping[str, Any]) -> Table:
     dates = dict(spec.get("fechas", {}))
     leaks = spec.get("fuga", {})
     excluded = dict(spec.get("excluidas", {}))
+    if "dia" in columns:
+        raise problem(f"{name}: a column named dia would shadow the argument of every kernel function")
     if set(columns.values()) - TYPES:
         raise problem(f"{name} declares a type outside {sorted(TYPES)}")
     if {column for column, kind in columns.items() if kind == "date"} != set(dates):

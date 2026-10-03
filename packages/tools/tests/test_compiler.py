@@ -68,6 +68,11 @@ def test_a_weekly_baseline_uses_only_complete_weeks():
     assert '"pedidos"."fecha" < (' in query
 
 
+def test_a_monthly_baseline_uses_only_complete_months():
+    query = text(changed("ventas_semana_linea", lambda b: b["linea_base"].update(periodo="mes")))
+    assert "(date_trunc('month', CAST(%(dia)s AS date) + 1) - interval '1 month')::date" in query
+
+
 def test_a_baseline_reads_every_period_of_its_window_for_every_entity():
     query = text(fixture_block("ventas_semana_linea"))
     assert "SELECT DISTINCT \"linea\" FROM periodos" in query
@@ -142,6 +147,8 @@ def test_a_closing_date_in_a_measure_is_read_as_empty_after_dia():
         pytest.param(changed("ventas_semana_linea", lambda b: b.update(agrupar=["productos.linea", {"columna": "pedidos.fecha", "por": "mes"}])), "lenguaje", "own period", id="baseline-with-a-period"),
         pytest.param(changed("oc_abiertas", lambda b: b["salida"].update(valor="proveedor_id")), "lenguaje", "unique name", id="duplicate-name"),
         pytest.param(changed("oc_abiertas", lambda b: b["salida"].update(valor="dia")), "lenguaje", "unique name", id="reserved-name"),
+        pytest.param(changed("oc_abiertas", lambda b: b.update(filtro=[{"columna": "ordenes_compra.fecha_oc", "op": ">=", "valor": "2026W011"}])), "lenguaje", "YYYY-MM-DD", id="date-in-week-form"),
+        pytest.param(changed("oc_abiertas", lambda b: b.update(filtro=[{"columna": "ordenes_compra.sku", "op": "=", "valor": "a\x00b"}])), "lenguaje", "filtro/0/valor", id="text-with-nul"),
     ],
 )
 def test_a_block_the_kernel_cannot_bound_is_refused_with_its_guard(block, guard, words):
