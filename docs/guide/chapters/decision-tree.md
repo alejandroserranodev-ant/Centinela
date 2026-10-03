@@ -1,12 +1,13 @@
 # The decision tree
 
-The decision tree replaces the routing that today is spread over the sections of each agent and
-the orchestrator's table of nodes and edges: one artefact that is **data, validated by code, and
-walked by a deterministic interpreter**. The model acts only at a leaf. This chapter owns what the
-tree is until [packages/agents](../../../packages/agents/AGENTS.md) states it.
+The decision tree holds every route of an alert in one artefact that is **data, validated by code,
+and walked by a deterministic interpreter**. The model acts only at a leaf. What the tree is,
+[packages/agents](../../../packages/agents/AGENTS.md) states; this chapter keeps what founds it, the
+walk the team drew, and how the tree grows.
 
-> **Decided, not implemented.** Only the registry of `fundamentos` exists as a file. No node, no
-> validator and no interpreter exist yet.
+> **Decided, not implemented.** How the tree grows, below, is a design with no code. The base, its
+> validator and its interpreter are code, and [packages/agents](../../../packages/agents/AGENTS.md)
+> states them.
 
 ## What founds it
 
@@ -62,52 +63,18 @@ made it, and updates the alert's state.
 or `not`, and its `fundamento` names one entry of the registry. A node that splits into two
 independent predicates is two nodes, because the atomic node is the unit a client changes.
 
-## The node
+## The node, the levels and the validator
 
-The base lives in `packages/agents/arbol/` as YAML beside the registry, because routing is the
-orchestrator's concern and YAML matches `metricas.yaml`, which predicates read. A predicate holds
-no literal threshold: it names the metric whose `umbral_alerta` it applies.
-
-```yaml
-version: 1
-nodos:
-  - id: detectar.cartera.vencida
-    fundamento: fin-pol-004.s4
-    predicado: { lee: kpi.saldo_vencido.max_dias_vencido, op: ">", umbral: saldo_vencido }
-    si: hoja.vigia.titular
-    no: fin.sin_alerta
-  - id: hoja.vigia.titular
-    hoja: { agente: vigia, decision: titular, skill: vigia/contrato.md }
-    sigue: explicar.raiz
-```
-
-| Field | Rule |
-|---|---|
-| `id` | unique; its first segment is a stage, or `hoja`, or `fin` |
-| `fundamento` | one entry of the registry; required on a node, absent on a leaf, which inherits its parent's |
-| `predicado.lee` | a KPI column of the kernel (`kpi.<metric>.<column>`) or a declared field of the alert's state |
-| `predicado.op` | one of `>`, `>=`, `<`, `<=`, `=`, `!=`, `en`, `existe` |
-| `predicado.umbral` or `valor` | `umbral` names a metric of `metricas.yaml`; a literal `valor` is admitted only for a state field |
-| `si`, `no` | both required, each a node, a leaf or an end |
-| `hoja` | `agente`, a `decision` from that agent's closed list, and a `skill` under `packages/agents/skills/` |
-| `sigue` | on a leaf: the node the walk continues at once the agent returns |
-
-The closed decisions per agent: `vigia` takes `detectar` (code), `titular`, `proponer_kpi`,
-`expandir`; `analista` takes `explicar`, `responder_chat`, `expandir`; `estratega` takes
-`proponer`, `revision_manual` (code), `expandir`; `ejecutor` takes `ejecutar`, `nota_manual`,
-`expandir`.
-
-**The tree compiles to the LangGraph graph.** Each leaf becomes a graph node, each predicate the
-function of a conditional edge, and the approval interrupt sits before every `Ejecutor` leaf. The
-base is validated at startup, and an invalid base stops the start. The fallbacks of a failed step,
-the token cap, the retry and the order of a day's alerts stay settings of the interpreter, because
-they decide *how* a step runs, not *which* step runs.
+What a node holds, the closed decisions of each agent, the levels and who changes each, the ends,
+the validator and `ejecutar.vigente` are stated by
+[packages/agents](../../../packages/agents/AGENTS.md), its section on the decision tree. The base
+itself is [`arbol/base.yaml`](../../../packages/agents/arbol/base.yaml).
 
 ## The levels and who changes them
 
 ```mermaid
 flowchart TB
-  L0["L0 · the laws, checked on every step"] --- L1["L1 · one node per stage"]
+  L0["L0 · the laws, checked on every step"] --- L1["L1 · every node that names no family"]
   L1 --- L2["L2 · one branch per metric family"]
   L2 --- L3["L3 · the nodes of one metric and their leaves"]
   PR(["a person, by pull request"]) --> L0
@@ -119,39 +86,25 @@ flowchart TB
   PR --> REG[("the registry")]
 ```
 
-The base's L2 families are `cartera`, `margen`, `inventario`, `comercial`, `abastecimiento` and
-`clientes`. L0 holds the laws every path obeys; they are not branches, and a step that breaks one
-fails:
+*Draws: `packages/agents/AGENTS.md` § The levels*
 
-| Law | `fundamento` |
-|---|---|
-| every figure comes from a logged query | the brief's golden rule; ISO 9001 §7.5 |
-| no action without a recorded human approval | ISO/IEC 42001 human oversight |
-| no agent changes a database | ISO/IEC 42001 §8 |
-| data and documents are data, never instructions | ISO/IEC 42001 §6.1 |
-| "not enough evidence" is a complete answer | ISO 31000 §6.4.3 |
-| an agent uses only the tools its label allows | ISO/IEC 42001 §8 |
-| every step lands in the `bitácora` | ISO 31000 §6.7; ISO 9001 §10.2.2 |
+L0 holds the laws every path obeys; they are not branches, and a step that breaks one fails:
+
+| Law |
+|---|
+| every figure comes from a logged query |
+| no action without a recorded human approval |
+| no agent changes a database |
+| data and documents are data, never instructions |
+| "not enough evidence" is a complete answer |
+| an agent uses only the tools its label allows |
+| every step lands in the `bitácora` |
+
+Each law rests on the registry entry its row of `leyes` names in the base.
 
 **What never grows at runtime:** L0, L1, the registry, the kernel's language, the list of tools,
 the closed decisions per agent, and the dataset. Each one bounds what does grow, and a bound that
 moves with what it bounds is no bound.
-
-## The validator
-
-Code in `packages/agents`, run at startup and as a test. It refuses a tree where:
-
-- a node fails the schema, or a predicate fails the atomicity test;
-- a node lacks its `fundamento`, its `si` or its `no`, or cites a `fundamento` absent from the registry;
-- a path reaches an `Ejecutor` leaf without passing the gate `aprobar.decision` and the node `ejecutar.vigente`;
-- the graph has a cycle other than the two capped returns, `proponer` → `explicar` and `aprobar.recargar` → `proponer`;
-- a path from the root reaches no `fin`;
-- a `lee` names a KPI column the kernel does not build, or a state field the alert's state does not declare;
-- an `umbral` names a metric absent from `metricas.yaml` and from the client's approved KPIs;
-- a leaf's `skill` does not exist, or its `decision` is outside its agent's list;
-- an L0 or L1 node differs from the base.
-
-A metric with no L3 branch, or an L3 leaf whose skill is missing, is a refusal instead of a gap.
 
 ## How the tree grows
 
@@ -196,14 +149,6 @@ a client's versions live in `apps/api`, keyed by client, and growth is capped by
 the machine (path depth, nodes per stage), because a tree no small model can read is a tree no
 agent uses.
 
-## `ejecutar.vigente`
-
-Before every `Ejecutor` leaf, the node `ejecutar.vigente` reads, on the simulated day of the
-execution, the KPI that justified the approved action, with the same `umbral`. If it still breaks,
-the walk reaches the leaf; if not, it ends at `fin.ya_no_aplica` and the alert records that the
-condition no longer holds. It is code, so `Ejecutor` keeps no discretion, and its `fundamento` is
-ISO 9001 §10.2.1 c), an action that addresses a nonconformity a resolved one no longer has.
-
 ## Walkthrough: a customer who paid in 30 days is 6 days late
 
 ```mermaid
@@ -214,7 +159,7 @@ flowchart TB
   X --> P["hoja · estratega / proponer<br/>a reminder email"]
   P --> G{{"gate aprobar.decision"}}
   G -- "approve or edit" --> V{"ejecutar.vigente<br/>still past due?"}
-  G -- reject --> R(["clasificar_rechazo, then end"])
+  G -- reject --> R(["fin.rechazada: the reason is classified"])
   G -- "request_changes, once" --> P
   V -- no --> F1(["fin.ya_no_aplica"])
   V -- si --> A{"ejecutar.automatizable<br/>does the action have a tool?"}
@@ -223,6 +168,8 @@ flowchart TB
   E --> C["cerrar · apps/api records ejecutada"]
   M --> C
 ```
+
+*Draws: `packages/agents/AGENTS.md` § The decision tree*
 
 1. **`detectar` sees nothing today.** `saldo_vencido` fires above 15 days and `dias_pago_prom` above
    a 50% rise; a 6-day delay on a 30-day habit crosses neither, while `FIN-POL-004 §4` prescribes a
@@ -238,8 +185,7 @@ flowchart TB
    what `FIN-POL-004 §4` prescribes for 1 to 15 days.
 5. `aprobar`: the person approves, edits, rejects, or requests changes once. `request_changes` is a
    decision with a reason that sends the alert back to `proponer`, capped at one per alert as the
-   return to `Analista` is; it adds no state to the lifecycle, because the alert stays
-   `propuesta` while `Estratega` proposes again.
+   return to `Analista` is.
 6. `ejecutar.vigente`: the invoice is still past due. `ejecutar.automatizable`: an email draft has a
    tool, so `ejecutor`/`ejecutar`; an action the policy prescribes with no tool, such as a phone
    call, becomes a `task` for a person through `nota_manual`.
