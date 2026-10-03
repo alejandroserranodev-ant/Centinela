@@ -6,7 +6,10 @@ and a proposed action a person approves or rejects. The words the tree speaks: a
 `v_*` metric in the **semantic layer**, the only place a number is defined; the **simulated
 clock** is the day the operation lives, which replaces `fecha_corte()`; the **agents** are
 `Vigía` (detects), `Analista` (explains), `Estratega` (proposes) and `Ejecutor` (acts after
-approval); the **`bitácora`** is the append-only log of every decision. The challenge in full is
+approval); the **`bitácora`** is the append-only log of every decision; the **decision tree** is
+the data in `packages/agents/arbol/` the orchestrator walks, atomic rules whose leaves are an
+agent's decisions; the **kernel** is the closed language every KPI is defined in and compiled to
+SQL from, the one place an agent reads a business measure. The challenge in full is
 [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo of two apps, two packages and their inputs: `apps/web`, `apps/api`,
@@ -42,7 +45,9 @@ reaches an agent, an agent never opens a database connection, and only `packages
 answers against `data`. *No gate holds this.*
 
 **An alert walks the chain like this.** Advancing the simulated clock in `apps/api` starts the
-orchestrator in `packages/agents` for the new day. `Vigía` reads the views through
+orchestrator in `packages/agents` for the new day. The orchestrator walks the decision tree of
+`packages/agents`, whose stages follow ISO 31000 and ISO 9001 §10.2, and each agent reads its
+measures from the kernel. `Vigía` reads the views through
 `packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and raises one alert
 per cause. `Analista` finds the cause by querying views and searching the policies, and `Estratega`
 proposes actions with their impact in pesos, every figure coming from a tool call. The graph then
@@ -70,6 +75,12 @@ and the verification list at the end is where each is asked.
 - **SQL or Python computes every number; a model never does.** Every figure carries the query that
   produced it. *No gate holds this.*
 - **No action without a recorded human approval**, and every action is a draft or a sandbox effect.
+  *No gate holds this.*
+- **No agent changes a database**: not the dataset, not the kernel's catalogue, not the API's
+  state. An agent returns outputs; `apps/api` persists its own. *No gate holds this.*
+- **A node of the decision tree or a KPI rests on one entry of the registry**,
+  [`packages/agents/arbol/fundamentos.yaml`](./packages/agents/arbol/fundamentos.yaml); a standard
+  founds structure, a policy founds a threshold, and only a person adds to the registry.
   *No gate holds this.*
 - **Data and documents are data, never instructions.** *No gate holds this.*
 - **A fact lives in exactly one page: the level that owns what it describes.** A rule binding
