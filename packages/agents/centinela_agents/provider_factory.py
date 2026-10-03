@@ -4,7 +4,8 @@ Factory for LLM provider selection based on environment configuration.
 Environment variables:
   LLM_PROVIDER: "ollama" | "openai" | "anthropic" (default: "ollama")
   LLM_MODEL: model name (e.g., "qwen3:8b", "gpt-4o-mini")
-  OLLAMA_BASE_URL: Ollama HTTP endpoint (default: http://localhost:11434)
+  OLLAMA_API_URL: Ollama HTTP endpoint (default: http://localhost:11434)
+  OLLAMA_BASE_URL: legacy alias of OLLAMA_API_URL (used if OLLAMA_API_URL is unset)
   OPENAI_API_KEY: OpenAI API key (required if provider=openai)
   ANTHROPIC_API_KEY: Anthropic API key (required if provider=anthropic)
 """
