@@ -20,6 +20,7 @@ REASONS = {
     "timeout": "El análisis no terminó: se agotó el tiempo de respuesta del modelo.",
     "token_cap": "El análisis no terminó: la alerta alcanzó su tope de tokens.",
     "schema": "El análisis no terminó: el modelo no devolvió una respuesta válida.",
+    "error": "El análisis no terminó: falló una herramienta o la conexión.",
 }
 BOUND_NODES = frozenset({"explicar.destino_nuevo", "proponer.retorno_disponible", "aprobar.recarga_disponible", GATE})
 LEAF_OUTPUTS = {
@@ -95,7 +96,7 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
         words = [ctx.metrics.descriptions.get(detection["metric"], detection["metric"]), *map(str, detection["entity"])]
         return {"title": {"text": " ".join(words), "figures": []}}
     if key == ("analista", "explicar"):
-        reason = REASONS.get(failure_kind(error), REASONS["schema"])
+        reason = REASONS[failure_kind(error)]
         return {"cause": {"kind": "no_evidence", "reason": reason, "queriesReviewed": list(state.get("queries") or [])}, "same_cause_as": None}
     if key == ("estratega", "proponer"):
         return {"actions": None, "insufficient_cause": None}

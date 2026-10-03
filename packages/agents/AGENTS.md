@@ -386,7 +386,8 @@ Ollama, as the model is. The fallback `reason` of `analista`/`explicar` is one o
 |---|---|
 | timeout | "El análisis no terminó: se agotó el tiempo de respuesta del modelo." |
 | token cap | "El análisis no terminó: la alerta alcanzó su tope de tokens." |
-| refused schema or error | "El análisis no terminó: el modelo no devolvió una respuesta válida." |
+| refused schema | "El análisis no terminó: el modelo no devolvió una respuesta válida." |
+| any other error: a tool, a connection | "El análisis no terminó: falló una herramienta o la conexión." |
 
 ### The state of an alert
 

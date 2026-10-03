@@ -155,6 +155,15 @@ def test_orq_a_model_call_past_its_timeout_takes_the_fallback_and_still_reaches_
     assert statuses(state)[-1] == "propuesta"
 
 
+
+def test_orq_a_tool_or_connection_error_gives_its_own_reason_not_the_schema_one():
+    def broken(state):
+        raise ConnectionError("pgvector")
+
+    graph, state = started(Recorder(), overrides={("analista", "explicar"): broken})
+    assert state["cause"]["reason"] == "El análisis no terminó: falló una herramienta o la conexión."
+    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error"}]
+
 def test_orq_a_failed_execution_leaves_the_alert_aprobada():
     def broken(state):
         raise RuntimeError("sandbox")
