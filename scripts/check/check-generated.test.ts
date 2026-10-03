@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { UNMARKED, problems } from './check-generated.ts';
+import { plant } from './support.ts';
+
+const unmarked = new Map([
+  ['web/package-lock.json', 'npm writes it'],
+  ['out/', 'a generator writes it and git ignores it'],
+]);
+
+const sound = {
+  '.gitignore': 'out/\n',
+  'GENERATED.md': '`sql/kpis.generated.sql`, `web/package-lock.json` and `out/`.\n',
+  'sql/kpis.generated.sql': '-- Written by `make kpis`.\nselect 1;\n',
+  'web/package-lock.json': '{}',
+};
+
+test('a sound tree passes', () => {
+  assert.deepEqual(problems(plant(sound), unmarked), []);
+});
+
+test('UNMARKED holds each whole-file output with its reason', () => {
+  assert.deepEqual([...UNMARKED.keys()], [
+    'package-lock.json',
+    'apps/web/package-lock.json',
+    'packages/agents/uv.lock',
+    'packages/tools/uv.lock',
+    'data/generator/csv/',
+  ]);
+  for (const reason of UNMARKED.values()) assert.match(reason, /writes/);
+});
+
+test('a generated file with no banner fails', () => {
+  const found = problems(plant({ ...sound, 'sql/kpis.generated.sql': 'select 1;\n' }), unmarked);
+  assert.deepEqual(found, ['sql/kpis.generated.sql is named generated and its first lines carry no banner naming the command that writes it']);
+});
+
+test('a lockfile missing from UNMARKED fails', () => {
+  const found = problems(plant({ ...sound, 'py/uv.lock': '' }), unmarked);
+  assert.deepEqual(found, ['py/uv.lock is written whole by a tool, is not named .generated. and is missing from UNMARKED']);
+});
+
+test('an output GENERATED.md does not name fails', () => {
+  const found = problems(plant({ ...sound, 'GENERATED.md': '`web/package-lock.json` and `out/`.\n' }), unmarked);
+  assert.deepEqual(found, ['sql/kpis.generated.sql is written by a generator and GENERATED.md does not name it']);
+});
+
+test('a stale UNMARKED entry fails', () => {
+  const { 'web/package-lock.json': _, ...rest } = sound;
+  const found = problems(plant(rest), unmarked);
+  assert.deepEqual(found, ['UNMARKED names web/package-lock.json, which the tree no longer holds']);
+});
+
+test('a tree with no generated file fails as a zero scan', () => {
+  const found = problems(plant({ 'GENERATED.md': 'x\n' }), new Map());
+  assert.deepEqual(found, ['walked 0 generated files, so every rule below passes over a tree it never opened']);
+});

@@ -1,0 +1,23 @@
+{
+  "name": "@centinela/root",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "check": "node scripts/check/check-all.ts",
+    "check:agents": "node scripts/check/check-agents.ts",
+    "check:citations": "node scripts/check/check-citations.ts",
+    "check:vocabulary": "node scripts/check/check-vocabulary.ts",
+    "check:docs": "node scripts/check/check-docs.ts",
+    "check:generated": "node scripts/check/check-generated.ts",
+    "check:routes": "node scripts/check/check-routes.ts",
+    "test": "node --test \"scripts/check/*.test.ts\"",
+    "typecheck": "tsc -p scripts/check"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}
