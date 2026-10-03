@@ -15,7 +15,7 @@ an agent's instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md).
 | `centinela_agents/` | the schema of the tree, its validator, the walk of `detectar`, and the compiler to the LangGraph graph |
 | `skills/` | what each agent is told ([`skills/AGENTS.md`](./skills/AGENTS.md)) |
 | `tests/` | one planted violation per rule of the validator, the walk of `detectar`, and the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` |
-| `pyproject.toml`, `uv.lock` | the package and its pinned dependencies; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
+| `pyproject.toml`, `uv.lock` | the package and its pinned dependencies, with `packages/tools` for the tests, which validate the base against the catalogue the kernel serves; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
 
 ## Commands
 
@@ -57,12 +57,15 @@ development machine has no `ensurepip` and uv builds the environment without it:
 - **The kernel reaches the tree through two inputs**: the catalogue of KPI columns the validator
   checks each `lee` against, and a reader the interpreter calls with a metric and a simulated day.
   The tree never opens a connection, because no agent does.
+  `centinela_agents/catalog.py:catalog_from_kernel(kpis)` builds the catalogue from `kpi_catalogo`,
+  and `centinela_agents/catalog.py:kernel_reader(call)` builds the reader from `kpi_consultar`,
+  raising on a refusal, so a refused reading never passes for a day with no alert.
 
 ## The universe
 
-**An agent knows `data/csv/` and `data/policies/`, reached through the `v_*` views, and nothing
-else.** No agent states a policy, a threshold or a fact those files do not hold. When a question
-falls outside them, the answer says so.
+**An agent knows `data/csv/` and `data/policies/`, reached through the kernel's KPIs and the
+`v_*` views, and nothing else.** No agent states a policy, a threshold or a fact those files do
+not hold. When a question falls outside them, the answer says so.
 
 **What the data cannot answer, and no agent covers:**
 
@@ -94,7 +97,7 @@ this one, because a tool is a permission, not a route.
 ### `Vigía` detects
 
 - **Input:** the simulated day, and the metric, entity and severity of every earlier alert.
-- **Tools:** read-only SQL over the views `metricas.yaml` names, filtered by the simulated day.
+- **Tools:** `kpi_consultar` over the KPIs `metricas.yaml` names, on the simulated day.
   No policy search: its thresholds are already in `metricas.yaml`.
 - **Leaves:** `detectar`, the walk of the stage `detectar` in code, and `titular`, the title.
 - **Output:** a detected alert: metric, entity, simulated day, the triggering figure with its

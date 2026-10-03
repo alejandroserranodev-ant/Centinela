@@ -100,6 +100,9 @@ The views are listed by `grep -o 'VIEW v_[a-z_]*' sql/0[34]_*.sql`.
 at a time, the simulated day replaces `fecha_corte()`, and every query filters
 `fecha <= <simulated day>`. Who owns the clock is [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md).
 
+**The three paragraphs below describe the kit's views**, which the kernel KPIs replace for
+detection; they still bind any agent that reads a view directly.
+
 **Only some views compute "today" from `fecha_corte()`.** `v_cartera_cliente`,
 `v_cobertura_inventario`, `v_actividad_cliente`, `v_costo_sku`, `v_precio_sku` and
 `v_ordenes_compra` do, and `v_margen_minimo_linea` holds no dates. `v_ventas`,
@@ -141,12 +144,17 @@ refused. `kernel/lenguaje.schema.json` holds the keys and the bounds; the compil
 | `unir` | names of the source's joins | at most three, each after the one it joins from |
 | `abierto_al_dia` | `desde`, an event date, and `hasta`, a closing date or a closing the source declares: the rows open on `dia` | one time frame per KPI |
 | `ventana` | an event date and a number of days back from `dia` | at most 365 days; one time frame per KPI |
-| `filtro` | a column, an operator from `=`, `!=`, `<`, `<=`, `>`, `>=`, `en`, and a literal of the column's type, a date written `YYYY-MM-DD` | at most five; an `en` list of at most 20; a text literal of at most 200 characters, with no `%` and no NUL character |
+| `filtro` | a column, an operator from `=`, `!=`, `<`, `<=`, `>`, `>=`, `en`, and a literal of the column's type, a date written `YYYY-MM-DD`; or, in place of the literal, `contra`: another column or `dia`, less `menos_dias` or `menos_meses` when it is a date | at most five; an `en` list of at most 20; a text literal of at most 200 characters, with no `%` and no NUL character; `contra` takes no `en`, and `menos_dias` at most 365 or `menos_meses` at most 12, never both |
 | `agrupar` | dimensions the source declares, or `{columna, por}` with `semana` or `mes` over an event or term date; it is the KPI's entity, one row per entity | one to three |
-| `medida` | `sum`, `avg`, `count`, `min`, `max` or `mediana` over a column, or over one expression of `+ - * /` over columns; `count` with no column counts rows | expression depth two |
+| `medida` | `sum`, `avg`, `count`, `min`, `max` or `mediana` over a column, or over one expression of `+ - * /` over columns, numbers and `dia`; `ultimo` or `anterior`, the latest value or the one before it by `por`, an event date; `si`, conditions of the `filtro` form that only this measure applies; `count` with no column counts rows | expression depth three; at most three conditions in `si`; a `sum` with `si` over no row is 0 |
 | `razon` | a `medida` over another `medida`, in place of `medida` | one |
-| `linea_base` | an event date, `semana` or `mes`, N, and `delta` or `delta_pct`: the last period complete on `dia` against the mean of the N before it | N at most 12; one time frame per KPI; a numeric measure; no `{columna, por}` in `agrupar` |
-| `salida` | the names of the output columns: `valor`, plus `base` and `delta` with a `linea_base` | each unique, never `dia` or `periodo` |
+| `linea_base` | an event date, `semana` or `mes`, N, and `delta`, `delta_pct` or `caida` (the base minus the value): the last period complete on `dia` against the mean of the N before it | N at most 12; one time frame per KPI; a numeric measure; no `{columna, por}` in `agrupar` |
+| `columnas` | more named measures over the same rows; with a `linea_base`, each is measured on the last complete period | at most eight |
+| `tomar` | other KPIs, each written inline as a block, named, with `por` mapping each column of its entity to a column of this KPI; read as `<name>.<column>` | at most two; a taken KPI takes at most one more level |
+| `derivadas` | named expressions computed after the measures, over the columns before them: `+ - * /`, `mayor` and `menor` of two, `dias_habiles` (Monday to Friday after `desde`, up to `hasta`), `compara`, `existe`, `si` with `cuando`, `entonces` and `sino`, `participacion` (the percent of a column's total over every row) and `periodo_anterior` (a column of the same entity one period before); operands are columns, numbers, `dia` and `{umbral: <column>}`, the entry's own `umbrales` for that column | at most six; four operations deep; `periodo_anterior` needs exactly one `{columna, por}` in `agrupar` |
+| `decimales` | the decimals of an output column, rounded on the way out only, so a derived column reads the unrounded value | 0 to 4 |
+| `tener` | an output column, a comparison and a number: the only rows the KPI returns | at most three |
+| `salida` | the names of the output columns: `valor`, plus `base` and `delta` with a `linea_base` | each unique across `agrupar`, `salida`, `columnas` and `derivadas`, never `dia` or `periodo` |
 
 **Every date column has a role**, because `dia` bounds each kind differently:
 - `evento`: the row exists from that day, and the compiler adds `<= dia`.
@@ -161,6 +169,12 @@ omits that join is refused.
 `LEFT JOIN`. A child such as a payment reaches a KPI only as a **closing** in
 `abierto_al_dia.hasta`: an invoice is open while no payment exists up to `dia`, because the data
 holds one full payment per invoice.
+
+**A taken KPI joins like a join.** `tomar` reaches the whole entity of another KPI, which holds one
+row per entity, so it never multiplies a row; it compiles on the same `dia`, so the clock holds
+inside it. It is written inline, not named by id, so a block stays self-contained and an approved
+KPI can take one with no base KPI behind it. An `umbral` operand reads the entry's own `umbrales`,
+so a pesos at risk that needs a threshold reads the one place the threshold is written.
 
 **A baseline frames every entity over its whole window.** An entity with any row in the current
 period or the N before it gets every period of that window. An empty period counts 0 for `sum` and
@@ -183,6 +197,55 @@ with its bound, never by a hand-written function. `uv run pytest tests/test_sour
 `sql/01_esquema.sql`. No table of `fuentes.yaml` declares a column named `dia`, because inside a
 `k_` function a column of that name would win over the function's argument `dia`; the load
 refuses one.
+
+## The base KPIs
+
+**Every metric of `metricas.yaml` carries a `kernel:` block, and none is dropped or renamed**,
+because the skills, `acciones.md`, the evals and the draft contract of `apps/web` name them. The list
+is `grep -oP '^  \K[a-z_]+(?=:)' metricas.yaml`. Each compiles to `centinela.k_<metric>(dia)`, which
+`Vigía`'s detection reads.
+
+**A base KPI outputs what is read from it**: its entity, the columns the decision tree reads, the
+columns its `umbrales` names, the columns `calcular_impacto` reads
+([`../packages/tools/AGENTS.md`](../packages/tools/AGENTS.md)), and its view's own columns that
+parity compares. `Analista` still reads the views for anything else.
+
+**Every base KPI outputs `pesos_en_riesgo`**, the formula its entry writes in prose, because the
+detection reads an alert's exposure from that column and computes none.
+
+**`cobertura_dias` outputs `pedidos_pendientes`**: the orders holding the SKU that are placed by
+`dia`, not cancelled, and not invoiced by `dia`, through the closing `facturada`. `OPE-POL-007` §2
+makes a coverage under 5 days with pending orders critical, and `pedidos.estado` is `fuga`. It
+counts across both warehouses, because the map from a city to its warehouse is written only in
+`v_cobertura_inventario`'s text, in no table.
+
+**`descuento_en_exceso` outputs `exceso_semana_anterior`**, the same seller's excess the week
+before, because `COM-POL-002` §5 escalates two consecutive weeks of the same seller. It and
+`margen_bruto_negativo` return the whole history up to `dia`, as their views do; the tree's rule of
+one alert per metric and entity keeps an old week or line from alerting twice.
+
+**`dias_pago_prom` measures by month of payment**: the mean days from invoice to payment of the
+payments made in the last complete month, against the mean of the 12 months before. Its view,
+`v_dias_pago_mensual`, groups by month of invoice, and the last months of invoices hold only the
+ones already paid, so a slow payer would never reach the threshold of `FIN-POL-004` §5. A customer
+who pays nothing has no row; `saldo_vencido` covers that case.
+
+**`audiencia` is derived from the owners** that the two tables of
+[`../packages/agents/skills/estratega/acciones.md`](../packages/agents/skills/estratega/acciones.md)
+name for the metric: `operacion` is who executes (`Compras`, `Analista de cartera`, a
+`vendedor_id`), `supervision` who supervises (`Jefe de cartera`, `Control Comercial`, `Comercial`),
+and `gerencia` is `Dirección Financiera` and `Gerencia Comercial`. A new owner there is placed here
+first.
+
+**The kit's views stay as delivered**, because `Analista`'s cause views and the kit's examples read
+them, and they are the reference for parity.
+
+**Parity is checked in two halves.** On `fecha_corte()`, the last day of the dataset, the kit's views
+are right by definition, so each KPI returns its view's rows, value for value, on the columns the
+view holds. On earlier simulated days the views leak, so each KPI agrees with a hand-written as-of
+query, never with the view. `dias_pago_prom` has only that second half, because its view measures
+by month of invoice. `uv run pytest tests/test_parity.py` in `packages/tools` holds both against
+the scratch database; its header states the comparisons that depart and why.
 
 ## The scenarios
 
