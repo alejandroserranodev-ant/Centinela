@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kernel",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fuente", "agrupar", "salida"],
+  "properties": {
+    "fuente": { "$ref": "#/$defs/nombre" },
+    "unir": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/nombre" } },
+    "abierto_al_dia": {
+      "type": "object", "additionalProperties": false, "required": ["desde", "hasta"],
+      "properties": {
+        "desde": { "$ref": "#/$defs/columna" },
+        "hasta": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/nombre" }] }
+      }
+    },
+    "ventana": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "dias"],
+      "properties": { "columna": { "$ref": "#/$defs/columna" }, "dias": { "type": "integer", "minimum": 1, "maximum": 365 } }
+    },
+    "filtro": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/filtro" } },
+    "agrupar": {
+      "type": "array", "minItems": 1, "maxItems": 3,
+      "items": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/periodo" }] }
+    },
+    "medida": { "$ref": "#/$defs/medida" },
+    "razon": {
+      "type": "object", "additionalProperties": false, "required": ["numerador", "denominador"],
+      "properties": { "numerador": { "$ref": "#/$defs/medida" }, "denominador": { "$ref": "#/$defs/medida" } }
+    },
+    "linea_base": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "periodo", "n", "salida"],
+      "properties": {
+        "columna": { "$ref": "#/$defs/columna" },
+        "periodo": { "enum": ["semana", "mes"] },
+        "n": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "salida": { "enum": ["delta", "delta_pct"] }
+      }
+    },
+    "salida": {
+      "type": "object", "additionalProperties": false, "required": ["valor"],
+      "properties": { "valor": { "$ref": "#/$defs/nombre" }, "base": { "$ref": "#/$defs/nombre" }, "delta": { "$ref": "#/$defs/nombre" } }
+    }
+  },
+  "oneOf": [{ "required": ["medida"] }, { "required": ["razon"] }],
+  "not": {
+    "anyOf": [
+      { "required": ["ventana", "abierto_al_dia"] },
+      { "required": ["ventana", "linea_base"] },
+      { "required": ["abierto_al_dia", "linea_base"] }
+    ]
+  },
+  "if": { "required": ["linea_base"] },
+  "then": { "properties": { "salida": { "required": ["valor", "base", "delta"] } } },
+  "else": { "properties": { "salida": { "properties": { "base": false, "delta": false } } } },
+  "$defs": {
+    "nombre": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,62}$" },
+    "columna": { "type": "string", "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$" },
+    "periodo": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "por"],
+      "properties": { "columna": { "$ref": "#/$defs/columna" }, "por": { "enum": ["semana", "mes"] } }
+    },
+    "literal": {
+      "anyOf": [
+        { "type": "string", "maxLength": 200, "pattern": "^[^%]*$" },
+        { "type": "number" },
+        { "type": "boolean" }
+      ]
+    },
+    "filtro": {
+      "type": "object", "additionalProperties": false, "required": ["columna", "op", "valor"],
+      "properties": {
+        "columna": { "$ref": "#/$defs/columna" },
+        "op": { "enum": ["=", "!=", "<", "<=", ">", ">=", "en"] },
+        "valor": true
+      },
+      "if": { "properties": { "op": { "const": "en" } } },
+      "then": { "properties": { "valor": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/literal" } } } },
+      "else": { "properties": { "valor": { "$ref": "#/$defs/literal" } } }
+    },
+    "operacion": {
+      "type": "object", "additionalProperties": false, "required": ["op", "izq", "der"],
+      "properties": { "op": { "enum": ["+", "-", "*", "/"] }, "izq": { "$ref": "#/$defs/columna" }, "der": { "$ref": "#/$defs/columna" } }
+    },
+    "expresion": {
+      "anyOf": [
+        { "$ref": "#/$defs/columna" },
+        { "$ref": "#/$defs/operacion" },
+        {
+          "type": "object", "additionalProperties": false, "required": ["op", "izq", "der"],
+          "properties": {
+            "op": { "enum": ["+", "-", "*", "/"] },
+            "izq": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/operacion" }] },
+            "der": { "anyOf": [{ "$ref": "#/$defs/columna" }, { "$ref": "#/$defs/operacion" }] }
+          }
+        }
+      ]
+    },
+    "medida": {
+      "type": "object", "additionalProperties": false, "required": ["agregado"],
+      "properties": {
+        "agregado": { "enum": ["sum", "avg", "count", "min", "max", "mediana"] },
+        "de": { "$ref": "#/$defs/expresion" }
+      },
+      "if": { "properties": { "agregado": { "not": { "const": "count" } } } },
+      "then": { "required": ["de"] }
+    },
+    "ficha": {
+      "type": "object",
+      "required": ["descripcion", "unidad", "rango", "tendencia", "temporalidad", "audiencia"],
+      "properties": {
+        "descripcion": { "type": "string", "minLength": 1 },
+        "unidad": { "type": "string", "minLength": 1 },
+        "rango": {
+          "type": "object", "additionalProperties": false, "required": ["min", "max"],
+          "properties": { "min": { "type": ["number", "null"] }, "max": { "type": ["number", "null"] } }
+        },
+        "tendencia": { "enum": ["mayor_es_mejor", "menor_es_mejor"] },
+        "temporalidad": { "enum": ["diaria", "semanal", "mensual"] },
+        "audiencia": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["operacion", "supervision", "gerencia"] } }
+      }
+    }
+  }
+}
