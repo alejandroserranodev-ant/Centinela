@@ -147,6 +147,7 @@ another case from the same generated dataset.
 | `apps/api/AGENTS.md` | the gap store and its repetition count, the catalogue of approved KPIs per client and its lifecycle, the `administrador` role, the endpoints above |
 | `apps/web/AGENTS.md` and `apps/web/src/api/types.ts` | the catalogue and the proposals in `Configuración`; `KpiProposal` and `KpiDecision` in the draft contract |
 | `evals/AGENTS.md` | `KPI-` cases: gaps below N (no proposal); gaps at N (one proposal); a threshold gap (reported, no proposal); a proposal the guard refuses twice (dropped); a rejected `pregunta` (no new proposal until N new gaps); a stored SQL whose hash no longer matches (refused); a policy passage asking for a KPI (no gap, reported); a retired KPI (its nodes retired, never handed to a run) |
+| `docs/guide/chapters/kpi-kernel.md` | the section on how a new KPI is born shrink to a link to the level page this spec writes them into; the diagrams stay in the chapter, each captioned `Draws:` with that page's new section, and the chapter's warning box drops what this spec implements |
 
 ## Acceptance
 

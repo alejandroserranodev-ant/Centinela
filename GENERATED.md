@@ -22,6 +22,7 @@ Read the file.
 |---|---|---|
 | `data/generator/generar_dataset.py` | one CSV per table into `data/generator/csv/` by default, or into `SALIDA` | CSV has no room for a banner, and the names must match the table names `data/sql/02_carga.sql` loads |
 | `arena-to-prod`, run by `npm run dev` and `npm run build` in `apps/web` | `apps/web/src/arena.generated.css` and `apps/web/src/icons.generated.css`, from `apps/web/arena.config.json` and `apps/web/design/centinela/` | none needed: the name says so, and git ignores both |
+| `docs/guide/publish.py` | the Docmost space `centinela`, whole, from `docs/guide/guide.json`; its zip goes to a temporary directory outside the tree | none possible: its output lives in Docmost, outside the tree, so an edit made there is lost on the next publish and its source is always in this repository |
 
 Its default output directory is ignored by git. **Never point `SALIDA` at `data/csv/`**: that is the
 official evaluation dataset, written by the kit and by no generator in this tree. How to run it is

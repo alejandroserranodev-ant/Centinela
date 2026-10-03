@@ -31,6 +31,7 @@ parts hold no code yet. Each page states the decisions its code is written again
 | a tool an agent calls: SQL, policy search, an action | [`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md) |
 | a screen, a component, the Arena skin | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md) |
 | an evaluation case, or proving nothing regressed | [`evals/AGENTS.md`](./evals/AGENTS.md) |
+| the guide a developer reads in Docmost, its compose, or one of its chapters | [`docs/guide/AGENTS.md`](./docs/guide/AGENTS.md) |
 | whether the file in front of me is mine to edit | [`GENERATED.md`](./GENERATED.md), before the edit |
 | I am about to write down that something is wrong | [`DOUBTS.md`](./DOUBTS.md) |
 
@@ -117,7 +118,9 @@ Run each one that the change touches, and always the last.
 2. After a change to an agent, a prompt or a tool, run the set in [`evals/AGENTS.md`](./evals/AGENTS.md).
 3. After a change to a screen, the person-run check in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md).
 4. After any change, `git status --short` against [`GENERATED.md`](./GENERATED.md).
-5. After a change to any `.md`, check that every relative link resolves. Fenced code blocks are
+5. After a change to a page the guide imports or a guide diagram draws, publish the guide and read
+   that page in Docmost, with the steps in [`docs/guide/AGENTS.md`](./docs/guide/AGENTS.md).
+6. After a change to any `.md`, check that every relative link resolves. Fenced code blocks are
    skipped, because a link inside one is an example and renders as text. The check prints each
    broken link and nothing when all resolve:
 
@@ -127,5 +130,5 @@ Run each one that the change touches, and always the last.
        while read -r l; do [ -e "$(dirname "$f")/$l" ] || echo "$f -> $l"; done
    done
    ```
-6. **An end-to-end read of every page the change touched**, for present tense and for a fact
+7. **An end-to-end read of every page the change touched**, for present tense and for a fact
    stated in two places. Nothing else asks this.

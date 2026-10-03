@@ -142,6 +142,7 @@ banner naming the command that writes it. It is never edited by hand; the defect
 | `packages/tools/AGENTS.md`, "Decisions" | the kernel in the list of servers, its four read-only tools, and the sentence "The kernel has no action: a KPI becomes active by `apps/api`'s record of an approval, never by a change to a database" |
 | `GENERATED.md`, "What writes today" | a row: the kernel's compiler writes `data/sql/05_kpis.generated.sql` from `data/metricas.yaml`; its name says so |
 | `data/docker-compose.yml` | the role `centinela_kernel` and the setup step for `05_kpis.generated.sql` |
+| `docs/guide/chapters/kpi-kernel.md` | the sections on the language, the kinds of KPI, the guards, the roles and the tools shrink to a link to the level page this spec writes them into; the diagrams stay in the chapter, each captioned `Draws:` with that page's new section, and the chapter's warning box drops what this spec implements |
 
 ## Acceptance
 

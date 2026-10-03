@@ -1,0 +1,95 @@
+{
+  "space": {
+    "name": "Centinela",
+    "slug": "centinela",
+    "description": "The guide to Centinela, published from its repository. Read it in order."
+  },
+  "pages": [
+    {
+      "source": "docs/guide/chapters/start-here.md"
+    },
+    {
+      "source": "docs/challenge/AGENTS.md"
+    },
+    {
+      "source": "AGENTS.md"
+    },
+    {
+      "source": "docs/guide/chapters/alert-journey.md"
+    },
+    {
+      "title": "The levels",
+      "intro": "Each part of the monorepo has its own page, and each page states the decisions its code is written against. They follow the dependency chain from the data up to the screen, then the evaluation set beside it.",
+      "children": [
+        {
+          "source": "data/AGENTS.md"
+        },
+        {
+          "source": "packages/tools/AGENTS.md"
+        },
+        {
+          "source": "packages/agents/AGENTS.md",
+          "children": [
+            {
+              "source": "packages/agents/skills/AGENTS.md"
+            }
+          ]
+        },
+        {
+          "source": "apps/api/AGENTS.md"
+        },
+        {
+          "source": "apps/web/AGENTS.md"
+        },
+        {
+          "source": "evals/AGENTS.md"
+        }
+      ]
+    },
+    {
+      "source": "docs/guide/chapters/decision-tree.md",
+      "children": [
+        {
+          "source": "packages/agents/arbol/fundamentos.yaml",
+          "title": "The registry of fundamentos"
+        }
+      ]
+    },
+    {
+      "source": "docs/guide/chapters/kpi-kernel.md"
+    },
+    {
+      "source": "docs/guide/chapters/status.md",
+      "children": [
+        {
+          "generated": "inventory",
+          "title": "Code inventory"
+        }
+      ]
+    },
+    {
+      "title": "Conventions",
+      "intro": "What binds every change beyond the rules of the project page: which files a machine writes, where a debt goes, and how a page is written.",
+      "children": [
+        {
+          "source": "GENERATED.md"
+        },
+        {
+          "source": "DOUBTS.md"
+        },
+        {
+          "source": "docs_guide.md",
+          "title": "How a page is written",
+          "extract": [
+            "## 3. ",
+            "## 6. "
+          ],
+          "sections": "3 to 5"
+        },
+        {
+          "source": "docs/guide/AGENTS.md"
+        }
+      ]
+    }
+  ]
+}

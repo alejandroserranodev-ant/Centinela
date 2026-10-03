@@ -92,6 +92,7 @@ it, so "how I got here" shows the path, not just the queries.
 | `apps/api/AGENTS.md` | the store of tree versions per client, handed to each run; the administrator's retirement of an expansion; the tree version on each alert event of the `bitácora` |
 | `apps/web/AGENTS.md` | `Configuración` lists the client's expansions, newest first, each with its evidence and a "Retirar" action |
 | `evals/AGENTS.md` | `ORQ-` cases: an expansion outside its agent's stage (refused); a `fundamento` absent from the registry (refused); a split leaf whose old branch still produces the earlier output; a move that bypasses `aprobar` (refused); evidence below N (no expansion); a retired expansion not drafted again before N; a change to an L1 node (refused) |
+| `docs/guide/chapters/decision-tree.md` | the section on how the tree grows shrink to a link to the level page this spec writes them into; the diagrams stay in the chapter, each captioned `Draws:` with that page's new section, and the chapter's warning box drops what this spec implements |
 
 ## Acceptance
 

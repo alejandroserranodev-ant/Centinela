@@ -164,6 +164,7 @@ L3 leaf whose skill is missing, is a refusal instead of a printed gap.
 | `apps/api/AGENTS.md` | the decision check gains `request_changes` (a reason is required, and it is refused on an alert that already had one); the lifecycle gains no state, because `request_changes` keeps the alert in `propuesta` |
 | `apps/web/src/api/types.ts` (draft contract) | `Decision` gains `request_changes`; the alert detail shows "Solicitar cambios" beside approve, edit and reject |
 | `evals/AGENTS.md` | `ORQ-` cases: a tree with a missing `no` (refused at startup), a `request_changes` (one re-proposal, a second refused), an action type with no tool (one `task`), an approved action whose KPI no longer breaks on the day of execution (`fin.ya_no_aplica`, `Ejecutor` not called), a path to `Ejecutor` without `aprobar` (refused), the walkthrough above |
+| `docs/guide/chapters/decision-tree.md` | the sections on the node, the levels, the validator and `ejecutar.vigente` shrink to a link to the level page this spec writes them into; the diagrams stay in the chapter, each captioned `Draws:` with that page's new section, and the chapter's warning box drops what this spec implements |
 
 ## Acceptance
 

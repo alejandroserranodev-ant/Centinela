@@ -59,6 +59,7 @@ test asserts the kernel's value.
 | `packages/agents/AGENTS.md`, `Vigía`'s tools | "read-only SQL over the views `metricas.yaml` names, filtered by the simulated day" becomes "`kpi_consultar` over the KPIs `metricas.yaml` names, on the simulated day" |
 | `packages/tools/AGENTS.md`, "The impact calculator" | the "Computed as" column names kernel KPIs where it names a metric's view |
 | `evals/AGENTS.md` | a `KER-` prefix: parity on `fecha_corte()` and the as-of check per metric; the `VIG-` cases run unchanged and must still pass |
+| `docs/guide/chapters/kpi-kernel.md` | the section on rebuilding the current metrics shrink to a link to the level page this spec writes them into; the diagrams stay in the chapter, each captioned `Draws:` with that page's new section, and the chapter's warning box drops what this spec implements |
 
 ## Acceptance
 
