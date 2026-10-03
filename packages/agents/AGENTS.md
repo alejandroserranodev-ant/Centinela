@@ -424,6 +424,10 @@ Ollama, as the model is. The fallback `reason` of `analista`/`explicar` is one o
 | `next_node`, the target a predicate node chose | orchestrator | orchestrator |
 | `fin`: the end the walk reached | orchestrator | `apps/api` |
 
+`cost` and the `attempts` of a failure come with the retry and the token cap, and the code has
+neither yet: `centinela_agents/state.py:AlertState` holds no `cost`, and a failure carries only its
+step and its kind.
+
 Each output reaches `apps/api` as a log event, typed as `LogEventType` declares:
 
 | Output | `type` | Actor |
