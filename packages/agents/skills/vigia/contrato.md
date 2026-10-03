@@ -1,6 +1,6 @@
 # Vigía: the title of a detected alert
 
-Detection is code: it reads the thresholds in `metricas.yaml` and the views, and hands you one
+Detection is code: it reads the thresholds in `metricas.yaml` and the kernel's KPIs, and hands you one
 detected alert. You do one thing: you write its `title`.
 
 ## Input

@@ -1,0 +1,44 @@
+metricas:
+  oc_abiertas:
+    descripcion: Órdenes de compra abiertas por proveedor en el día simulado
+    unidad: órdenes
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [operacion]
+    kernel:
+      fuente: ordenes_compra
+      abierto_al_dia: { desde: ordenes_compra.fecha_oc, hasta: ordenes_compra.fecha_recibida }
+      agrupar: [ordenes_compra.proveedor_id]
+      medida: { agregado: count }
+      salida: { valor: ordenes_abiertas }
+  facturas_abiertas:
+    descripcion: Valor de las facturas sin pago en el día simulado, por cliente
+    unidad: COP
+    rango: { min: 0, max: null }
+    tendencia: menor_es_mejor
+    temporalidad: diaria
+    audiencia: [supervision, gerencia]
+    fuente_umbral: "fixture de prueba; no cita una política"
+    kernel:
+      fuente: facturas
+      abierto_al_dia: { desde: facturas.fecha_factura, hasta: pagada }
+      agrupar: [facturas.cliente_id]
+      medida: { agregado: sum, de: facturas.valor_total }
+      salida: { valor: saldo_abierto }
+  ventas_semana_linea:
+    descripcion: Ventas netas de la última semana completa por línea, frente a las 8 anteriores
+    unidad: COP
+    rango: { min: 0, max: null }
+    tendencia: mayor_es_mejor
+    temporalidad: semanal
+    audiencia: [gerencia]
+    kernel:
+      fuente: pedidos_detalle
+      unir: [pedidos, productos]
+      filtro:
+        - { columna: pedidos.estado, op: "!=", valor: Cancelado }
+      agrupar: [productos.linea]
+      medida: { agregado: sum, de: pedidos_detalle.valor_neto }
+      linea_base: { columna: pedidos.fecha, periodo: semana, n: 8, salida: delta_pct }
+      salida: { valor: ventas, base: ventas_base, delta: ventas_delta_pct }

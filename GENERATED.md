@@ -22,7 +22,8 @@ Read the file.
 |---|---|---|
 | `data/generator/generar_dataset.py` | one CSV per table into `data/generator/csv/` by default, or into `SALIDA` | CSV has no room for a banner, and the names must match the table names `data/sql/02_carga.sql` loads |
 | `arena-to-prod`, run by `npm run dev` and `npm run build` in `apps/web` | `apps/web/src/arena.generated.css` and `apps/web/src/icons.generated.css`, from `apps/web/arena.config.json` and `apps/web/design/centinela/` | none needed: the name says so, and git ignores both |
-| `uv sync` and `uv lock`, run in `packages/agents` | `packages/agents/uv.lock`, from `packages/agents/pyproject.toml` | uv writes the file whole and owns its format; the defect is in `pyproject.toml`, and `uv lock` writes the file again |
+| `uv sync` and `uv lock`, run in `packages/agents` and in `packages/tools` | `packages/agents/uv.lock` and `packages/tools/uv.lock`, each from the `pyproject.toml` beside it | uv writes the file whole and owns its format; the defect is in the `pyproject.toml` files, and `uv lock` writes the file again |
+| `uv run python -m centinela_tools.generate`, run in `packages/tools` | `data/sql/05_kpis.generated.sql`, from `data/kernel/fuentes.yaml`, `data/metricas.yaml` and the view names of `data/sql/03` and `04` | none needed: the name says so, and its banner names the command; `tests/test_generate.py` fails when the file differs from what the generator writes |
 | `docs/guide/publish.py` | the Docmost space `centinela`, whole, from `docs/guide/guide.json`; its zip goes to a temporary directory outside the tree | none possible: its output lives in Docmost, outside the tree, so an edit made there is lost on the next publish and its source is always in this repository |
 
 Its default output directory is ignored by git. **Never point `SALIDA` at `data/csv/`**: that is the
