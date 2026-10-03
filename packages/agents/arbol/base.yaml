@@ -1,0 +1,260 @@
+version: 1
+leyes:
+  - id: cifra_de_consulta
+    fundamento: iso9001.7.5
+  - id: accion_aprobada
+    fundamento: iso42001.anexo-a.supervision-humana
+  - id: ningun_agente_cambia_una_base
+    fundamento: iso42001.8
+  - id: datos_no_ordenes
+    fundamento: iso42001.6.1
+  - id: sin_evidencia_es_respuesta
+    fundamento: iso31000.6.4.3
+  - id: herramientas_de_su_hoja
+    fundamento: iso42001.8
+  - id: todo_paso_en_bitacora
+    fundamento: iso31000.6.7
+nodos:
+  - id: detectar.raiz
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.descriptivo, op: "=", valor: false }
+    si: detectar.cartera
+    no: fin.sin_alerta
+  - id: detectar.cartera
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: en, valor: [saldo_vencido, concentracion_vencida_pct, dias_pago_prom] }
+    si: detectar.cartera.saldo_vencido
+    no: detectar.margen
+  - id: detectar.cartera.saldo_vencido
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: saldo_vencido }
+    si: detectar.cartera.saldo_vencido.dias
+    no: detectar.cartera.concentracion_vencida_pct
+  - id: detectar.cartera.saldo_vencido.dias
+    fundamento: fin-pol-004.s4
+    predicado: { lee: kpi.saldo_vencido.max_dias_vencido, op: ">", umbral: saldo_vencido }
+    si: hoja.vigia.titular
+    no: detectar.cartera.saldo_vencido.cupo
+  - id: detectar.cartera.saldo_vencido.cupo
+    fundamento: fin-pol-004.s3
+    predicado: { lee: kpi.saldo_vencido.saldo_abierto, op: ">", umbral: saldo_vencido }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.cartera.concentracion_vencida_pct
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: concentracion_vencida_pct }
+    si: detectar.cartera.concentracion_vencida_pct.participacion
+    no: detectar.cartera.dias_pago_prom
+  - id: detectar.cartera.concentracion_vencida_pct.participacion
+    fundamento: fin-pol-004.s5
+    predicado: { lee: kpi.concentracion_vencida_pct.concentracion_vencida_pct, op: ">", umbral: concentracion_vencida_pct }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.cartera.dias_pago_prom
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: dias_pago_prom }
+    si: detectar.cartera.dias_pago_prom.aumento
+    no: fin.sin_alerta
+  - id: detectar.cartera.dias_pago_prom.aumento
+    fundamento: fin-pol-004.s5
+    predicado: { lee: kpi.dias_pago_prom.aumento_pct, op: ">", umbral: dias_pago_prom }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.margen
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: en, valor: [margen_pct] }
+    si: detectar.margen.margen_pct
+    no: detectar.inventario
+  - id: detectar.margen.margen_pct
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: margen_pct }
+    si: detectar.margen.margen_pct.caida
+    no: fin.sin_alerta
+  - id: detectar.margen.margen_pct.caida
+    fundamento: kit.umbrales
+    predicado: { lee: kpi.margen_pct.caida_pts, op: ">", umbral: margen_pct }
+    si: hoja.vigia.titular
+    no: detectar.margen.margen_pct.minimo
+  - id: detectar.margen.margen_pct.minimo
+    fundamento: ope-pol-007.s4
+    predicado: { lee: kpi.margen_pct.margen_pct, op: "<", umbral: margen_pct }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.inventario
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: en, valor: [cobertura_dias] }
+    si: detectar.inventario.cobertura_dias
+    no: detectar.comercial
+  - id: detectar.inventario.cobertura_dias
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: cobertura_dias }
+    si: detectar.inventario.cobertura_dias.minima
+    no: fin.sin_alerta
+  - id: detectar.inventario.cobertura_dias.minima
+    fundamento: ope-pol-007.s2
+    predicado: { lee: kpi.cobertura_dias.cobertura_dias, op: "<", umbral: cobertura_dias }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.comercial
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: en, valor: [descuento_en_exceso, margen_bruto_negativo] }
+    si: detectar.comercial.descuento_en_exceso
+    no: detectar.abastecimiento
+  - id: detectar.comercial.descuento_en_exceso
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: descuento_en_exceso }
+    si: detectar.comercial.descuento_en_exceso.tope
+    no: detectar.comercial.margen_bruto_negativo
+  - id: detectar.comercial.descuento_en_exceso.tope
+    fundamento: com-pol-002.s2
+    predicado: { lee: kpi.descuento_en_exceso.descuento_en_exceso, op: ">", umbral: descuento_en_exceso }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.comercial.margen_bruto_negativo
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: margen_bruto_negativo }
+    si: detectar.comercial.margen_bruto_negativo.bajo_costo
+    no: fin.sin_alerta
+  - id: detectar.comercial.margen_bruto_negativo.bajo_costo
+    fundamento: com-pol-002.s4
+    predicado: { lee: kpi.margen_bruto_negativo.margen_bruto, op: "<", umbral: margen_bruto_negativo }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.abastecimiento
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: en, valor: [variacion_costo_pct, dias_retraso] }
+    si: detectar.abastecimiento.variacion_costo_pct
+    no: detectar.clientes
+  - id: detectar.abastecimiento.variacion_costo_pct
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: variacion_costo_pct }
+    si: detectar.abastecimiento.variacion_costo_pct.alza
+    no: detectar.abastecimiento.dias_retraso
+  - id: detectar.abastecimiento.variacion_costo_pct.alza
+    fundamento: ope-pol-007.s4
+    predicado: { lee: kpi.variacion_costo_pct.variacion_pct, op: ">", umbral: variacion_costo_pct }
+    si: detectar.abastecimiento.variacion_costo_pct.sin_traslado
+    no: fin.sin_alerta
+  - id: detectar.abastecimiento.variacion_costo_pct.sin_traslado
+    fundamento: ope-pol-007.s4
+    predicado: { lee: kpi.variacion_costo_pct.dias_habiles_sin_traslado, op: ">", umbral: variacion_costo_pct }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.abastecimiento.dias_retraso
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: dias_retraso }
+    si: detectar.abastecimiento.dias_retraso.atraso
+    no: fin.sin_alerta
+  - id: detectar.abastecimiento.dias_retraso.atraso
+    fundamento: ope-pol-007.s3
+    predicado: { lee: kpi.dias_retraso.dias_retraso, op: ">", umbral: dias_retraso }
+    si: detectar.abastecimiento.dias_retraso.pendiente
+    no: fin.sin_alerta
+  - id: detectar.abastecimiento.dias_retraso.pendiente
+    fundamento: ope-pol-007.s3
+    predicado: { lee: kpi.dias_retraso.recibida, op: "=", umbral: dias_retraso }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: detectar.clientes
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: en, valor: [veces_intervalo_habitual] }
+    si: detectar.clientes.veces_intervalo_habitual
+    no: fin.sin_alerta
+  - id: detectar.clientes.veces_intervalo_habitual
+    fundamento: iso31000.6.4.2
+    predicado: { lee: estado.candidato.metrica, op: "=", valor: veces_intervalo_habitual }
+    si: detectar.clientes.veces_intervalo_habitual.historial
+    no: fin.sin_alerta
+  - id: detectar.clientes.veces_intervalo_habitual.historial
+    fundamento: kit.umbrales
+    predicado: { lee: kpi.veces_intervalo_habitual.pedidos, op: ">=", umbral: veces_intervalo_habitual }
+    si: detectar.clientes.veces_intervalo_habitual.inactividad
+    no: fin.sin_alerta
+  - id: detectar.clientes.veces_intervalo_habitual.inactividad
+    fundamento: kit.umbrales
+    predicado: { lee: kpi.veces_intervalo_habitual.veces_intervalo_habitual, op: ">", umbral: veces_intervalo_habitual }
+    si: hoja.vigia.titular
+    no: fin.sin_alerta
+  - id: hoja.vigia.titular
+    hoja: { agente: vigia, decision: titular, skill: vigia/contrato.md }
+    sigue: hoja.analista.explicar
+  - id: hoja.analista.explicar
+    hoja: { agente: analista, decision: explicar, skill: analista/contrato.md }
+    sigue: explicar.misma_causa
+  - id: explicar.misma_causa
+    fundamento: iso9001.10.2.1.b.3
+    predicado: { lee: estado.same_cause_as, op: existe }
+    si: explicar.destino_analizado
+    no: explicar.con_evidencia
+  - id: explicar.destino_analizado
+    fundamento: iso9001.10.2.1.b.3
+    predicado: { lee: estado.same_cause_as.status, op: en, valor: [en análisis, propuesta] }
+    si: fin.unida
+    no: explicar.destino_nuevo
+  - id: explicar.destino_nuevo
+    fundamento: iso9001.10.2.1.b.3
+    predicado: { lee: estado.same_cause_as.status, op: "=", valor: nueva }
+    si: explicar.con_evidencia
+    no: explicar.con_evidencia
+  - id: explicar.con_evidencia
+    fundamento: iso9001.10.2.1.b.2
+    predicado: { lee: estado.cause.kind, op: "=", valor: identified }
+    si: hoja.estratega.proponer
+    no: hoja.estratega.revision_manual
+  - id: hoja.estratega.proponer
+    hoja: { agente: estratega, decision: proponer, skill: estratega/contrato.md }
+    sigue: proponer.causa_insuficiente
+  - id: proponer.causa_insuficiente
+    fundamento: iso31000.6.4.4
+    predicado: { lee: estado.insufficient_cause, op: existe }
+    si: proponer.retorno_disponible
+    no: proponer.con_acciones
+  - id: proponer.retorno_disponible
+    fundamento: iso9001.10.2.1.b.2
+    predicado: { lee: estado.analyst_returns, op: "=", valor: 0 }
+    si: hoja.analista.explicar
+    no: hoja.estratega.revision_manual
+  - id: proponer.con_acciones
+    fundamento: iso31000.6.5.2
+    predicado: { lee: estado.actions, op: existe }
+    si: aprobar.decision
+    no: hoja.estratega.revision_manual
+  - id: hoja.estratega.revision_manual
+    hoja: { agente: estratega, decision: revision_manual, skill: estratega/acciones.md }
+    sigue: aprobar.decision
+  - id: aprobar.decision
+    fundamento: iso42001.anexo-a.supervision-humana
+    predicado: { lee: estado.decision.kind, op: en, valor: [approve, edit] }
+    si: ejecutar.vigente
+    no: aprobar.recargar
+  - id: aprobar.recargar
+    fundamento: iso31000.6.5.3
+    predicado: { lee: estado.decision.kind, op: "=", valor: request_changes }
+    si: aprobar.recarga_disponible
+    no: fin.rechazada
+  - id: aprobar.recarga_disponible
+    fundamento: iso31000.6.5.3
+    predicado: { lee: estado.proposal_returns, op: "=", valor: 0 }
+    si: hoja.estratega.proponer
+    no: fin.recarga_agotada
+  - id: ejecutar.vigente
+    fundamento: iso9001.10.2.1.c
+    predicado: { lee: estado.detection.vigente, op: "=", valor: true }
+    si: ejecutar.automatizable
+    no: fin.ya_no_aplica
+  - id: ejecutar.automatizable
+    fundamento: iso9001.10.2.1.c
+    predicado: { lee: estado.action.type, op: en, valor: [email_draft, task, purchase_order_draft, price_change_draft] }
+    si: hoja.ejecutor.ejecutar
+    no: hoja.ejecutor.nota_manual
+  - id: hoja.ejecutor.ejecutar
+    hoja: { agente: ejecutor, decision: ejecutar, skill: ejecutor/contrato.md }
+    sigue: ejecutar.resultado
+  - id: hoja.ejecutor.nota_manual
+    hoja: { agente: ejecutor, decision: nota_manual, skill: ejecutor/contrato.md }
+    sigue: ejecutar.resultado
+  - id: ejecutar.resultado
+    fundamento: iso9001.10.2.1.c
+    predicado: { lee: estado.executed_action, op: existe }
+    si: fin.ejecutada
+    no: fin.fallo_ejecucion

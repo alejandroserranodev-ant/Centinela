@@ -10,7 +10,7 @@ import {
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
 import { getAlert, getQuery } from '../api/client';
-import type { Alert, Evidence, Query } from '../api/types';
+import type { Alert, Evidence, MergedAlert, Query } from '../api/types';
 import { Confidence, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
@@ -33,6 +33,29 @@ function Proof({ evidence }: { evidence: Evidence }) {
       {evidence.series && source ? (
         <SeriesChart title={sourceTitle(source.source)} name={source.description} series={evidence.series} unit={unit} />
       ) : null}
+    </li>
+  );
+}
+
+function Merged({ alert }: { alert: MergedAlert }) {
+  return (
+    <li className="arena-stack arena-stack--group">
+      <p>
+        <SentenceWithFigures text={alert.title.text} figures={alert.title.figures} />
+      </p>
+      <p className="text-muted">
+        Detectada el {formatDate(alert.simulatedDate)}, con <LinkedFigure figure={alert.pesosAtRisk} /> en riesgo que no se
+        suman a los de esta alerta.
+      </p>
+      {alert.cause.kind === 'identified' ? (
+        <ul className="arena-stack evidence-list">
+          {alert.cause.evidence.map((e) => (
+            <Proof key={e.queryId + e.claim.text} evidence={e} />
+          ))}
+        </ul>
+      ) : (
+        <p>{alert.cause.reason}</p>
+      )}
     </li>
   );
 }
@@ -167,6 +190,20 @@ export function AlertDetail({ id }: { id: string }) {
               <ul className="arena-stack evidence-list">
                 {alert.cause.evidence.map((e) => (
                   <Proof key={e.queryId + e.claim.text} evidence={e} />
+                ))}
+              </ul>
+            </ArenaSection>
+          ) : null}
+
+          {alert.mergedAlerts?.length ? (
+            <ArenaSection
+              title="Alertas con la misma causa"
+              headingLevel="h3"
+              description="Se unieron a esta porque la misma causa las explica. Su evidencia lo prueba."
+            >
+              <ul className="arena-stack">
+                {alert.mergedAlerts.map((m) => (
+                  <Merged key={m.id} alert={m} />
                 ))}
               </ul>
             </ArenaSection>

@@ -93,7 +93,7 @@ export function Inbox() {
     );
   }
 
-  const visible = alerts?.filter((a) => passesFilter(a, filter)) ?? null;
+  const visible = alerts?.filter((a) => a.status !== 'merged' && passesFilter(a, filter)) ?? null;
 
   return (
     <div className="arena-band page arena-stack arena-stack--section">

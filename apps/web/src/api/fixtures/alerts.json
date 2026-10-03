@@ -52,6 +52,40 @@
         }
       ]
     },
+    "mergedAlerts": [
+      {
+        "id": "alert-overdue-a-payment-days",
+        "metric": "dias_pago_prom",
+        "simulatedDate": "2026-09-14",
+        "title": {
+          "text": "Cliente de ejemplo A tarda {0} días en pagar sus facturas, por encima de su promedio histórico",
+          "figures": [{ "value": 58, "unit": "days", "queryId": "q-overdue-a-payment-days" }]
+        },
+        "pesosAtRisk": { "value": 62300000, "unit": "COP", "queryId": "q-overdue-a-balance" },
+        "cause": {
+          "kind": "identified",
+          "sentence": {
+            "text": "Sus pagos se alargaron de {0} a {1} días desde junio",
+            "figures": [
+              { "value": 31, "unit": "days", "queryId": "q-overdue-a-payment-days" },
+              { "value": 58, "unit": "days", "queryId": "q-overdue-a-payment-days" }
+            ]
+          },
+          "evidence": [
+            {
+              "claim": {
+                "text": "Las facturas de agosto de 2026 se pagaron en {0} días en promedio, frente a {1} en marzo",
+                "figures": [
+                  { "value": 58, "unit": "days", "queryId": "q-overdue-a-payment-days" },
+                  { "value": 31, "unit": "days", "queryId": "q-overdue-a-payment-days" }
+                ]
+              },
+              "queryId": "q-overdue-a-payment-days"
+            }
+          ]
+        }
+      }
+    ],
     "actions": [
       {
         "id": "overdue-a-reminder",

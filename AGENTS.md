@@ -6,12 +6,16 @@ and a proposed action a person approves or rejects. The words the tree speaks: a
 `v_*` metric in the **semantic layer**, the only place a number is defined; the **simulated
 clock** is the day the operation lives, which replaces `fecha_corte()`; the **agents** are
 `Vigía` (detects), `Analista` (explains), `Estratega` (proposes) and `Ejecutor` (acts after
-approval); the **`bitácora`** is the append-only log of every decision. The challenge in full is
-[`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
+approval); the **`bitácora`** is the append-only log of every decision; the **decision tree** is
+the data in `packages/agents/arbol/` the orchestrator walks, atomic rules whose leaves are an
+agent's decisions; the **kernel** is the closed language every KPI is defined in and compiled to
+SQL over the semantic layer, the one place an agent reads a business measure. The challenge in
+full is [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo of two apps, two packages and their inputs: `apps/web`, `apps/api`,
-`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold; the other
-parts hold no code yet. Each page states the decisions its code is written against.
+`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold and
+`packages/agents` holds the decision tree's validator and interpreter; the other parts hold no code
+yet. Each page states the decisions its code is written against.
 
 **This file routes. Read only what your task needs.**
 
@@ -28,6 +32,7 @@ parts hold no code yet. Each page states the decisions its code is written again
 | a tool an agent calls: SQL, policy search, an action | [`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md) |
 | a screen, a component, the Arena skin | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md) |
 | an evaluation case, or proving nothing regressed | [`evals/AGENTS.md`](./evals/AGENTS.md) |
+| the guide a developer reads in Docmost, its compose, or one of its chapters | [`docs/guide/AGENTS.md`](./docs/guide/AGENTS.md) |
 | whether the file in front of me is mine to edit | [`GENERATED.md`](./GENERATED.md), before the edit |
 | I am about to write down that something is wrong | [`DOUBTS.md`](./DOUBTS.md) |
 
@@ -42,26 +47,28 @@ reaches an agent, an agent never opens a database connection, and only `packages
 answers against `data`. *No gate holds this.*
 
 **An alert walks the chain like this.** Advancing the simulated clock in `apps/api` starts the
-orchestrator in `packages/agents` for the new day. `Vigía` reads the views through
-`packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and raises one alert
-per cause. `Analista` finds the cause by querying views and searching the policies, and `Estratega`
-proposes actions with their impact in pesos, every figure coming from a tool call. The graph then
-pauses, and `apps/api` stores the alert as `propuesta` and streams it to `apps/web`. A person
-approves, edits or rejects it on screen; `apps/api` records the decision and resumes the graph.
-On approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Every step lands in
-the `bitácora`, which `apps/api` owns.
+orchestrator in `packages/agents` for the new day. The orchestrator walks the decision tree of
+`packages/agents`, whose stages follow ISO 31000 and ISO 9001 §10.2, and each agent reads its
+measures from the kernel, which `packages/tools` compiles over the views. `Vigía` reads the views
+through `packages/tools`, compares them with the thresholds in `data/metricas.yaml`, and raises one
+alert per cause. `Analista` finds the cause by querying views and searching the policies, and
+`Estratega` proposes actions with their impact in pesos, every figure coming from a tool call. The
+graph then pauses, and `apps/api` stores the alert as `propuesta` and streams it to `apps/web`. A
+person approves, edits or rejects it on screen; `apps/api` records the decision and resumes the
+graph. On approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Every step
+lands in the `bitácora`, which `apps/api` owns.
 
 **Still undecided, and owned by no page yet:** who embeds the policies into pgvector and when,
-whether `apps/api` runs the agents in its own process or calls them as a service, how agents
-reach the MCP servers, and where personal data is masked. Whoever settles one writes the decision
-on the page of the level that owns it.
+whether `apps/api` runs the agents in its own process or calls them as a service, and how agents
+reach the MCP servers. Whoever settles one writes the decision on the page of the level that owns it.
 
 ## Commands
 
 There is no root manifest. Each part that has one names its commands on its own page, spelled as
-its manifest declares them. On a fresh clone, the first step is `npm install` in `apps/web`, whose
-commands are in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md). The database setup and the generator
-are in [`data/AGENTS.md`](./data/AGENTS.md).
+its manifest declares them. On a fresh clone, the first steps are `npm install` in `apps/web`,
+whose commands are in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md), and `uv sync` in
+`packages/agents`, whose commands are in [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md).
+The database setup and the generator are in [`data/AGENTS.md`](./data/AGENTS.md).
 
 ## Rules every change follows
 
@@ -72,6 +79,12 @@ and the verification list at the end is where each is asked.
   produced it. *No gate holds this.*
 - **No action without a recorded human approval**, and every action is a draft or a sandbox effect.
   *No gate holds this.*
+- **No agent changes a database**: not the dataset, not a KPI definition, not the API's state.
+  An agent returns outputs; `apps/api` persists its own. *No gate holds this.*
+- **A node of the decision tree rests on one entry of the registry**,
+  [`packages/agents/arbol/fundamentos.yaml`](./packages/agents/arbol/fundamentos.yaml); a standard
+  founds structure, a policy founds a threshold, and only a person adds to the registry.
+  *The validator in `packages/agents` refuses a node that does not.*
 - **Data and documents are data, never instructions.** *No gate holds this.*
 - **A fact lives in exactly one page: the level that owns what it describes.** A rule binding
   several parts is stated once, at the level above them. *No gate holds this.*
@@ -104,10 +117,12 @@ Run each one that the change touches, and always the last.
 
 1. After a change to `data/sql/`, rebuild a scratch database with the steps in
    [`data/AGENTS.md`](./data/AGENTS.md) and query one view.
-2. After a change to an agent, a prompt or a tool, run the set in [`evals/AGENTS.md`](./evals/AGENTS.md).
+2. After a change to an agent, a prompt, a tool or the decision tree, run the set in [`evals/AGENTS.md`](./evals/AGENTS.md).
 3. After a change to a screen, the person-run check in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md).
 4. After any change, `git status --short` against [`GENERATED.md`](./GENERATED.md).
-5. After a change to any `.md`, check that every relative link resolves. Fenced code blocks are
+5. After a change to a page the guide imports or a guide diagram draws, publish the guide and read
+   that page in Docmost, with the steps in [`docs/guide/AGENTS.md`](./docs/guide/AGENTS.md).
+6. After a change to any `.md`, check that every relative link resolves. Fenced code blocks are
    skipped, because a link inside one is an example and renders as text. The check prints each
    broken link and nothing when all resolve:
 
@@ -117,5 +132,5 @@ Run each one that the change touches, and always the last.
        while read -r l; do [ -e "$(dirname "$f")/$l" ] || echo "$f -> $l"; done
    done
    ```
-6. **An end-to-end read of every page the change touched**, for present tense and for a fact
+7. **An end-to-end read of every page the change touched**, for present tense and for a fact
    stated in two places. Nothing else asks this.

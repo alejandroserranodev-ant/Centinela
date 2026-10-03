@@ -14,6 +14,7 @@ import type {
   AgentStep,
   Alert,
   AlertFilter,
+  Cause,
   ChatEvent,
   ChatMessage,
   ChatQuestion,
@@ -30,7 +31,7 @@ import type {
   User,
 } from './types';
 
-type AlertFixture = Omit<Alert, 'status' | 'executedAction'> & {
+type AlertFixture = Omit<Alert, 'status' | 'executedAction' | 'changesRequested'> & {
   script: Record<'analista' | 'estratega', string>;
 };
 
@@ -169,6 +170,21 @@ export async function decide(id: string, decision: Decision): Promise<Alert> {
     return copy(alert);
   }
 
+  if (decision.kind === 'request_changes') {
+    const reason = decision.reason.trim();
+    if (!reason) {
+      throw new ApiError(422, 'Para pedir cambios hace falta un motivo');
+    }
+    if (alert.changesRequested) {
+      throw new ApiError(422, 'Esta alerta ya pidió cambios una vez');
+    }
+    alert.changesRequested = true;
+    log(alert.id, 'decision', person, `Cambios solicitados. Motivo: ${reason}`);
+    await wait(STEP_DELAY_MS);
+    log(alert.id, 'proposal', { kind: 'agent', agent: 'estratega' }, `Propuesta revisada con el motivo: ${reason}`);
+    return copy(alert);
+  }
+
   const action = alert.actions.find((a) => a.id === decision.actionId);
   if (!action) {
     throw new ApiError(422, 'La acción elegida no pertenece a esta alerta');
@@ -266,7 +282,7 @@ export async function getQuery(id: string): Promise<Query> {
 
 function createAlert(fixture: AlertFixture, status: Alert['status']): Alert {
   const { script: _script, ...data } = structuredClone(fixture);
-  const alert: Alert = { ...data, status };
+  const alert: Alert = { ...data, status, changesRequested: false };
   alerts.set(alert.id, alert);
   return alert;
 }
@@ -348,20 +364,23 @@ function normalize(text: string): string {
 }
 
 function resolveAlert(fixture: AlertFixture): AlertFixture {
-  const cause: AlertFixture['cause'] =
-    fixture.cause.kind === 'identified'
-      ? {
-          ...fixture.cause,
-          sentence: resolveSentence(fixture.cause.sentence),
-          evidence: fixture.cause.evidence.map((e) => ({ ...e, claim: resolveSentence(e.claim) })),
-        }
-      : fixture.cause;
   return {
     ...fixture,
     title: resolveSentence(fixture.title),
-    cause,
+    cause: resolveCause(fixture.cause),
     actions: fixture.actions.map((a) => ({ ...a, description: resolveSentence(a.description) })) as Alert['actions'],
+    mergedAlerts: fixture.mergedAlerts?.map((m) => ({ ...m, title: resolveSentence(m.title), cause: resolveCause(m.cause) })),
   };
+}
+
+function resolveCause(cause: Cause): Cause {
+  return cause.kind === 'identified'
+    ? {
+        ...cause,
+        sentence: resolveSentence(cause.sentence),
+        evidence: cause.evidence.map((e) => ({ ...e, claim: resolveSentence(e.claim) })),
+      }
+    : cause;
 }
 
 function resolveSentence(sentence: Sentence): Sentence {

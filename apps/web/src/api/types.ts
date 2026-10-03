@@ -1,4 +1,4 @@
-export type AlertStatus = 'new' | 'analyzing' | 'proposed' | 'approved' | 'rejected' | 'executed';
+export type AlertStatus = 'new' | 'analyzing' | 'proposed' | 'approved' | 'rejected' | 'executed' | 'merged';
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -100,7 +100,12 @@ export interface Alert {
   cause: Cause;
   actions: Actions;
   executedAction?: ExecutedAction;
+  changesRequested: boolean;
+  mergedInto?: string;
+  mergedAlerts?: MergedAlert[];
 }
+
+export type MergedAlert = Pick<Alert, 'id' | 'metric' | 'simulatedDate' | 'title' | 'pesosAtRisk' | 'cause'>;
 
 export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor';
 
@@ -162,7 +167,8 @@ export type ChatEvent =
 export type Decision =
   | { kind: 'approve'; actionId: string }
   | { kind: 'edit'; actionId: string; parameters: Record<string, string | number> }
-  | { kind: 'reject'; reason: string };
+  | { kind: 'reject'; reason: string }
+  | { kind: 'request_changes'; reason: string };
 
 export interface ChatQuestion {
   question: string;

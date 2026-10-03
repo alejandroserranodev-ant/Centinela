@@ -8,7 +8,7 @@ import { useSimulation } from '../state/Simulation';
 import { formatFigure } from '../format';
 import { parameterName } from '../actionParameters';
 import { EditDialog } from './EditDialog';
-import { RejectDialog } from './RejectDialog';
+import { ReasonDialog } from './ReasonDialog';
 
 const TYPE: Record<ActionType, string> = {
   email_draft: 'Borrador de correo',
@@ -32,6 +32,7 @@ export function ProposedActions({ alert }: { alert: Alert }) {
   const [approving, setApproving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const chosen = alert.actions.find((a) => a.id === chosenId) ?? alert.actions[0];
 
   const send = async (decision: Decision) => {
@@ -39,6 +40,8 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       const result = await decide(alert.id, decision);
       if (decision.kind === 'reject') {
         notify({ tone: 'neutral', title: 'Propuesta rechazada', message: 'El motivo quedó en la bitácora.' });
+      } else if (decision.kind === 'request_changes') {
+        notify({ tone: 'neutral', title: 'Cambios solicitados', message: 'La propuesta se revisará con tu motivo.' });
       } else {
         notify({
           tone: 'success',
@@ -48,12 +51,14 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       }
       setEditing(false);
       setRejecting(false);
+      setRequesting(false);
       changed();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         notify({ tone: 'danger', title: 'Esta alerta ya se decidió', message: 'Recargamos su estado actual.' });
         setEditing(false);
         setRejecting(false);
+        setRequesting(false);
         changed();
         return;
       }
@@ -122,6 +127,11 @@ export function ProposedActions({ alert }: { alert: Alert }) {
         <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
           Editar
         </ArenaButton>
+        {alert.changesRequested ? null : (
+          <ArenaButton variant="secondary" icon="ph-bold ph-arrow-counter-clockwise" onClick={() => setRequesting(true)}>
+            Solicitar cambios
+          </ArenaButton>
+        )}
         <ArenaButton variant="danger" icon="ph-bold ph-x" onClick={() => setRejecting(true)}>
           Rechazar
         </ArenaButton>
@@ -129,13 +139,43 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       <p className="text-muted">
         Aprobar deja un borrador o una tarea: nada se envía ni se publica hasta que una persona lo haga.
       </p>
+      {alert.changesRequested ? (
+        <p className="text-muted">Ya se pidieron cambios una vez: queda aprobar, editar o rechazar.</p>
+      ) : null}
       <EditDialog
         action={chosen}
         open={editing}
         onClose={() => setEditing(false)}
         onApprove={(parameters) => send({ kind: 'edit', actionId: chosen.id, parameters })}
       />
-      <RejectDialog open={rejecting} onClose={() => setRejecting(false)} onReject={(reason) => send({ kind: 'reject', reason })} />
+      <ReasonDialog
+        open={requesting}
+        eyebrow="Solicitar cambios"
+        title="¿Qué debe cambiar en la propuesta?"
+        hint="El motivo queda en la bitácora, y la propuesta se revisa una sola vez."
+        label="Qué debe cambiar"
+        missing="Escribe qué debe cambiar para continuar."
+        failure="No se pudo registrar la solicitud. Inténtalo de nuevo."
+        confirm="Solicitar cambios"
+        variant="primary"
+        icon="ph-bold ph-arrow-counter-clockwise"
+        onClose={() => setRequesting(false)}
+        onSend={(reason) => send({ kind: 'request_changes', reason })}
+      />
+      <ReasonDialog
+        open={rejecting}
+        eyebrow="Rechazar"
+        title="¿Por qué rechazas la propuesta?"
+        hint="El motivo queda en la bitácora junto a tu nombre."
+        label="Motivo del rechazo"
+        missing="Escribe el motivo del rechazo para continuar."
+        failure="No se pudo registrar el rechazo. Inténtalo de nuevo."
+        confirm="Rechazar"
+        variant="danger"
+        icon="ph-bold ph-x"
+        onClose={() => setRejecting(false)}
+        onSend={(reason) => send({ kind: 'reject', reason })}
+      />
     </div>
   );
 }
