@@ -16,6 +16,7 @@ CAPPED_RETURNS = (
     ("proponer.retorno_disponible", "explicar", "estado.analyst_returns"),
     ("aprobar.recarga_disponible", "proponer", "estado.proposal_returns"),
 )
+BOOLEAN_SPELLINGS = frozenset({"y", "yes", "n", "no", "true", "false", "on", "off"})
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,12 @@ def atomicity_problems(tree: Tree) -> list[str]:
             found.append(f"{node.id} compares a KPI with a valor; a KPI takes an umbral")
         if not kpi and predicate.umbral is not None:
             found.append(f"{node.id} bounds a state field with an umbral; a state field takes a valor")
+        values = predicate.valor if isinstance(predicate.valor, list) else [predicate.valor]
+        found += [
+            f"{node.id} writes a boolean as {value}; write true or false"
+            for value in values
+            if isinstance(value, str) and value.lower() in BOOLEAN_SPELLINGS
+        ]
     return found
 
 

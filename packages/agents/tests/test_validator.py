@@ -120,6 +120,8 @@ PLANTED = [
     ("threshold on a column the kpi lacks", set_threshold("saldo_vencido", "saldo_abierto", {"columna": "cupo_inventado"}), "reads cupo_inventado, which kpi.saldo_vencido does not build"),
     ("L1 node absent from the base", add_node({"id": "explicar.nuevo", **ANY_STATE}), "L1 node explicar.nuevo is absent from the base"),
     ("law on an unregistered id", set_law(0, "iso9999.1"), "law cifra_de_consulta rests on iso9999.1, absent from fundamentos.yaml"),
+    ("boolean written as text", set_predicate("detectar.raiz", valor="True"), "detectar.raiz writes a boolean as True; write true or false"),
+    ("boolean in a list written as text", set_predicate("aprobar.decision", valor=["approve", "yes"]), "aprobar.decision writes a boolean as yes; write true or false"),
     ("orphan entry", add_orphan, "hoja.vigia.huerfana is unreachable from detectar.raiz"),
     ("base leaf decision changed", set_leaf("hoja.vigia.titular", decision="detectar"), "leaf hoja.vigia.titular differs from the base"),
     ("return the interpreter does not count", add_return, "cycle"),

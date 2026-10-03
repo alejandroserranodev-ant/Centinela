@@ -310,6 +310,8 @@ return, `centinela_agents/graph.py:LEAF_OUTPUTS`, so a second proposal never kee
 
 - a node fails the schema, or a predicate fails the atomicity test: more than one operand, an
   `umbral` and a `valor` together, `en` without a closed list;
+- a `valor` spells a boolean another way, `True`, `yes`, `on` or the like: the tree's YAML reads only
+  `true` and `false` as booleans, so any other spelling would be text that never equals a boolean;
 - a node lacks its `fundamento`, its `si` or its `no`, or rests on an id absent from the registry;
 - a path from `detectar.raiz` reaches an `Ejecutor` leaf without passing `aprobar.decision` and
   `ejecutar.vigente`;
