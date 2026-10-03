@@ -84,7 +84,7 @@ Representative rows:
 
 | Today | In the tree |
 |---|---|
-| `analizar` → `unir` when `same_cause_as` names an open alert | node `explicar.misma_causa`, `lee: estado.same_cause_as`, `op: existe`, `fundamento: "ISO 9001:2015 §10.2.1 b) 3)"` |
+| `analizar` → `unir` when `same_cause_as` names an open alert | node `explicar.misma_causa`, `lee: estado.same_cause_as`, `op: existe`, `fundamento: iso9001.10.2.1.b.3` |
 | `proponer` → `analizar` when `insufficient_cause` and `analyst_returns` is 0 | two nodes: `proponer.causa_insuficiente` (`existe`), then `proponer.retorno_disponible` (`analyst_returns` `=` 0); two predicates, so two nodes |
 | `esperar_decision` → `ejecutar` on `approve` or `edit` | gate `aprobar.decision`, `lee: estado.decision.kind`, `op: en`, list `[approve, edit]` |
 
