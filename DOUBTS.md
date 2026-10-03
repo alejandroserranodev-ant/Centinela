@@ -19,14 +19,16 @@ the next reader does not propose it again.
 
 ## Where a debt goes, in order of preference
 
-The first five fail when they stop being true; a paragraph does not.
+Paying a debt leaves nothing to record. Each of the next four places fails when its record stops
+being true; a paragraph does not.
 
 1. **Pay it.** A defect that can be fixed is work, not debt.
-2. **A gate with a reason-carrying map**, once gates exist: each entry names a case and says why,
-   as a string value, and a stale entry fails the gate.
+2. **A gate with a reason-carrying map**: each entry names a case and says why, as a string value,
+   and a stale entry fails the gate. The gates and their maps are in
+   [`scripts/check/AGENTS.md`](./scripts/check/AGENTS.md).
 3. **A test assertion.**
 4. **The level's own `AGENTS.md`**, where the rule the limit qualifies is stated. The clock section
-   of [`data/AGENTS.md`](./data/AGENTS.md) is one: views that ignore the simulated day.
+   of [`data/AGENTS.md`](./data/AGENTS.md#the-simulated-clock) is one: views that ignore the simulated day.
 5. **The one header** a script or a test is allowed.
 6. **A paragraph here**, written as what is wrong, what it costs, and the command that re-derives it.
 
@@ -55,3 +57,12 @@ It costs a requirement that nobody can check against its source, and a missing s
 hold the criteria the jury scores. It is paid when the complete deck replaces the PDF and the
 challenge page is re-read against it. Re-derive it with
 `pdftotext -layout docs/challenge/hackathon-brief.pdf - | grep -n "Evaluación\|Criterios\|oculto\|Escenarios"`.
+
+**The guide's code inventory names its parts in code.** `docs/guide/publish.py:inventory(stamp)`
+counts the code, configuration, documents and data of each part from a list written in the
+function, not from the tree, so a part missing from that list is missing from the inventory
+Docmost shows, and nothing fails. `scripts/check` is such a part. It costs a reader of the guide a
+wrong picture of where code lives, and a new part costs an edit to `docs/guide/publish.py` that
+nothing asks for. It is paid when the function derives the parts from the tree. Re-derive the gap
+by comparing the list in the function with the tree's directories that hold code:
+`grep -n 'parts = ' docs/guide/publish.py; git ls-files '*.py' '*.ts' '*.tsx' | cut -d/ -f1-2 | sort -u`.
