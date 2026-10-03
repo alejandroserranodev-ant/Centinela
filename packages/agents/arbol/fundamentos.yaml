@@ -65,3 +65,30 @@ fundamentos:
   - id: iso22400-2.descripcion-kpi
     cita: "ISO 22400-2:2014, KPI description structure"
     funda: "the fields of a KPI in the kernel: name, id, description, scope, formula, unit, range, trend, timing, audience"
+  - id: fin-pol-004.s3
+    cita: "FIN-POL-004 §3, Cupo de crédito"
+    funda: "the threshold that a customer's open balance stays within its cupo_credito"
+  - id: fin-pol-004.s4
+    cita: "FIN-POL-004 §4, Seguimiento y escalamiento"
+    funda: "the threshold on the days an invoice is past due, and the tramos of escalation"
+  - id: fin-pol-004.s5
+    cita: "FIN-POL-004 §5, Señales de alerta temprana"
+    funda: "the thresholds on a customer's share of the past-due receivables and on the rise of its days to pay"
+  - id: com-pol-002.s2
+    cita: "COM-POL-002 §2, Topes de descuento por segmento"
+    funda: "the threshold that a discount stays within its segment's cap"
+  - id: com-pol-002.s4
+    cita: "COM-POL-002 §4, Prohibiciones"
+    funda: "the threshold that no line is sold below cost"
+  - id: ope-pol-007.s2
+    cita: "OPE-POL-007 §2, Cobertura mínima"
+    funda: "the thresholds on the days of stock a class A or B SKU covers"
+  - id: ope-pol-007.s3
+    cita: "OPE-POL-007 §3, Proveedores"
+    funda: "the threshold that a purchase order arrives by its expected date"
+  - id: ope-pol-007.s4
+    cita: "OPE-POL-007 §4, Revisión de precios"
+    funda: "the thresholds on a cost increase the list price does not pass on, and on a line below its minimum margin"
+  - id: kit.umbrales
+    cita: "the challenge kit's metricas.yaml, where fuente_umbral is kit"
+    funda: "the thresholds the kit sets with no policy behind them: the drop of a line's margin, and the inactivity of a customer"
