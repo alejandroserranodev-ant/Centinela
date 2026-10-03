@@ -94,6 +94,12 @@ def test_a_new_bound_of_the_language_is_refused(change, path):
         pytest.param("saldo_vencido", lambda b: b.update(derivadas={"d": {"si": {"cuando": "saldo_abierto", "entonces": 1, "sino": 0}}}), "lenguaje", "cuando", id="if-on-a-number"),
         pytest.param("dias_retraso", lambda b: b.update(derivadas={"d": {"participacion": "fecha_esperada"}}), "lenguaje", "participacion", id="share-of-a-date"),
         pytest.param("saldo_vencido", lambda b: b.update(derivadas={"d": {"periodo_anterior": "saldo_vencido"}}), "lenguaje", "exactly one", id="previous-period-without-a-period"),
+        pytest.param("cobertura_dias", lambda b: b["tomar"]["precio"].update(por={"sku": "precio.sku"}), "fuente", "neither the source", id="taken-by-its-own-column"),
+        pytest.param("cobertura_dias", lambda b: b["tomar"]["precio"].update(por={"sku": "pendientes.sku"}), "fuente", "neither the source", id="taken-by-a-later-taken-kpi"),
+        pytest.param("descuento_en_exceso", lambda b: b["derivadas"].update(d={"participacion": "exceso_semana_anterior"}), "lenguaje", "every row", id="share-of-a-previous-period"),
+        pytest.param("descuento_en_exceso", lambda b: b["derivadas"].update(s={"participacion": "descuento_en_exceso"}, d={"periodo_anterior": "s"}), "lenguaje", "every row", id="previous-period-of-a-share"),
+        pytest.param("descuento_en_exceso", lambda b: b["derivadas"].update(s={"op": "+", "izq": "exceso_semana_anterior", "der": 1}, d={"participacion": "s"}), "lenguaje", "every row", id="share-of-a-column-over-a-window"),
+        pytest.param("dias_pago_prom", lambda b: b["columnas"].update(valor={"agregado": "count"}), "lenguaje", "unique name", id="a-column-named-valor"),
     ],
 )
 def test_a_new_primitive_the_kernel_cannot_bound_is_refused(metric, change, guard, words):

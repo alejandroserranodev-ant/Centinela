@@ -13,7 +13,8 @@ from .sources import Join, Source, Sources, Table
 COMPILER_VERSION = "2"
 NAME = re.compile(r"^[a-z][a-z0-9_]{0,60}$")
 NUMERIC = frozenset({"integer", "bigint", "numeric"})
-RESERVED = frozenset({"dia", "periodo"})
+RESERVED = frozenset({"dia", "periodo", "valor"})
+WINDOWS = ("participacion", "periodo_anterior")
 LITERALS = {"text": (str,), "integer": (int,), "bigint": (int,), "numeric": (int, float), "boolean": (bool,), "date": (str,)}
 TYPES = {
     "text": sql.SQL("text"),
@@ -179,7 +180,11 @@ def event_bounds(scope: Scope, alias: str) -> list[sql.Composable]:
     return [sql.SQL("{} <= {}").format(sql.Identifier(alias, column), scope.day) for column, role in dates.items() if role == "evento"]
 
 
-def taken_join(item: Taken, scope: Scope) -> sql.Composable:
+def taken_join(item: Taken, scope: Scope, before: set[str]) -> sql.Composable:
+    for local in item.on.values():
+        alias = local.partition(".")[0]
+        if alias not in before:
+            raise Refused("fuente", f"tomar: {item.name} joins by {local}, and {alias} is neither the source, a join nor a KPI taken before it")
     if set(item.on) != set(item.compiled.entity):
         raise Refused("fuente", f"tomar: {item.name} joins by {sorted(item.on)}, and must join by the whole entity {list(item.compiled.entity)} of the KPI it takes")
     kinds = dict(item.compiled.columns)
@@ -198,7 +203,10 @@ def from_clause(scope: Scope, joins: list[Join], taken: list[Taken]) -> sql.Comp
         on = [sql.SQL("{} = {}").format(sql.Identifier(join.origin, local), sql.Identifier(join.name, remote)) for local, remote in join.on.items()]
         on += event_bounds(scope, join.name)
         parts.append(sql.SQL("LEFT JOIN {} AS {} ON {}").format(sql.Identifier("centinela", join.table), sql.Identifier(join.name), sql.SQL(" AND ").join(on)))
-    parts += [taken_join(item, scope) for item in taken]
+    before = {scope.source.name, *(join.name for join in joins)}
+    for item in taken:
+        parts.append(taken_join(item, scope, before))
+        before.add(item.name)
     return sql.SQL(" ").join(parts)
 
 
@@ -368,7 +376,7 @@ def dimension(item: Any, scope: Scope) -> tuple[str, sql.Composable, str]:
 def output_names(block: Mapping[str, Any], dims: list) -> list[str]:
     names = [name for name, _, _ in dims] + list(block["salida"].values()) + list(block.get("columnas", {})) + list(block.get("derivadas", {}))
     if len(set(names)) != len(names) or RESERVED & set(names):
-        raise Refused("lenguaje", f"agrupar, salida, columnas and derivadas name {names}: each output column needs a unique name other than dia or periodo")
+        raise Refused("lenguaje", f"agrupar, salida, columnas and derivadas name {names}: each output column needs a unique name other than dia, periodo or valor")
     return names
 
 
@@ -556,14 +564,42 @@ def previous(name: str, available: Mapping[str, tuple[sql.Composable, str]], fra
     return PREVIOUS.format(x=available[name][0], partition=partition, period=sql.Identifier("nucleo", period), step=STEP[period]), available[name][1]
 
 
+def parts_of(node: Any) -> list[Mapping[str, Any]]:
+    if isinstance(node, Mapping):
+        return [node, *(part for child in node.values() for part in parts_of(child))]
+    if isinstance(node, list):
+        return [part for child in node for part in parts_of(child)]
+    return []
+
+
+def read_by(node: Any, thresholds: Mapping[str, Any]) -> set[str]:
+    if isinstance(node, str):
+        return {node}
+    if isinstance(node, list):
+        return set().union(*(read_by(child, thresholds) for child in node))
+    if not isinstance(node, Mapping):
+        return set()
+    if "umbral" in node:
+        spec = thresholds.get(node["umbral"])
+        return {spec[key] for key in ("columna", "por") if key in spec} if isinstance(spec, Mapping) else set()
+    return set().union(*(read_by(child, thresholds) for child in node.values()))
+
+
 def finish(block: Mapping[str, Any], core: Compiled, day: sql.Composable, thresholds: Mapping[str, Any]) -> Compiled:
     available = {name: (sql.Identifier("nucleo", name), kind) for name, kind in core.columns}
     periods = tuple(item["por"] for item in block["agrupar"] if not isinstance(item, str))
     frame = (periods, tuple(name for name in core.entity if name not in periods))
     columns = list(core.columns)
+    windowed: set[str] = set()
     for name, node in block.get("derivadas", {}).items():
+        for part in parts_of(node):
+            for key in WINDOWS:
+                if key in part and part[key] in windowed:
+                    raise Refused("lenguaje", f"derivadas: {name} takes {key} of {part[key]}, which is already computed over every row")
         available[name] = derived(node, available, day, thresholds, frame)
         columns.append((name, available[name][1]))
+        if any(key in part for part in parts_of(node) for key in WINDOWS) or read_by(node, thresholds) & windowed:
+            windowed.add(name)
     places = block.get("decimales", {})
     for name in places:
         if name in core.entity or name not in available or available[name][1] not in NUMERIC:
