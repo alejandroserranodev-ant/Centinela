@@ -13,9 +13,10 @@ SQL over the semantic layer, the one place an agent reads a business measure. Th
 full is [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo of two apps, two packages and their inputs: `apps/web`, `apps/api`,
-`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold and
-`packages/agents` holds the decision tree's validator and interpreter; the other parts hold no code
-yet. Each page states the decisions its code is written against.
+`packages/agents`, `packages/tools`, `data` and `evals`. `apps/web` holds a scaffold,
+`packages/agents` holds the decision tree's validator and interpreter, and `packages/tools` holds
+the KPI kernel; the other parts hold no code yet. Each page states the decisions its code is written
+against.
 
 **This file routes. Read only what your task needs.**
 
@@ -67,7 +68,9 @@ reach the MCP servers. Whoever settles one writes the decision on the page of th
 There is no root manifest. Each part that has one names its commands on its own page, spelled as
 its manifest declares them. On a fresh clone, the first steps are `npm install` in `apps/web`,
 whose commands are in [`apps/web/AGENTS.md`](./apps/web/AGENTS.md), and `uv sync` in
-`packages/agents`, whose commands are in [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md).
+`packages/agents` and in `packages/tools`, whose commands are in
+[`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md) and
+[`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md).
 The database setup and the generator are in [`data/AGENTS.md`](./data/AGENTS.md).
 
 ## Rules every change follows
