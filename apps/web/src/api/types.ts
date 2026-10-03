@@ -100,6 +100,7 @@ export interface Alert {
   cause: Cause;
   actions: Actions;
   executedAction?: ExecutedAction;
+  changesRequested: boolean;
   mergedInto?: string;
   mergedAlerts?: MergedAlert[];
 }

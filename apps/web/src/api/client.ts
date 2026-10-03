@@ -31,7 +31,7 @@ import type {
   User,
 } from './types';
 
-type AlertFixture = Omit<Alert, 'status' | 'executedAction'> & {
+type AlertFixture = Omit<Alert, 'status' | 'executedAction' | 'changesRequested'> & {
   script: Record<'analista' | 'estratega', string>;
 };
 
@@ -84,7 +84,6 @@ let currentSettings = settingsJson as Settings;
 let simulatedDay = clock.initialDay;
 const alerts = new Map<string, Alert>();
 const logEvents: LogEvent[] = [];
-const changesRequested = new Set<string>();
 let sequence = 0;
 
 for (const fixture of fixtures.filter((f) => f.simulatedDate <= simulatedDay)) {
@@ -176,10 +175,10 @@ export async function decide(id: string, decision: Decision): Promise<Alert> {
     if (!reason) {
       throw new ApiError(422, 'Para pedir cambios hace falta un motivo');
     }
-    if (changesRequested.has(alert.id)) {
+    if (alert.changesRequested) {
       throw new ApiError(422, 'Esta alerta ya pidió cambios una vez');
     }
-    changesRequested.add(alert.id);
+    alert.changesRequested = true;
     log(alert.id, 'decision', person, `Cambios solicitados. Motivo: ${reason}`);
     await wait(STEP_DELAY_MS);
     log(alert.id, 'proposal', { kind: 'agent', agent: 'estratega' }, `Propuesta revisada con el motivo: ${reason}`);
@@ -283,7 +282,7 @@ export async function getQuery(id: string): Promise<Query> {
 
 function createAlert(fixture: AlertFixture, status: Alert['status']): Alert {
   const { script: _script, ...data } = structuredClone(fixture);
-  const alert: Alert = { ...data, status };
+  const alert: Alert = { ...data, status, changesRequested: false };
   alerts.set(alert.id, alert);
   return alert;
 }

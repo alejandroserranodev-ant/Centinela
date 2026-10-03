@@ -127,9 +127,11 @@ export function ProposedActions({ alert }: { alert: Alert }) {
         <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
           Editar
         </ArenaButton>
-        <ArenaButton variant="secondary" icon="ph-bold ph-arrow-counter-clockwise" onClick={() => setRequesting(true)}>
-          Solicitar cambios
-        </ArenaButton>
+        {alert.changesRequested ? null : (
+          <ArenaButton variant="secondary" icon="ph-bold ph-arrow-counter-clockwise" onClick={() => setRequesting(true)}>
+            Solicitar cambios
+          </ArenaButton>
+        )}
         <ArenaButton variant="danger" icon="ph-bold ph-x" onClick={() => setRejecting(true)}>
           Rechazar
         </ArenaButton>
@@ -137,6 +139,9 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       <p className="text-muted">
         Aprobar deja un borrador o una tarea: nada se envía ni se publica hasta que una persona lo haga.
       </p>
+      {alert.changesRequested ? (
+        <p className="text-muted">Ya se pidieron cambios una vez: queda aprobar, editar o rechazar.</p>
+      ) : null}
       <EditDialog
         action={chosen}
         open={editing}
