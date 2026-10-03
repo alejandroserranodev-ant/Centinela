@@ -1,6 +1,6 @@
 # Fixtures for the tests marked db. They run only when CENTINELA_TEST_DSN names a scratch PostgreSQL
 # loaded with data/sql/01 to 04 (packages/tools/AGENTS.md starts one); the session applies to it the
-# roles, the grants and the fixture KPIs of tests/fixtures/metricas.yaml, as the generator writes them.
+# roles, the grants, the base KPIs of data/metricas.yaml and the fixture KPIs, as the generator writes them.
 import os
 
 import psycopg
@@ -8,9 +8,10 @@ import pytest
 from psycopg.conninfo import make_conninfo
 
 from centinela_tools.generate import render, view_names
-from centinela_tools.paths import SQL_DIR
+from centinela_tools.paths import METRICAS, SQL_DIR
 from centinela_tools.settings import Settings
 from centinela_tools.sources import load_sources
+from centinela_tools.tools import load_entries
 
 from support import fixture_entries
 
@@ -35,7 +36,7 @@ def open_as(role: str) -> psycopg.Connection:
 @pytest.fixture(scope="session")
 def applied():
     with psycopg.connect(DSN, autocommit=True) as conn:
-        conn.execute(render(load_sources(), fixture_entries(), view_names(SQL_DIR), lambda query: 0.0, Settings()))
+        conn.execute(render(load_sources(), {**load_entries(METRICAS), **fixture_entries()}, view_names(SQL_DIR), lambda query: 0.0, Settings()))
     return True
 
 
