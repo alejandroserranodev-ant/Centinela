@@ -16,8 +16,8 @@ design, not running code.**
 
 | Part | What it decides | Pending design owned by this guide |
 |---|---|---|
-| `data` | [data](../../../data/AGENTS.md): the dataset, the semantic layer, the clock, the generator | the kernel's language and `05_kpis.generated.sql` ([the KPI kernel](./kpi-kernel.md)) |
-| `packages/tools` | [packages/tools](../../../packages/tools/AGENTS.md): SQL, policy search, `calcular_impacto`, actions | the kernel's compiler and its tools |
+| `data` | [data](../../../data/AGENTS.md): the dataset, the semantic layer, the clock, the generator | the `kernel:` block of each current metric ([the KPI kernel](./kpi-kernel.md)) |
+| `packages/tools` | [packages/tools](../../../packages/tools/AGENTS.md): SQL, policy search, `calcular_impacto`, actions | the kernel KPIs that `calcular_impacto` and `Vigía` read |
 | `packages/agents` | [packages/agents](../../../packages/agents/AGENTS.md): the agents, the decision tree and its interpreter; [its skills](../../../packages/agents/skills/AGENTS.md) | the growth of the decision tree ([the decision tree](./decision-tree.md)); `proponer_kpi` |
 | `apps/api` | [apps/api](../../../apps/api/AGENTS.md): the clock, the lifecycle, roles, the `bitácora` | the store of tree versions per client, the KPI catalogue and its lifecycle |
 | `apps/web` | [apps/web](../../../apps/web/AGENTS.md): the inbox, its skin, the simulated API it runs on | the KPI catalogue and proposals, and the expansions list, in `Configuración` |
