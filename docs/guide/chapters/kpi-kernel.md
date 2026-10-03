@@ -3,9 +3,9 @@
 The kernel is a **workbench with a closed language**: it defines every KPI from the same
 primitives, compiles each to SQL in code, refuses anything it cannot bound in cost or in time, and
 is the one place an agent reads a business measure from. A fact it does not measure, such as a
-price or a cost in force, still comes from a `v_*` cause view. The language is [data](../../../data/AGENTS.md)'s, and the compiler, its guards and its tools are [packages/tools](../../../packages/tools/AGENTS.md)'s; this chapter draws them and owns the two parts still to be built.
+supplier or a purchase order, still comes from a `v_*` cause view. The language is [data](../../../data/AGENTS.md)'s, and the compiler, its guards and its tools are [packages/tools](../../../packages/tools/AGENTS.md)'s; this chapter draws them and owns the one part still to be built.
 
-> **Decided, not implemented.** No metric of `metricas.yaml` carries a `kernel:` block yet, so `05_kpis.generated.sql` holds the roles and no function, and no agent calls the kernel's tools. The last two sections are what remains.
+> **Decided, not implemented.** No agent calls the kernel's tools yet, and no KPI is born at runtime. The last section is what remains.
 
 ## Where the kernel is stated
 
@@ -38,15 +38,8 @@ flowchart TB
 
 ## Rebuilding the current metrics
 
-> **Decided, not implemented.** No metric carries a `kernel:` block, and no parity check exists.
-
-Every metric of `metricas.yaml` gains a `kernel:` block and none is dropped or renamed, because the
-skills, the action list, the evals and the web's draft contract name them; the list is
-`grep -oP '^  \K[a-z_]+(?=:)' data/metricas.yaml`. **Parity is checked in two halves**: on
-`fecha_corte()`, where the kit's views are right by definition, the KPI returns the view's rows
-value for value; on earlier simulated days, where the views leak, it is checked against a
-hand-written as-of query. The kit's views stay as delivered, and `pesos_en_riesgo` and every formula
-of `calcular_impacto` read kernel KPIs, so exposure and recovery share one definition.
+Every metric of `metricas.yaml` is a base KPI of the kernel, checked against its view in two
+halves; [data](../../../data/AGENTS.md) states it under "The base KPIs".
 
 ## How a new KPI is born
 
