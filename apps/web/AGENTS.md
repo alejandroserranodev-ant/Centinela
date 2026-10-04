@@ -19,6 +19,8 @@ and what each shows is
 | `src/state/Session.tsx` | the person and token, `signIn`, `signOut`, and `RequireSession`, the guard of every route but `/ingresar` |
 | `src/api/session.ts` | the token's store and the callback a 401 calls, outside React so the fetch client needs none |
 | `src/roles.ts` | the Spanish label of each role |
+| `src/actor.ts` | `who(actor)` and `agentName(agent)`, which name an actor as `Centinela · <stage>` or as a person with the role, for the `Bitácora` and the tree's tab; `src/actor.test.ts` tests it |
+| `src/expansion.ts` | `inactiveLine(reason)`, the Spanish line under an inactive expansion; `src/expansion.test.ts` tests it |
 | `src/api/client.ts` | the one module the screens import the API from; it re-exports `src/api/http-client.ts` |
 | `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
 | `src/api/error-message.ts` | `messageOfError`, which turns an error response into the message of `ApiError`; `src/api/http-client.test.ts` tests it |
@@ -119,6 +121,8 @@ and what each shows is
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
   table, which is why `src/api/types.ts:QuerySource` is `kernel` or `alertas`, and a view's name
   is never a source. A sum taken on screen would be a figure with no query behind it.
+- **A day whose analysis failed ends with a danger notice**: the `end` event's `failure`, written
+  for a manager by `apps/api`, replaces "Sin hallazgos" and "decisiones nuevas".
 - **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's
@@ -161,8 +165,11 @@ and what each shows is
   `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
 - **The tree's tab shows each expansion "Activo", "Inactivo", or "Retirado por" its person with
   the reason**, and offers "Retirar" only on an active one to a person who configures, because an
-  inactive change no longer walks and the API refuses its retirement. It reloads the list after a
-  retirement, so a change that nested under the retired one reads inactive at once.
+  inactive change no longer walks and the API refuses its retirement. An inactive row says why, from
+  `inactiveReason`, and the "Quién" column names an agent as the `Bitácora` does. It reloads the
+  list after a retirement, so a change that nested under the retired one reads inactive at once; a
+  retirement the API refuses shows its message in the dialog, and a 409 reloads the list so the row
+  shows its real status. Evidence links are the `link` button of `src/app.css`, as the `Bitácora`'s.
 - **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
   leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta", naming its
   `mergedInto` by title with the action that opens it, and one with no cause of its own,

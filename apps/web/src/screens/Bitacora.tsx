@@ -12,12 +12,12 @@ import {
   type ArenaTableColumn,
 } from '@dravensoft/arena-react';
 import { ApiError, listAlerts, listBitacora } from '../api/client';
-import type { Actor, Agent, Alert, LogEvent, LogEventType } from '../api/types';
+import type { Alert, LogEvent, LogEventType } from '../api/types';
 import { useSimulation } from '../state/Simulation';
 import { fillSentence, formatShortDate, formatShortDateTime } from '../format';
 import { SentenceWithFigures } from '../common/SentenceWithFigures';
 import { withoutAlert } from '../logEvent';
-import { roleName } from '../roles';
+import { who } from '../actor';
 
 const PAGE_SIZE = 10;
 
@@ -35,14 +35,6 @@ const EVENT: Record<LogEventType, string> = {
   arbol: 'Árbol de decisión',
 };
 
-const STAGE: Record<Agent, string> = {
-  vigia: 'detección',
-  analista: 'análisis',
-  estratega: 'propuesta',
-  ejecutor: 'ejecución',
-  chat: 'chat',
-};
-
 const COLUMNS: ArenaTableColumn[] = [
   { header: 'Registrado (hora real)', width: 'calc(var(--sp-1) * 32)' },
   { header: 'Día de la operación', mono: true, width: 'calc(var(--sp-1) * 28)' },
@@ -52,10 +44,6 @@ const COLUMNS: ArenaTableColumn[] = [
   { header: 'Detalle' },
   { header: 'Fuente', mobileLayout: 'block', width: 'calc(var(--sp-1) * 40)' },
 ];
-
-function who(actor: Actor): string {
-  return actor.kind === 'agent' ? `Centinela · ${STAGE[actor.agent]}` : `${actor.name} (${roleName(actor.role)})`;
-}
 
 function SourceButton({ queryId, open }: { queryId: string; open: (id: string) => void }) {
   return (

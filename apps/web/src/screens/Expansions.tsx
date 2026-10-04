@@ -11,18 +11,12 @@ import {
   type ArenaTableColumn,
 } from '@dravensoft/arena-react';
 import { ApiError, listExpansions, retireExpansion } from '../api/client';
-import type { Agent, TreeExpansion } from '../api/types';
+import type { TreeExpansion } from '../api/types';
+import { agentName } from '../actor';
+import { inactiveLine } from '../expansion';
 import { fillSentence, formatShortDate } from '../format';
 import { useSimulation } from '../state/Simulation';
 import { ReasonDialog } from './ReasonDialog';
-
-const AGENT: Record<Agent, string> = {
-  vigia: 'Vigía',
-  analista: 'Analista',
-  estratega: 'Estratega',
-  ejecutor: 'Ejecutor',
-  chat: 'Chat',
-};
 
 const COLUMNS: ArenaTableColumn[] = [
   { header: 'Día de la operación', mono: true, width: 'calc(var(--sp-1) * 28)' },
@@ -68,7 +62,15 @@ export function Expansions({ allowed }: { allowed: boolean }) {
     if (retiring === null) {
       return;
     }
-    const retired = await retireExpansion(retiring.id, reason);
+    let retired: TreeExpansion;
+    try {
+      retired = await retireExpansion(retiring.id, reason);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        setExpansions(await listExpansions().catch(() => expansions));
+      }
+      throw e;
+    }
     const patched = expansions.map((e) => (e.id === retired.id ? retired : e));
     setExpansions(await listExpansions().catch(() => patched));
     setRetiring(null);
@@ -85,14 +87,14 @@ export function Expansions({ allowed }: { allowed: boolean }) {
         {expansions.map((e) => (
           <ArenaTableRow key={e.id}>
             <ArenaTableCell>{e.simulatedDate ? formatShortDate(e.simulatedDate) : 'Sin día'}</ArenaTableCell>
-            <ArenaTableCell>{AGENT[e.agent]}</ArenaTableCell>
+            <ArenaTableCell>{agentName(e.agent)}</ArenaTableCell>
             <ArenaTableCell>{e.description}</ArenaTableCell>
             <ArenaTableCell>
               <span className="arena-stack">
                 {e.evidence.map((evidence) => (
-                  <ArenaButton key={evidence.alertId} variant="ghost" onClick={() => navigate(`/alertas/${evidence.alertId}`)}>
+                  <button key={evidence.alertId} type="button" className="link" onClick={() => navigate(`/alertas/${evidence.alertId}`)}>
                     {fillSentence(evidence.title.text, evidence.title.figures)}
-                  </ArenaButton>
+                  </button>
                 ))}
               </span>
             </ArenaTableCell>
@@ -102,7 +104,10 @@ export function Expansions({ allowed }: { allowed: boolean }) {
                   Retirado por {e.retiredBy ?? 'alguien'}: {e.retireReason}
                 </span>
               ) : e.status === 'inactive' ? (
-                <ArenaTag>Inactivo</ArenaTag>
+                <span className="arena-stack">
+                  <ArenaTag>Inactivo</ArenaTag>
+                  <span className="text-muted">{inactiveLine(e.inactiveReason)}</span>
+                </span>
               ) : (
                 <span className="arena-stack">
                   <ArenaTag>Activo</ArenaTag>

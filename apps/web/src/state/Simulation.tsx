@@ -132,7 +132,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           setSimulatedDay(event.data.simulatedDay);
           changed();
           const newAlerts = event.data.newAlerts;
-          if (newAlerts.length === 0) {
+          if (event.data.failure !== null) {
+            notify({ tone: 'danger', title: 'El análisis del día no terminó', message: event.data.failure });
+          } else if (newAlerts.length === 0) {
             notify({
               tone: 'neutral',
               title: `Sin hallazgos el ${formatDate(event.data.simulatedDay)}`,
