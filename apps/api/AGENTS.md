@@ -81,7 +81,8 @@ reads the simulated day and the anchored alert, logs the question under the pers
 `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.ask(question, day, alert)`
 through `asyncio.to_thread`. It streams one `step` per node with a Spanish description, then the
 `end`, whose figures pass through `src/centinela_api/agentes.py:_convert_figures(raw)` and whose
-`outcome` names the end the walk reached. A failed call answers `no_evidence`, never an error. The
+`outcome` names the end the walk reached. A failed model call answers `no_evidence`, never an
+error, and its step and kind join the `answer` row, so the log never reads an outage as a refusal. The
 headers default to `Sin nombre` and `lectura`, because reading needs no role.
 
 **`/consultas/{queryId}` serves the call, never runs it**: `api.consultas` holds each

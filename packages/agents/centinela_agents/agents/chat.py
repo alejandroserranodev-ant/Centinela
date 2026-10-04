@@ -31,15 +31,16 @@ CLASSIFY_TOKENS = 80
 ANSWER_TOKENS = 350
 INTENTS = ("dato", "explicar", "que_hacer", "por_que_alerta", "politica", "fuera_de_alcance", "accion")
 ACTION_WORDS = re.compile(
-    r"\b(?:aprueba|apruébala|apruebe|rechaza|rechace|ejecuta|ejecute|envía|envia|manda|borra|elimina|modifica|edita|approve|reject|execute|send|delete)\b",
+    r"\b(?:aprueb[ae]s?|apruébal[ao]s?|aprobar(?:l[ao]s?)?|rechaz[ae]|rechaces|rechazar(?:l[ao]s?)?|ejecut[ae]s?|ejecutar(?:l[ao]s?)?|env[ií][ae]s?|enviar(?:l[ao]s?)?|mand[ae]|mandar|borr[ae]|borrar|elimin[ae]|eliminar|modific[ae]|modifique|modificar|edit[ae]|editar|cerrar(?:l[ao]s?)?|cambiar(?:l[ao]s?)?|cambies|approve|reject|execute|send|delete)\b",
     re.IGNORECASE,
 )
-ENTITY = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+ENTITY = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9_-]{1,40}$")
 MASKED = ("email", "api_key", "token", "password", "credit_card")
 REFUSAL = "No proceso esa pregunta: trae instrucciones. Pregunta por los datos o las alertas."
 OUT_OF_SCOPE = "Solo respondo sobre los datos de la operación, sus alertas y el árbol de decisión. Aprobar, rechazar o ejecutar se hace en la bandeja."
 NO_EVIDENCE = "Los datos del día no responden esa pregunta."
 NO_POLICY = "Todavía no consulto las políticas desde el chat."
+FAILED = "No pude responder: falló el modelo o la conexión. Vuelve a preguntar en un momento."
 ARBOL = Path(__file__).resolve().parents[2] / "arbol"
 REFS = {"type": "array", "items": {"type": "string"}}
 ANSWER_SCHEMA = {
@@ -117,17 +118,11 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
         .add_untrusted_content(masked(question))
         .build()
     )
-    costs: list[dict[str, Any]] = []
-    try:
-        parsed, cost = costed(
-            provider,
-            LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=schema, temperature=0.0, max_tokens=CLASSIFY_TOKENS),
-            "clasificar",
-        )
-        costs.append(cost)
-    except Exception as error:
-        logger.warning("Chat: the classifier failed, the question is out of scope: %s", error)
-        parsed = {}
+    parsed, cost = costed(
+        provider,
+        LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=schema, temperature=0.0, max_tokens=CLASSIFY_TOKENS),
+        "clasificar",
+    )
     intent = parsed.get("intent") if parsed.get("intent") in INTENTS else "fuera_de_alcance"
     if ACTION_WORDS.search(question):
         intent = "accion"
@@ -137,7 +132,7 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
     if metric and kpi is None and chosen is None:
         kpi, chosen = metric, entity
     logger.info("Chat: intent %s, kpi %s, entity %s", intent, kpi, chosen)
-    return {"chat": {**chat, "intent": intent, "kpi": kpi, "entity": chosen}, "costs": costs}
+    return {"chat": {**chat, "intent": intent, "kpi": kpi, "entity": chosen}, "costs": [cost]}
 
 
 def figure_of(raw: Any) -> dict[str, Any] | None:
@@ -185,8 +180,8 @@ def kpi_facts(facts: Facts, ledger, state: Mapping[str, Any], sources: Sources) 
     qid, rows = ledger.consult(kpi, day)
     spec = sources.catalog.kpis[kpi]
     if entity is not None:
-        wanted = [part.strip() for part in entity.split(",")]
-        rows = [row for row in rows if [str(row.get(column)) for column in spec.entity] == wanted]
+        wanted = [part.strip().lower() for part in entity.split(",")]
+        rows = [row for row in rows if [str(row.get(column)).lower() for column in spec.entity] == wanted]
     else:
         rows = sorted(rows, key=lambda row: -(row.get("pesos_en_riesgo") or 0))
     ctx = Context(sources.nodes, sources.metrics, sources.catalog, lambda metric, day: [])
@@ -215,7 +210,10 @@ def alert_facts(facts: Facts, state: Mapping[str, Any]) -> None:
         cause = state.get("cause") or {}
         facts.quote("causa", cause.get("sentence"))
         for item in cause.get("evidence") or []:
-            facts.quote("evidencia de la causa", item.get("claim") if isinstance(item, Mapping) else item)
+            claim = item.get("claim") if isinstance(item, Mapping) else item
+            if isinstance(claim, str) and isinstance(item, Mapping):
+                claim = {"text": claim, "figures": item.get("figures") or []}
+            facts.quote("evidencia de la causa", claim)
     if intent == "que_hacer":
         for action in state.get("actions") or []:
             facts.lines.append(f"acción {action.get('id')}: {action.get('title')} (tipo {action.get('type')})")
@@ -236,7 +234,7 @@ def written(parsed: Mapping[str, Any], facts: Facts, allowed: tuple[str, ...]) -
         text = str(item.get("text") or "").strip()
         refs = cited(text, list(item.get("figures") or []))
         indexes = {int(index) for index in re.findall(r"\{(\d+)\}", text)}
-        if not text or stray_digits(text, allowed) or any(ref not in facts.figures for ref in refs) or len(refs) < len(indexes):
+        if not refs or indexes != set(range(len(refs))) or stray_digits(text, allowed) or any(ref not in facts.figures for ref in refs):
             continue
         offset = len(figures)
         texts.append(re.sub(r"\{(\d+)\}", lambda match: f"{{{int(match.group(1)) + offset}}}", text))
@@ -249,7 +247,8 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
     ledger = sources.ledger()
     facts = Facts()
     alert_facts(facts, state)
-    if chat["intent"] not in ("explicar", "que_hacer") and chat.get("kpi"):
+    anchored_reading = chat["intent"] in ("explicar", "que_hacer") and state.get("alert")
+    if chat.get("kpi") and not anchored_reading:
         kpi_facts(facts, ledger, state, sources)
     queries = merged_queries(state, ledger)
     if not facts.figures:
@@ -267,7 +266,9 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
         LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=ANSWER_SCHEMA, temperature=0.0, max_tokens=ANSWER_TOKENS),
         "responder",
     )
-    allowed = tuple(part for part in (chat.get("entity") or "", entity or "", state["day"], *facts.names) if part)
+    anchor_parts = [str(part) for part in (state.get("alert") or {}).get("entity") or []]
+    names = [*anchor_parts, *facts.names]
+    allowed = tuple(part for part in (state["day"], *names, *(name.lower() for name in names)) if part)
     texts, figures = written(parsed, facts, allowed)
     if not texts:
         return {**no_answer(chat), "queries": queries, "costs": [cost]}
@@ -278,6 +279,8 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
 
 def closing(state: Mapping[str, Any]) -> dict[str, Any]:
     end = state.get("fin")
+    if state.get("failures") and end != "fin.chat_respondida":
+        return ChatAnswer(text=FAILED, enough_evidence=False).model_dump()
     if end == "fin.chat_respondida" and state.get("answer"):
         return dict(state["answer"])
     if end == "fin.chat_rechazada":

@@ -167,3 +167,12 @@ def test_un_fallo_del_orquestador_responde_sin_evidencia(monkeypatch, mundo):
     assert mensaje["outcome"] == "no_evidence"
     assert mensaje["enoughEvidence"] is False
     assert [tipo for _, tipo, *_ in mundo["bitacora"]] == ["question", "answer"]
+
+
+def test_un_fallo_del_modelo_no_se_registra_como_rechazo(monkeypatch, mundo):
+    fallida = {**RECHAZADA, "fin": "fin.chat_fuera_de_alcance", "failures": [{"step": "hoja.chat.clasificar", "kind": "timeout"}]}
+    orquestador(monkeypatch, fallida)
+    mensaje = eventos(TestClient(app).post("/chat", json={"question": "¿Cuánto?"}, headers=CABECERAS).text)[-1][1]
+    assert mensaje["outcome"] == "no_evidence"
+    tipo, detalle = mundo["bitacora"][-1][1], mundo["bitacora"][-1][3]
+    assert tipo == "answer" and "hoja.chat.clasificar: timeout" in detalle

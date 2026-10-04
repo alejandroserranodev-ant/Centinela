@@ -476,3 +476,13 @@ class TestChatInjections:
         assert reply["queries"][0]["consulta"] == "SELECT * FROM k_saldo_vencido(%(dia)s)"
         assert [step["node"] for step in reply["steps"]][-1] == "conversar.con_evidencia"
         assert [cost["step"] for cost in reply["costs"]] == ["clasificar", "responder"]
+
+
+def test_a_model_outage_answers_that_the_model_failed_not_that_the_data_is_silent():
+    from centinela_agents.agents.chat import FAILED
+
+    provider = MagicMock()
+    provider.generate_structured.side_effect = TimeoutError("slow")
+    reply = orchestrator(provider).ask("¿Cuánto debe CLI-001?", "2026-03-02")
+    assert reply["failures"] == [{"step": "hoja.chat.clasificar", "kind": "error"}]
+    assert reply["answer"]["text"] == FAILED

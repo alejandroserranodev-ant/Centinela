@@ -117,6 +117,8 @@ def check_prompt_injection(
         "instruction_override_es": r"(?:ignora|olvida|omite|desobedece|sáltate|saltate)\s+(?:\w+\s+){0,3}?(?:instrucciones|reglas|órdenes|ordenes|restricciones|prompt)",
         "role_change_es": r"(?:ahora eres|actúa como|actua como|finge ser|hazte pasar por)",
         "prompt_leak": r"(?:muestra|revela|imprime|repite|dime|show|reveal|print|repeat)\s+(?:\w+\s+){0,3}?(?:prompt|system prompt|instrucciones|instructions)",
+        "override_es": r"(?:olvídate|olvidate|descarta|desecha|no sigas|nueva regla|a partir de ahora)\b",
+        "override_en": r"(?:disregard|ignore|forget)\s+(?:\w+\s+){0,2}?(?:guidance|guidelines|context|directions)|from now on you are",
         "sql_statement": r"\b(?:drop|delete|truncate|alter|insert|update|grant|revoke)\s+(?:table|from|into|database|schema|role|user)\b",
     }
 

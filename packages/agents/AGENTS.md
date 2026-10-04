@@ -235,15 +235,16 @@ and the only context is the alert it is anchored to.
   returns an intent of `centinela_agents/agents/chat.py:INTENTS`, a KPI of the catalogue and an
   entity, at temperature 0, from a prompt
   `centinela_agents/security.py:SecurePrompt` builds with the question as untrusted content. Code
-  drops a KPI outside the catalogue and an entity the question does not spell, reads a question
-  with an imperative to act as `accion` whatever the model says, and answers `fuera_de_alcance`
-  when the model fails. Anchored to an alert with no KPI named, the KPI and entity are the alert's.
+  drops a KPI outside the catalogue and an entity the question does not spell or that holds no
+  letter, and reads a question with an imperative or an infinitive to act as `accion` whatever the
+  model says. A failed call raises; its fallback is `fuera_de_alcance`, the failure lands in
+  `failures`, and the person reads that the model failed, never that the data is silent. Anchored to an alert with no KPI named, the KPI and entity are the alert's.
 - **`responder`**, `centinela_agents/agents/chat.py:answer(provider, state, sources)`: code
   numbers the facts, the rows of the KPI for the entity, at most three, through `kpi_consultar`;
   the path `centinela_agents/walk.py:walk_from(start, state, row, ctx)` takes for each row through
   `detectar`, every node with its registry entry; or the anchored alert's cause or actions. The
-  model writes at most three sentences citing facts by ref; code drops a sentence that writes a
-  number or cites a ref with no figure, and an answer with no sentence left is
+  model writes at most three sentences citing facts by ref; code drops a sentence that cites no
+  fact, writes a number no fact or entity read holds, or places a placeholder its refs do not fill, and an answer with no sentence left is
   `enough_evidence: false`. Email addresses and keys are masked in the answer.
 - **Tools:** none, for its model or its leaf: `centinela_agents/tools.py:ToolRegistry.get_tools_for_agent(agent)`
   hands `chat` nothing.

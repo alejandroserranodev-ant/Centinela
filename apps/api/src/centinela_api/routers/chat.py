@@ -5,7 +5,7 @@ import uuid
 from urllib.parse import unquote
 
 import psycopg
-from centinela_agents.agents.chat import masked
+from centinela_agents.agents.chat import FAILED, masked
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -19,7 +19,6 @@ from ..sse import flujo
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-FALLO = "No pude responder: falló el modelo o la conexión. Vuelve a preguntar en un momento."
 DESENLACE = {
     "fin.chat_respondida": "answered",
     "fin.chat_sin_evidencia": "no_evidence",
@@ -85,7 +84,14 @@ async def chat(
             )
         except Exception as error:
             logger.error(f"Chat failed: {error}", exc_info=True)
-            respuesta = {"fin": "fin.chat_sin_evidencia", "steps": [], "answer": {"text": FALLO, "figures": [], "enough_evidence": False}, "queries": [], "costs": []}
+            respuesta = {
+                "fin": "fin.chat_sin_evidencia",
+                "steps": [],
+                "answer": {"text": FAILED, "figures": [], "enough_evidence": False},
+                "queries": [],
+                "costs": [],
+                "failures": [{"step": "ask", "kind": type(error).__name__}],
+            }
 
         for paso in respuesta["steps"]:
             descripcion = f"{NODOS.get(paso['node'], paso['node'])}: {RAMAS.get(paso['branch'], paso['branch'])}"
@@ -93,13 +99,15 @@ async def chat(
 
         final = respuesta["answer"]
         figuras = _convert_figures(final.get("figures"))
-        desenlace = DESENLACE.get(respuesta["fin"], "no_evidence")
+        fallos = respuesta.get("failures") or []
+        desenlace = "no_evidence" if fallos and respuesta["fin"] != "fin.chat_respondida" else DESENLACE.get(respuesta["fin"], "no_evidence")
         with conn.transaction():
             consultas.registrar(conn, respuesta["queries"])
             for consulta in respuesta["queries"]:
                 bitacora.registrar(conn, pregunta.alert_id, "evidence", agente, f"{consulta['kpi']} el {consulta['dia']}: {consulta['consulta']}", dia, consulta["queryId"])
             tipo = "refusal" if desenlace in ("refused", "out_of_scope") else "answer"
-            bitacora.registrar(conn, pregunta.alert_id, tipo, agente, f"{respuesta['fin']}: {final['text']}", dia, figuras[0].query_id if figuras else None)
+            fallidos = "".join(f" [falló {fallo['step']}: {fallo['kind']}]" for fallo in fallos)
+            bitacora.registrar(conn, pregunta.alert_id, tipo, agente, f"{respuesta['fin']}: {final['text']}{fallidos}", dia, figuras[0].query_id if figuras else None)
             for costo in respuesta.get("costs") or []:
                 bitacora.registrar(conn, pregunta.alert_id, "evidence", agente, costo_de(costo), dia)
 
