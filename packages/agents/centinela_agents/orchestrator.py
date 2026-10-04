@@ -29,6 +29,7 @@ Usage:
 """
 
 import logging
+import uuid
 from dataclasses import replace
 from typing import Any, Mapping
 
@@ -84,6 +85,7 @@ class CentinelaOrchestrator:
         kernel: KernelCall | None = None,
         reasoning_provider: LLMProvider | None = None,
         token_cap: int | None = TOKEN_CAP,
+        tracer: Any = None,
     ):
         """
         Initialize orchestrator.
@@ -105,6 +107,7 @@ class CentinelaOrchestrator:
         reasoning_provider = MeteredProvider(reasoning_provider) if reasoning_provider is not None else None
         self.provider = provider
         self.token_cap = token_cap
+        self.tracer = tracer
         self.tools = tools
         self.tree = tree
         self._thresholds = {name: dict(values) for name, values in metrics.thresholds.items()}
@@ -195,6 +198,7 @@ class CentinelaOrchestrator:
                 alert_briefs=alert_briefs or {},
                 cause_rejections=cause_rejections or [],
                 proposal_rejections=proposal_rejections or [],
+                tracer=self.tracer,
             )
 
             if awaiting_decision(self.graph, alert_id):
@@ -249,7 +253,7 @@ class CentinelaOrchestrator:
         )
 
         try:
-            state = resume(self.graph, alert_id, decision)
+            state = resume(self.graph, alert_id, decision, tracer=self.tracer)
 
             if awaiting_decision(self.graph, alert_id):
                 logger.info(f"Alert {alert_id} awaits next decision")
@@ -310,7 +314,7 @@ class CentinelaOrchestrator:
             "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "figuras": None},
             "queries": [],
         }
-        state = self._chat_graph.invoke(initial)
+        state = self._chat_graph.invoke(initial, dict(self.tracer.config(f"chat_{uuid.uuid4().hex[:12]}")) if self.tracer else None)
         nodes = index(self.tree)
         steps = [
             {"node": node_id, "branch": branch, "agent": nodes[node_id].hoja.agente if node_id in nodes and nodes[node_id].hoja else None}

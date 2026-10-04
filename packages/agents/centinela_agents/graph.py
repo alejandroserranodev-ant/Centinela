@@ -290,6 +290,10 @@ def thread(alert_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": alert_id}}
 
 
+def run_config(alert_id: str, tracer=None) -> dict[str, Any]:
+    return {**(dict(tracer.config(alert_id)) if tracer is not None else {}), **thread(alert_id)}
+
+
 def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections) -> dict[str, Any]:
     earlier = {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id}
     return {
@@ -313,7 +317,7 @@ def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts,
 def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None) -> Iterator[dict[str, Any]]:
     initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)
     fresh(graph, alert_id)
-    yield from graph.stream(initial, thread(alert_id), stream_mode="custom")
+    yield from graph.stream(initial, run_config(alert_id, tracer), stream_mode="custom")
 
 
 def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None) -> dict[str, Any]:
@@ -354,12 +358,12 @@ def decision_problem(decision: Mapping[str, Any], state: Mapping[str, Any]) -> s
     return None
 
 
-def resume(graph, alert_id: str, decision: Mapping[str, Any]) -> dict[str, Any]:
+def resume(graph, alert_id: str, decision: Mapping[str, Any], tracer=None) -> dict[str, Any]:
     snapshot = graph.get_state(thread(alert_id))
     if snapshot.next != (GATE,):
         raise ResumeRefused(f"{alert_id} awaits no decision")
     problem = decision_problem(decision, snapshot.values)
     if problem is not None:
         raise ResumeRefused(f"{alert_id}: {problem}")
-    graph.invoke(Command(resume=dict(decision)), thread(alert_id))
+    graph.invoke(Command(resume=dict(decision)), run_config(alert_id, tracer))
     return graph.get_state(thread(alert_id)).values
