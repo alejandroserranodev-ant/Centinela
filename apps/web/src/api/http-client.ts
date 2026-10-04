@@ -130,8 +130,6 @@ export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator
   for await (const { event, data } of readSse(response.body)) {
     if (event === 'step') {
       yield { event: 'step', data: data as AgentStep };
-    } else if (event === 'chunk') {
-      yield { event: 'chunk', data: data as { text: string } };
     } else if (event === 'end') {
       yield { event: 'end', data: data as ChatMessage };
     }

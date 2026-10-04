@@ -20,7 +20,9 @@ and what each shows is
 | `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
 | `src/api/sse.ts` | `readSse(body)`, which reads a server-sent event stream as `event` and parsed `data` pairs, the name from each event's `event:` line; `src/api/sse.test.ts` tests it with Node's test runner |
 | `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and the person every decision is sent as |
-| `src/api/types.ts` | the contract the client and the screens share, following `apps/api`'s Pydantic models |
+| `src/api/types.ts` | the contract the client and the screens share: aliases over `src/api/schema.generated.ts`, plus the types the API has no model for |
+| `src/api/openapi.json` | the API's OpenAPI document, written by `python -m centinela_api.contrato` |
+| `src/api/schema.generated.ts` | the TypeScript types of that document, written by `npm run contract`; never edited |
 | `src/api/fixtures/` | the illustrative data the screens ran on before the fetch client; no module imports it |
 | `.env` | the `VITE_API_URL` Vite reads, versioned with the local API's address |
 | `src/format.ts` | every number and date as a person reads it: pesos, percentages, points, days and units in `es-CO`, dates in the time zone of Bogotá |
@@ -74,10 +76,14 @@ and what each shows is
 - **There is no login.** `src/api/config.ts:getDecisionHeaders()` sends every decision and every
   chat question as `DEFAULT_USER`, a `gerente`, its name percent-encoded in `X-User-Name` because a header is
   ASCII-only.
-- **`src/api/types.ts` is the contract the screens read**: `apps/api`'s Pydantic models are the
-  source, and these types follow them field for field. Every number travels as a `Figure` with its
-  `queryId`, so the type itself asks each figure for its query. Where the types and the API
-  disagree is listed under the rules below.
+- **`src/api/types.ts` is the contract the screens read**: it aliases the types that
+  `src/api/schema.generated.ts` generates from the OpenAPI document of `apps/api`, so the API's
+  Pydantic models are the source. After a change to a model, run `python -m centinela_api.contrato`
+  in `apps/api` to write `src/api/openapi.json`, then `npm run contract` here to write the types;
+  the root gate `check:contract` fails when they drift. Only what the API defines no model
+  for stays written by hand in the same file. Every number travels as a `Figure` with its
+  `queryId`, so the type itself asks each figure for its query. The one place the web's
+  `Decision` outgrows the API's is listed under the rules below.
 - **The agents' current step is on screen while they work.** `src/shell/CurrentStep.tsx:CurrentStep()`
   renders the `step` events of the day run, which `apps/api` streams by SSE
   ([`../api/AGENTS.md`](../api/AGENTS.md)).
@@ -172,8 +178,8 @@ a table view.
 2. Give it a Spanish route in `src/App.tsx`, inside the shell. A screen the navigation reaches
    also gets an entry in `src/shell/Shell.tsx:DESTINATIONS`.
 3. Read its data through a new function of `src/api/http-client.ts`, re-exported by
-   `src/api/client.ts`, with its shapes in `src/api/types.ts` following the endpoint's Pydantic
-   model. Every number is a `Figure` with a `queryId` the API answers. The endpoint behind the
+   `src/api/client.ts`, with its shapes in `src/api/types.ts` aliasing the generated type of the endpoint's
+   Pydantic model. Every number is a `Figure` with a `queryId` the API answers. The endpoint behind the
    function is a row in [`../api/AGENTS.md`](../api/AGENTS.md) before the function exists.
 4. Place each piece by who renders it: a piece only this screen renders stays in `src/screens/`
    beside it; a piece another screen or the shell also renders goes in `src/common/`; what wraps

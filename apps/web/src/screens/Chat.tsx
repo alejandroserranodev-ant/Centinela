@@ -174,13 +174,6 @@ export function Chat() {
           update(answerId, (e) =>
             e.role === 'centinela' && e.status === 'searching' ? { ...e, step, path: [...e.path, ...walked] } : e,
           );
-        } else if (event.event === 'chunk') {
-          const chunk = event.data.text;
-          update(answerId, (e) =>
-            e.role === 'centinela' && (e.status === 'searching' || e.status === 'writing')
-              ? { ...e, status: 'writing', text: e.text + chunk }
-              : e,
-          );
         } else {
           const message = event.data;
           update(answerId, (e) => ({

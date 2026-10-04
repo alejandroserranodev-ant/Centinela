@@ -1,16 +1,42 @@
-export type AlertStatus = 'new' | 'analyzing' | 'proposed' | 'approved' | 'rejected' | 'executed' | 'merged';
+import type { components } from './schema.generated.ts';
 
-export type Severity = 'critical' | 'high' | 'medium' | 'low';
+type Schemas = components['schemas'];
 
-export type ConfidenceLevel = 'high' | 'medium' | 'low';
+export type Alert = Schemas['Alert'];
+export type AlertStatus = Alert['status'];
+export type Severity = Alert['severity'];
+export type Metric = Alert['metric'];
+export type Cause = Alert['cause'];
+export type MergedAlert = Schemas['MergedAlert'];
+export type Figure = Schemas['Figure'];
+export type FigureUnit = Figure['unit'];
+export type Sentence = Schemas['Sentence-Output'];
+export type Confidence = Schemas['Confidence-Output'];
+export type ConfidenceLevel = Confidence['level'];
+export type SeriesPoint = Schemas['SeriesPoint'];
+export type Evidence = Schemas['Evidence-Output'];
+export type Action = Schemas['Action-Output'];
+export type ActionType = Action['type'];
+export type Impact = Schemas['Impact'];
+export type ExecutedAction = Schemas['ExecutedAction'];
+export type AgentStep = Schemas['AgentStep'];
+export type Agent = AgentStep['agent'];
+export type Actor = LogEvent['actor'];
+export type LogEvent = Schemas['LogEvent'];
+export type LogEventType = LogEvent['type'];
+export type ChatMessage = Schemas['ChatMessage'];
+export type ChatOutcome = ChatMessage['outcome'];
+export type ChatQuestion = Schemas['ChatQuestion'];
+export type Query = Schemas['Query'];
 
-export type Metric =
-  | 'margen_pct'
-  | 'saldo_vencido'
-  | 'dias_pago_prom'
-  | 'cobertura_dias'
-  | 'descuento_en_exceso'
-  | 'veces_intervalo_habitual';
+export type QuerySource = SemanticView | Query['source'];
+export type AdvanceEnd = Schemas['AdvanceEnd'];
+export type ApiDecision = Schemas['DecisionApprove'] | Schemas['DecisionEdit'] | Schemas['DecisionReject'];
+
+export interface User {
+  name: string;
+  role: string;
+}
 
 export type SemanticView =
   | 'v_ventas'
@@ -21,148 +47,6 @@ export type SemanticView =
   | 'v_descuentos_fuera_politica'
   | 'v_actividad_cliente';
 
-export type QuerySource = SemanticView | 'alertas' | 'kernel';
-
-export interface Query {
-  id: string;
-  source: QuerySource;
-  sql: string;
-  description: string;
-}
-
-export type FigureUnit = 'COP' | 'points' | 'percent' | 'days' | 'units';
-
-export interface Figure {
-  value: number;
-  unit: FigureUnit;
-  queryId: string;
-}
-
-export interface Sentence {
-  text: string;
-  figures: Figure[];
-}
-
-export interface Confidence {
-  level: ConfidenceLevel;
-  assumptions: string[];
-}
-
-export interface SeriesPoint {
-  date: string;
-  value: number;
-}
-
-export interface Evidence {
-  claim: Sentence;
-  queryId: string;
-  series?: SeriesPoint[];
-}
-
-export type Cause =
-  | { kind: 'identified'; sentence: Sentence; evidence: Evidence[] }
-  | { kind: 'no_evidence'; reason: string; queriesReviewed: string[] };
-
-export type ActionType = 'email_draft' | 'task' | 'purchase_order_draft' | 'price_change_draft';
-
-export interface Impact {
-  figure: Figure;
-  period: 'month' | 'once';
-}
-
-export interface Action {
-  id: string;
-  title: string;
-  description: Sentence;
-  type: ActionType;
-  impact: Impact | null;
-  confidence: Confidence;
-  parameters: Record<string, string | number>;
-}
-
-export type Actions = [Action] | [Action, Action] | [Action, Action, Action];
-
-export interface ExecutedAction {
-  actionId: string;
-  result: string;
-}
-
-export interface Alert {
-  id: string;
-  status: AlertStatus;
-  severity: Severity;
-  metric: Metric;
-  labels: string[];
-  title: Sentence;
-  pesosAtRisk: Figure;
-  recoverablePerMonth: Figure | null;
-  confidence: Confidence;
-  simulatedDate: string;
-  cause: Cause;
-  actions: Actions;
-  executedAction?: ExecutedAction;
-  changesRequested: boolean;
-  mergedInto?: string;
-  mergedAlerts?: MergedAlert[];
-}
-
-export type MergedAlert = Pick<Alert, 'id' | 'metric' | 'simulatedDate' | 'title' | 'pesosAtRisk' | 'cause'>;
-
-export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor' | 'chat';
-
-export interface AgentStep {
-  alertId: string | null;
-  agent: Agent;
-  node?: string | null;
-  status: 'running' | 'done';
-  description: string;
-  start: string;
-  end?: string;
-}
-
-export interface User {
-  name: string;
-  role: string;
-}
-
-export type Actor = { kind: 'agent'; agent: Agent } | ({ kind: 'person' } & User);
-
-export type LogEventType =
-  | 'alert'
-  | 'evidence'
-  | 'proposal'
-  | 'decision'
-  | 'action'
-  | 'result'
-  | 'question'
-  | 'answer'
-  | 'refusal';
-
-export interface LogEvent {
-  id: string;
-  date: string;
-  simulatedDay: string;
-  alertId: string | null;
-  type: LogEventType;
-  actor: Actor;
-  detail: string;
-  queryId?: string;
-}
-
-export type ChatOutcome = 'answered' | 'no_evidence' | 'out_of_scope' | 'refused';
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'centinela';
-  text: string;
-  figures: Figure[];
-  alertId?: string | null;
-  series?: SeriesPoint[];
-  enoughEvidence: boolean;
-  outcome: ChatOutcome;
-  date: string;
-}
-
 export interface SseEvent<E extends string, D> {
   event: E;
   data: D;
@@ -171,23 +55,13 @@ export interface SseEvent<E extends string, D> {
 export type AdvanceEvent =
   | SseEvent<'step', AgentStep>
   | SseEvent<'alert', Alert>
-  | SseEvent<'end', { simulatedDay: string; newAlerts: string[] }>;
+  | SseEvent<'end', AdvanceEnd>;
 
 export type ChatEvent =
   | SseEvent<'step', AgentStep>
-  | SseEvent<'chunk', { text: string }>
   | SseEvent<'end', ChatMessage>;
 
-export type Decision =
-  | { kind: 'approve'; actionId: string }
-  | { kind: 'edit'; actionId: string; parameters: Record<string, string | number> }
-  | { kind: 'reject'; reason: string }
-  | { kind: 'request_changes'; reason: string };
-
-export interface ChatQuestion {
-  question: string;
-  alertId?: string;
-}
+export type Decision = ApiDecision | { kind: 'request_changes'; reason: string };
 
 export interface AlertFilter {
   status?: AlertStatus;

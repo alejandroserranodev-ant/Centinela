@@ -10,6 +10,7 @@ export const GATES = [
   'check:docs',
   'check:generated',
   'check:routes',
+  'check:contract',
 ];
 
 export function scriptOf(gate: string): string {

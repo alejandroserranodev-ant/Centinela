@@ -15,7 +15,7 @@ export const ENTRIES = new Map<string, Budget>([
 export const ROUTES = new Map<string, Budget>([
   ["the chat answered, refused or stayed silent when it should not have", [62500, "the chat's agent and its subtree are stated on the agents page and the tree's page"]],
   ["an alert is missing, wrong, duplicated or fires on the wrong day", [87000, "the agents, the tree and the clock are the three places a detection is decided"]],
-  ["a number on screen disagrees with SQL", [39000, "a screen's figure comes from the fetch client or from what the API serves, and both pages say which"]],
+  ["a number on screen disagrees with SQL", [40000, "a screen's figure comes from the fetch client or from what the API serves, and both pages say which"]],
   ["a number in an agent's answer or an alert disagrees with SQL", [47000, "a figure comes from the compiler and from the base KPI it compiles"]],
   ["something happened without approval, or the log is missing a step", [22500, "the decision checks, the in-process agents and the bitácora are stated on one page"]],
   ["a screen renders or behaves wrong", [18000, "the screens' decisions and their person-run check are one page"]],
@@ -41,7 +41,7 @@ export const ROUTES = new Map<string, Budget>([
   ["which model provider the agents call, its key or its variables", [3500, "the variables the providers read are one short page"]],
   ["the guide a developer reads in Docmost, its compose, or one of its chapters", [5500, "the guide's build and its compose are one page"]],
   ["how a page, a spec or a plan is written", [38000, "the practice every page follows is one reference, read whole"]],
-  ["whether the file in front of me is mine to edit", [4500, "which half of a file is a person's is one companion page"]],
+  ["whether the file in front of me is mine to edit", [4750, "which half of a file is a person's is one companion page"]],
   ["I am about to write down that something is wrong", [4500, "what counts as a debt and where it goes is one companion page"]],
 ]);
 

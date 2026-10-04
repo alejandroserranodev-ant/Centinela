@@ -1,0 +1,2322 @@
+{
+  "components": {
+    "schemas": {
+      "Action-Input": {
+        "additionalProperties": false,
+        "description": "Proposed mitigation action with impact and parameters.",
+        "properties": {
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence-Input",
+            "description": "Confidence in the action's effectiveness"
+          },
+          "description": {
+            "$ref": "#/components/schemas/Sentence-Input",
+            "description": "Detailed action description with impact figures"
+          },
+          "id": {
+            "description": "Unique action ID",
+            "example": "action_raise_price_3pct",
+            "title": "Id",
+            "type": "string"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Impact"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Expected business impact if executed"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "description": "Editable parameters (price, qty, etc.)",
+            "title": "Parameters",
+            "type": "object"
+          },
+          "title": {
+            "description": "Short action title",
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "description": "Type: email_draft, task, purchase_order_draft, or price_change_draft",
+            "enum": [
+              "email_draft",
+              "task",
+              "purchase_order_draft",
+              "price_change_draft"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "type",
+          "confidence"
+        ],
+        "title": "Action",
+        "type": "object"
+      },
+      "Action-Output": {
+        "additionalProperties": false,
+        "description": "Proposed mitigation action with impact and parameters.",
+        "properties": {
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence-Output",
+            "description": "Confidence in the action's effectiveness"
+          },
+          "description": {
+            "$ref": "#/components/schemas/Sentence-Output",
+            "description": "Detailed action description with impact figures"
+          },
+          "id": {
+            "description": "Unique action ID",
+            "example": "action_raise_price_3pct",
+            "title": "Id",
+            "type": "string"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Impact"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Expected business impact if executed"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "description": "Editable parameters (price, qty, etc.)",
+            "title": "Parameters",
+            "type": "object"
+          },
+          "title": {
+            "description": "Short action title",
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "description": "Type: email_draft, task, purchase_order_draft, or price_change_draft",
+            "enum": [
+              "email_draft",
+              "task",
+              "purchase_order_draft",
+              "price_change_draft"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "type",
+          "impact",
+          "confidence",
+          "parameters"
+        ],
+        "title": "Action",
+        "type": "object"
+      },
+      "ActorAgent": {
+        "additionalProperties": false,
+        "description": "Alert action performed by an agent.",
+        "properties": {
+          "agent": {
+            "description": "Agent name (vigia, analista, estratega, ejecutor, chat)",
+            "enum": [
+              "vigia",
+              "analista",
+              "estratega",
+              "ejecutor",
+              "chat"
+            ],
+            "title": "Agent",
+            "type": "string"
+          },
+          "kind": {
+            "const": "agent",
+            "default": "agent",
+            "description": "Discriminator: action by agent",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "agent"
+        ],
+        "title": "ActorAgent",
+        "type": "object"
+      },
+      "ActorPerson": {
+        "additionalProperties": false,
+        "description": "Alert decision made by a human.",
+        "properties": {
+          "kind": {
+            "const": "person",
+            "default": "person",
+            "description": "Discriminator: action by person",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "description": "Person name (percent-encoded)",
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "description": "Person role (gerente, lider_proceso)",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "role"
+        ],
+        "title": "ActorPerson",
+        "type": "object"
+      },
+      "AdvanceEnd": {
+        "additionalProperties": false,
+        "description": "Final event of the simulated clock's advance stream.",
+        "properties": {
+          "newAlerts": {
+            "description": "IDs of the alerts raised on that day",
+            "items": {
+              "type": "string"
+            },
+            "title": "Newalerts",
+            "type": "array"
+          },
+          "simulatedDay": {
+            "description": "Simulated day the clock reached (ISO 8601)",
+            "title": "Simulatedday",
+            "type": "string"
+          }
+        },
+        "required": [
+          "simulatedDay",
+          "newAlerts"
+        ],
+        "title": "AdvanceEnd",
+        "type": "object"
+      },
+      "AgentAlertInput": {
+        "additionalProperties": false,
+        "description": "Vig\u00eda input: new alert detected from metric anomaly.",
+        "properties": {
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence-Input",
+            "description": "Confidence in the alert detection"
+          },
+          "metric": {
+            "description": "Metric that triggered alert",
+            "enum": [
+              "margen_pct",
+              "saldo_vencido",
+              "dias_pago_prom",
+              "cobertura_dias",
+              "descuento_en_exceso",
+              "veces_intervalo_habitual"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "pesosAtRisk": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Pesos at risk (COP)"
+          },
+          "recoverablePerMonth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Figure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Monthly recovery potential"
+          },
+          "severity": {
+            "description": "Alert severity (critical, high, medium, low)",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "simulatedDate": {
+            "description": "Simulated date of detection (ISO 8601)",
+            "title": "Simulateddate",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Sentence-Input",
+            "description": "Alert title with figures"
+          }
+        },
+        "required": [
+          "severity",
+          "metric",
+          "title",
+          "pesosAtRisk",
+          "confidence",
+          "simulatedDate"
+        ],
+        "title": "AgentAlertInput",
+        "type": "object"
+      },
+      "AgentCauseInput": {
+        "additionalProperties": false,
+        "description": "Analista input: root cause explanation with evidence.",
+        "properties": {
+          "cause": {
+            "description": "Root cause (identified or no_evidence)",
+            "discriminator": {
+              "mapping": {
+                "identified": "#/components/schemas/CauseIdentified-Input",
+                "no_evidence": "#/components/schemas/CauseNoEvidence-Input"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CauseIdentified-Input"
+              },
+              {
+                "$ref": "#/components/schemas/CauseNoEvidence-Input"
+              }
+            ],
+            "title": "Cause"
+          },
+          "evidence": {
+            "description": "Additional evidence queries run by Analista",
+            "items": {
+              "$ref": "#/components/schemas/Evidence-Input"
+            },
+            "title": "Evidence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cause"
+        ],
+        "title": "AgentCauseInput",
+        "type": "object"
+      },
+      "AgentExecutionInput": {
+        "additionalProperties": false,
+        "description": "Ejecutor input: result of executing an approved action.",
+        "properties": {
+          "actionId": {
+            "description": "ID of the action executed",
+            "title": "Actionid",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Detailed error if status != success",
+            "title": "Error"
+          },
+          "result": {
+            "description": "Human-readable result or error message",
+            "title": "Result",
+            "type": "string"
+          },
+          "status": {
+            "description": "Execution result",
+            "enum": [
+              "success",
+              "failed",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionId",
+          "status",
+          "result"
+        ],
+        "title": "AgentExecutionInput",
+        "type": "object"
+      },
+      "AgentProposalInput": {
+        "additionalProperties": false,
+        "description": "Estratega input: proposed mitigation actions.",
+        "properties": {
+          "actions": {
+            "description": "1-3 proposed actions with impact and parameters",
+            "items": {
+              "$ref": "#/components/schemas/Action-Input"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Actions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "actions"
+        ],
+        "title": "AgentProposalInput",
+        "type": "object"
+      },
+      "AgentStep": {
+        "additionalProperties": false,
+        "description": "Progress event during agent processing (for SSE streams).",
+        "properties": {
+          "agent": {
+            "description": "Agent name",
+            "enum": [
+              "vigia",
+              "analista",
+              "estratega",
+              "ejecutor",
+              "chat"
+            ],
+            "title": "Agent",
+            "type": "string"
+          },
+          "alertId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Alert ID being processed",
+            "title": "Alertid"
+          },
+          "description": {
+            "description": "Human-readable step description",
+            "title": "Description",
+            "type": "string"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UTC end time (ISO 8601), null if running",
+            "title": "End"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Node of the decision tree the step walked, if any",
+            "title": "Node"
+          },
+          "start": {
+            "description": "UTC start time (ISO 8601)",
+            "title": "Start",
+            "type": "string"
+          },
+          "status": {
+            "description": "Step status",
+            "enum": [
+              "running",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alertId",
+          "agent",
+          "node",
+          "status",
+          "description",
+          "start",
+          "end"
+        ],
+        "title": "AgentStep",
+        "type": "object"
+      },
+      "Alert": {
+        "additionalProperties": false,
+        "description": "Complete alert lifecycle state.",
+        "properties": {
+          "actions": {
+            "description": "Proposed mitigation actions",
+            "items": {
+              "$ref": "#/components/schemas/Action-Output"
+            },
+            "maxItems": 3,
+            "minItems": 0,
+            "title": "Actions",
+            "type": "array"
+          },
+          "cause": {
+            "description": "Root cause (identified with evidence or no_evidence)",
+            "discriminator": {
+              "mapping": {
+                "identified": "#/components/schemas/CauseIdentified-Output",
+                "no_evidence": "#/components/schemas/CauseNoEvidence-Output"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CauseIdentified-Output"
+              },
+              {
+                "$ref": "#/components/schemas/CauseNoEvidence-Output"
+              }
+            ],
+            "title": "Cause"
+          },
+          "changesRequested": {
+            "default": false,
+            "description": "Whether a person asked for changes to the proposal",
+            "title": "Changesrequested",
+            "type": "boolean"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence-Output",
+            "description": "Confidence in the alert detection"
+          },
+          "executedAction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutedAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Action executed (only when status=executed)"
+          },
+          "id": {
+            "description": "Unique alert ID",
+            "example": "alerta_abc123def456",
+            "title": "Id",
+            "type": "string"
+          },
+          "labels": {
+            "description": "Identity labels a person reads, the metric's short name first then the affected entity (e.g. ['Margen', 'l\u00ednea Hogar'])",
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "mergedAlerts": {
+            "description": "Alerts merged into this one",
+            "items": {
+              "$ref": "#/components/schemas/MergedAlert"
+            },
+            "title": "Mergedalerts",
+            "type": "array"
+          },
+          "mergedInto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ID of the alert this one was merged into",
+            "title": "Mergedinto"
+          },
+          "metric": {
+            "description": "Metric that triggered this alert",
+            "enum": [
+              "margen_pct",
+              "saldo_vencido",
+              "dias_pago_prom",
+              "cobertura_dias",
+              "descuento_en_exceso",
+              "veces_intervalo_habitual"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "pesosAtRisk": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Pesos at risk (COP)"
+          },
+          "recoverablePerMonth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Figure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Potential monthly recovery if action taken"
+          },
+          "severity": {
+            "description": "Alert severity: critical, high, medium, or low",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "simulatedDate": {
+            "description": "Simulated date when alert was created (ISO 8601)",
+            "title": "Simulateddate",
+            "type": "string"
+          },
+          "status": {
+            "description": "Current status in lifecycle: new \u2192 analyzing \u2192 proposed \u2192 approved/rejected \u2192 executed",
+            "enum": [
+              "new",
+              "analyzing",
+              "proposed",
+              "approved",
+              "rejected",
+              "executed",
+              "merged"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Sentence-Output",
+            "description": "Alert title with initial impact figures"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "severity",
+          "metric",
+          "labels",
+          "title",
+          "pesosAtRisk",
+          "recoverablePerMonth",
+          "confidence",
+          "simulatedDate",
+          "cause",
+          "actions",
+          "executedAction",
+          "changesRequested",
+          "mergedInto",
+          "mergedAlerts"
+        ],
+        "title": "Alert",
+        "type": "object"
+      },
+      "AlertEstadoEnum": {
+        "description": "Valid alert estado values (Spanish names for API contract).",
+        "enum": [
+          "nueva",
+          "en_analisis",
+          "propuesta",
+          "aprobada",
+          "rechazada",
+          "ejecutada"
+        ],
+        "title": "AlertEstadoEnum",
+        "type": "string"
+      },
+      "CauseIdentified-Input": {
+        "additionalProperties": false,
+        "description": "Root cause found with evidence.",
+        "properties": {
+          "evidence": {
+            "description": "Supporting evidence",
+            "items": {
+              "$ref": "#/components/schemas/Evidence-Input"
+            },
+            "minItems": 1,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "kind": {
+            "const": "identified",
+            "default": "identified",
+            "description": "Discriminator: cause was identified",
+            "title": "Kind",
+            "type": "string"
+          },
+          "sentence": {
+            "$ref": "#/components/schemas/Sentence-Input",
+            "description": "Root cause statement with figures"
+          }
+        },
+        "required": [
+          "sentence",
+          "evidence"
+        ],
+        "title": "CauseIdentified",
+        "type": "object"
+      },
+      "CauseIdentified-Output": {
+        "additionalProperties": false,
+        "description": "Root cause found with evidence.",
+        "properties": {
+          "evidence": {
+            "description": "Supporting evidence",
+            "items": {
+              "$ref": "#/components/schemas/Evidence-Output"
+            },
+            "minItems": 1,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "kind": {
+            "const": "identified",
+            "default": "identified",
+            "description": "Discriminator: cause was identified",
+            "title": "Kind",
+            "type": "string"
+          },
+          "sentence": {
+            "$ref": "#/components/schemas/Sentence-Output",
+            "description": "Root cause statement with figures"
+          }
+        },
+        "required": [
+          "kind",
+          "sentence",
+          "evidence"
+        ],
+        "title": "CauseIdentified",
+        "type": "object"
+      },
+      "CauseNoEvidence-Input": {
+        "additionalProperties": false,
+        "description": "Root cause could not be identified with available data.",
+        "properties": {
+          "kind": {
+            "const": "no_evidence",
+            "default": "no_evidence",
+            "description": "Discriminator: cause could not be identified",
+            "title": "Kind",
+            "type": "string"
+          },
+          "queriesReviewed": {
+            "description": "Query IDs that were searched",
+            "items": {
+              "type": "string"
+            },
+            "title": "Queriesreviewed",
+            "type": "array"
+          },
+          "reason": {
+            "description": "Explanation why cause could not be determined",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CauseNoEvidence",
+        "type": "object"
+      },
+      "CauseNoEvidence-Output": {
+        "additionalProperties": false,
+        "description": "Root cause could not be identified with available data.",
+        "properties": {
+          "kind": {
+            "const": "no_evidence",
+            "default": "no_evidence",
+            "description": "Discriminator: cause could not be identified",
+            "title": "Kind",
+            "type": "string"
+          },
+          "queriesReviewed": {
+            "description": "Query IDs that were searched",
+            "items": {
+              "type": "string"
+            },
+            "title": "Queriesreviewed",
+            "type": "array"
+          },
+          "reason": {
+            "description": "Explanation why cause could not be determined",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason",
+          "queriesReviewed"
+        ],
+        "title": "CauseNoEvidence",
+        "type": "object"
+      },
+      "ChatMessage": {
+        "additionalProperties": false,
+        "description": "Chat response from Centinela (the agent chat).",
+        "properties": {
+          "alertId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Related alert ID if any",
+            "title": "Alertid"
+          },
+          "date": {
+            "description": "Message timestamp (ISO 8601)",
+            "title": "Date",
+            "type": "string"
+          },
+          "enoughEvidence": {
+            "description": "Whether answer is based on sufficient evidence",
+            "title": "Enoughevidence",
+            "type": "boolean"
+          },
+          "figures": {
+            "description": "Numeric evidence in the message",
+            "items": {
+              "$ref": "#/components/schemas/Figure"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "id": {
+            "description": "Message ID",
+            "title": "Id",
+            "type": "string"
+          },
+          "outcome": {
+            "default": "answered",
+            "description": "How the walk of conversar ended: answered, no_evidence, out_of_scope or refused",
+            "enum": [
+              "answered",
+              "no_evidence",
+              "out_of_scope",
+              "refused"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "role": {
+            "description": "Message source: user question or centinela answer",
+            "enum": [
+              "user",
+              "centinela"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SeriesPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Historical series if relevant",
+            "title": "Series"
+          },
+          "text": {
+            "description": "Message text",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "text",
+          "figures",
+          "alertId",
+          "series",
+          "enoughEvidence",
+          "outcome",
+          "date"
+        ],
+        "title": "ChatMessage",
+        "type": "object"
+      },
+      "ChatQuestion": {
+        "additionalProperties": false,
+        "description": "User question for Centinela (the agent chat).",
+        "properties": {
+          "alertId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alert the question is asked from, if any",
+            "title": "Alertid"
+          },
+          "question": {
+            "description": "Natural language question about alert or metric",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "ChatQuestion",
+        "type": "object"
+      },
+      "Confidence-Input": {
+        "additionalProperties": false,
+        "description": "Confidence assessment with assumptions.",
+        "properties": {
+          "assumptions": {
+            "description": "Assumptions underlying the confidence assessment",
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "level": {
+            "description": "Confidence level: high, medium, or low",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level"
+        ],
+        "title": "Confidence",
+        "type": "object"
+      },
+      "Confidence-Output": {
+        "additionalProperties": false,
+        "description": "Confidence assessment with assumptions.",
+        "properties": {
+          "assumptions": {
+            "description": "Assumptions underlying the confidence assessment",
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "level": {
+            "description": "Confidence level: high, medium, or low",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "assumptions"
+        ],
+        "title": "Confidence",
+        "type": "object"
+      },
+      "DecisionApprove": {
+        "additionalProperties": false,
+        "description": "Human decision: approve and execute action.",
+        "properties": {
+          "actionId": {
+            "description": "ID of action to approve",
+            "title": "Actionid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "approve",
+            "default": "approve",
+            "description": "Discriminator: approve decision",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionId"
+        ],
+        "title": "DecisionApprove",
+        "type": "object"
+      },
+      "DecisionEdit": {
+        "additionalProperties": false,
+        "description": "Human decision: approve with modified parameters.",
+        "properties": {
+          "actionId": {
+            "description": "ID of action to modify and approve",
+            "title": "Actionid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "edit",
+            "default": "edit",
+            "description": "Discriminator: edit and approve decision",
+            "title": "Kind",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "description": "Modified parameters (price, qty, etc.)",
+            "title": "Parameters",
+            "type": "object"
+          }
+        },
+        "required": [
+          "actionId",
+          "parameters"
+        ],
+        "title": "DecisionEdit",
+        "type": "object"
+      },
+      "DecisionReject": {
+        "additionalProperties": false,
+        "description": "Human decision: reject alert.",
+        "properties": {
+          "kind": {
+            "const": "reject",
+            "default": "reject",
+            "description": "Discriminator: reject decision",
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Reason for rejection",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DecisionReject",
+        "type": "object"
+      },
+      "Evidence-Input": {
+        "additionalProperties": false,
+        "description": "Supporting data for a claim: statement + historical series.",
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/Sentence-Input",
+            "description": "Statement with figures"
+          },
+          "queryId": {
+            "description": "SQL query ID that retrieved this evidence",
+            "title": "Queryid",
+            "type": "string"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SeriesPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical series supporting the claim",
+            "title": "Series"
+          }
+        },
+        "required": [
+          "claim",
+          "queryId"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "Evidence-Output": {
+        "additionalProperties": false,
+        "description": "Supporting data for a claim: statement + historical series.",
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/Sentence-Output",
+            "description": "Statement with figures"
+          },
+          "queryId": {
+            "description": "SQL query ID that retrieved this evidence",
+            "title": "Queryid",
+            "type": "string"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SeriesPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical series supporting the claim",
+            "title": "Series"
+          }
+        },
+        "required": [
+          "claim",
+          "queryId",
+          "series"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "ExecutedAction": {
+        "additionalProperties": false,
+        "description": "Result of executing an approved action.",
+        "properties": {
+          "actionId": {
+            "description": "ID of the executed action",
+            "title": "Actionid",
+            "type": "string"
+          },
+          "result": {
+            "description": "Execution outcome: success, failed, or partial",
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionId",
+          "result"
+        ],
+        "title": "ExecutedAction",
+        "type": "object"
+      },
+      "Figure": {
+        "additionalProperties": false,
+        "description": "Quantitative measurement with unit and traceability.",
+        "properties": {
+          "queryId": {
+            "description": "Reference to SQL query that produced this figure",
+            "title": "Queryid",
+            "type": "string"
+          },
+          "unit": {
+            "description": "Unit of measurement (COP, percent, days, etc.)",
+            "enum": [
+              "COP",
+              "points",
+              "percent",
+              "days",
+              "units"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "description": "Numeric value",
+            "example": 42000000,
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "unit",
+          "queryId"
+        ],
+        "title": "Figure",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Impact": {
+        "additionalProperties": false,
+        "description": "Expected business impact of an action.",
+        "properties": {
+          "figure": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Impact magnitude (pesos, percent, etc.)"
+          },
+          "period": {
+            "description": "Recurrence: monthly or one-time",
+            "enum": [
+              "month",
+              "once"
+            ],
+            "title": "Period",
+            "type": "string"
+          }
+        },
+        "required": [
+          "figure",
+          "period"
+        ],
+        "title": "Impact",
+        "type": "object"
+      },
+      "LogEvent": {
+        "additionalProperties": false,
+        "description": "Audit log entry for alert lifecycle event.",
+        "properties": {
+          "actor": {
+            "description": "Who/what performed the action (agent or person)",
+            "discriminator": {
+              "mapping": {
+                "agent": "#/components/schemas/ActorAgent",
+                "person": "#/components/schemas/ActorPerson"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActorAgent"
+              },
+              {
+                "$ref": "#/components/schemas/ActorPerson"
+              }
+            ],
+            "title": "Actor"
+          },
+          "alertId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alert ID, null for a chat question asked from no alert",
+            "title": "Alertid"
+          },
+          "date": {
+            "description": "UTC timestamp of event (ISO 8601)",
+            "title": "Date",
+            "type": "string"
+          },
+          "detail": {
+            "description": "Human-readable description or JSON cost data",
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "description": "Log entry ID",
+            "title": "Id",
+            "type": "string"
+          },
+          "queryId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SQL query ID if relevant to this event",
+            "title": "Queryid"
+          },
+          "simulatedDay": {
+            "description": "Simulated date when event occurred",
+            "title": "Simulatedday",
+            "type": "string"
+          },
+          "type": {
+            "description": "Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal",
+            "enum": [
+              "alert",
+              "evidence",
+              "proposal",
+              "decision",
+              "action",
+              "result",
+              "question",
+              "answer",
+              "refusal"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "simulatedDay",
+          "alertId",
+          "type",
+          "actor",
+          "detail",
+          "queryId"
+        ],
+        "title": "LogEvent",
+        "type": "object"
+      },
+      "MergedAlert": {
+        "additionalProperties": false,
+        "description": "Summary of an alert folded into another.",
+        "properties": {
+          "cause": {
+            "description": "Cause of the merged alert",
+            "discriminator": {
+              "mapping": {
+                "identified": "#/components/schemas/CauseIdentified-Output",
+                "no_evidence": "#/components/schemas/CauseNoEvidence-Output"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CauseIdentified-Output"
+              },
+              {
+                "$ref": "#/components/schemas/CauseNoEvidence-Output"
+              }
+            ],
+            "title": "Cause"
+          },
+          "id": {
+            "description": "ID of the merged alert",
+            "title": "Id",
+            "type": "string"
+          },
+          "metric": {
+            "description": "Metric of the merged alert",
+            "enum": [
+              "margen_pct",
+              "saldo_vencido",
+              "dias_pago_prom",
+              "cobertura_dias",
+              "descuento_en_exceso",
+              "veces_intervalo_habitual"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "pesosAtRisk": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Pesos at risk of the merged alert (COP)"
+          },
+          "simulatedDate": {
+            "description": "Simulated date of the merged alert (ISO 8601)",
+            "title": "Simulateddate",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Sentence-Output",
+            "description": "Title of the merged alert"
+          }
+        },
+        "required": [
+          "id",
+          "metric",
+          "simulatedDate",
+          "title",
+          "pesosAtRisk",
+          "cause"
+        ],
+        "title": "MergedAlert",
+        "type": "object"
+      },
+      "Query": {
+        "additionalProperties": false,
+        "description": "A query of the kernel that produced a figure, recorded when an agent ran it.",
+        "properties": {
+          "description": {
+            "description": "The KPI and the simulated day it was read on",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "description": "The figure's queryId",
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "default": "kernel",
+            "description": "Where the query runs: the KPI kernel of packages/tools, or the stored alerts",
+            "enum": [
+              "kernel",
+              "alertas"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "sql": {
+            "description": "The call the kernel ran",
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "sql",
+          "description"
+        ],
+        "title": "Query",
+        "type": "object"
+      },
+      "Sentence-Input": {
+        "additionalProperties": false,
+        "description": "Natural language statement with optional supporting figures.",
+        "properties": {
+          "figures": {
+            "description": "Numeric evidence supporting the statement",
+            "items": {
+              "$ref": "#/components/schemas/Figure"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "text": {
+            "description": "Human-readable statement",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "Sentence",
+        "type": "object"
+      },
+      "Sentence-Output": {
+        "additionalProperties": false,
+        "description": "Natural language statement with optional supporting figures.",
+        "properties": {
+          "figures": {
+            "description": "Numeric evidence supporting the statement",
+            "items": {
+              "$ref": "#/components/schemas/Figure"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "text": {
+            "description": "Human-readable statement",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "figures"
+        ],
+        "title": "Sentence",
+        "type": "object"
+      },
+      "SeriesPoint": {
+        "additionalProperties": false,
+        "description": "Single data point in a time series.",
+        "properties": {
+          "date": {
+            "description": "ISO 8601 date",
+            "example": "2026-10-01",
+            "title": "Date",
+            "type": "string"
+          },
+          "value": {
+            "description": "Value at this date",
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "value"
+        ],
+        "title": "SeriesPoint",
+        "type": "object"
+      },
+      "SimulatedDay": {
+        "additionalProperties": false,
+        "description": "Current simulated day in ISO 8601 format.",
+        "properties": {
+          "dia": {
+            "description": "Current simulated day (YYYY-MM-DD)",
+            "example": "2026-10-03",
+            "title": "Dia",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dia"
+        ],
+        "title": "SimulatedDay",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Centinela API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/alertas": {
+      "get": {
+        "description": "List all alerts, optionally filtered by estado.\n\nValid valores: nueva, en_analisis, propuesta, aprobada, rechazada, ejecutada",
+        "operationId": "listar_alertas_get",
+        "parameters": [
+          {
+            "description": "Filter by alert estado (Spanish name for status)",
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertEstadoEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by alert estado (Spanish name for status)",
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Alert"
+                  },
+                  "title": "Response Listar Alertas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listar",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/alertas/{id}": {
+      "get": {
+        "operationId": "obtener_alertas__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/alertas/{id}/decision": {
+      "post": {
+        "operationId": "decidir_alertas__id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-user-name",
+            "required": true,
+            "schema": {
+              "title": "X-User-Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-user-role",
+            "required": true,
+            "schema": {
+              "title": "X-User-Role",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "approve": "#/components/schemas/DecisionApprove",
+                    "edit": "#/components/schemas/DecisionEdit",
+                    "reject": "#/components/schemas/DecisionReject"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/DecisionApprove"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DecisionEdit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DecisionReject"
+                  }
+                ],
+                "title": "Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decidir",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/bitacora": {
+      "get": {
+        "description": "Get audit log (bit\u00e1cora) of alert lifecycle events, optionally filtered by alert and event type.",
+        "operationId": "listar_bitacora_get",
+        "parameters": [
+          {
+            "description": "Filter by alert ID (UUID-like identifier)",
+            "in": "query",
+            "name": "alertId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by alert ID (UUID-like identifier)",
+              "title": "Alertid"
+            }
+          },
+          {
+            "description": "Filter by event type",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "alert",
+                    "evidence",
+                    "proposal",
+                    "decision",
+                    "action",
+                    "result",
+                    "question",
+                    "answer",
+                    "refusal"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by event type",
+              "title": "Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LogEvent"
+                  },
+                  "title": "Response Listar Bitacora Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listar"
+      }
+    },
+    "/chat": {
+      "post": {
+        "operationId": "chat_chat_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-user-name",
+            "required": false,
+            "schema": {
+              "default": "Sin%20nombre",
+              "title": "X-User-Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-user-role",
+            "required": false,
+            "schema": {
+              "default": "lectura",
+              "title": "X-User-Role",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatQuestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat"
+      }
+    },
+    "/consultas/{query_id}": {
+      "get": {
+        "description": "The kernel query that produced a figure, as the agent that cited it recorded it.",
+        "operationId": "obtener_consultas__query_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "query_id",
+            "required": true,
+            "schema": {
+              "title": "Query Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Query"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener",
+        "tags": [
+          "queries"
+        ]
+      }
+    },
+    "/interno/alertas": {
+      "post": {
+        "description": "Vig\u00eda crea una nueva alerta.\nLa alerta nace en estado 'new' y entra inmediatamente en an\u00e1lisis por Analista.",
+        "operationId": "crear_alerta_interno_alertas_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Agent",
+            "required": true,
+            "schema": {
+              "title": "X-Agent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-agent-key",
+            "required": true,
+            "schema": {
+              "title": "X-Agent-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentAlertInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Crear Alerta",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
+    "/interno/alertas/{id}/causa": {
+      "put": {
+        "description": "Analista explica la causa.\nTransici\u00f3n: new \u2192 analyzing.\nEl texto de la causa es enmascarado antes de ser enviado al modelo,\npero se almacena sin enmascarar.",
+        "operationId": "ingresar_causa_interno_alertas__id__causa_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Agent",
+            "required": true,
+            "schema": {
+              "title": "X-Agent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Cost-Json",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cost-Json"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-agent-key",
+            "required": true,
+            "schema": {
+              "title": "X-Agent-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCauseInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingresar Causa",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
+    "/interno/alertas/{id}/ejecutar": {
+      "post": {
+        "description": "Ejecutor corre una acci\u00f3n aprobada.\nTransici\u00f3n: approved \u2192 executed.",
+        "operationId": "ejecutar_accion_interno_alertas__id__ejecutar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Agent",
+            "required": true,
+            "schema": {
+              "title": "X-Agent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-agent-key",
+            "required": true,
+            "schema": {
+              "title": "X-Agent-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentExecutionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ejecutar Accion",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
+    "/interno/alertas/{id}/propuesta": {
+      "put": {
+        "description": "Estratega propone acciones.\nTransici\u00f3n: analyzing \u2192 proposed.",
+        "operationId": "ingresar_propuesta_interno_alertas__id__propuesta_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Agent",
+            "required": true,
+            "schema": {
+              "title": "X-Agent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Cost-Json",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cost-Json"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-agent-key",
+            "required": true,
+            "schema": {
+              "title": "X-Agent-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProposalInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingresar Propuesta",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
+    "/simulacion/avanzar": {
+      "post": {
+        "operationId": "avanzar_simulacion_avanzar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dias",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Dias",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Avanzar"
+      }
+    },
+    "/simulacion/dia-actual": {
+      "get": {
+        "description": "Get the current simulated day.\nUsed by Vig\u00eda to know what date to filter queries by.",
+        "operationId": "dia_actual_simulacion_dia_actual_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulatedDay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dia Actual"
+      }
+    }
+  }
+}

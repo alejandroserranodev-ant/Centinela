@@ -18,6 +18,7 @@ implement.
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY` and `ROLES_CON_DECISION` |
 | `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
 | `src/centinela_api/modelos.py` | the Pydantic models, the HTTP contract's source; their conventions are [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md) |
+| `src/centinela_api/contrato.py` | `esquema()`, the OpenAPI document plus the payloads of the event streams, and `exportar(destino)`, which `python -m centinela_api.contrato` runs to write `../web/src/api/openapi.json` |
 | `src/centinela_api/ciclo_vida.py` | the lifecycle's transitions and the Spanish names it accepts at the edge |
 | `src/centinela_api/decisiones.py` | `aplicar(alerta, decision)`, the pure check of a person's decision |
 | `src/centinela_api/alertas.py` | reads and upserts `api.alertas` |
@@ -28,7 +29,7 @@ implement.
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
 | `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py` and `tests/test_chat.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py` and `tests/test_contrato.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py` and `tests/test_chat.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -116,7 +117,8 @@ become rows here when it is planned.
    web function that consumes it.
 2. Write its models in `src/centinela_api/modelos.py`, following
    [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md);
-   `apps/web/src/api/types.ts` follows them field for field.
+   then run `python -m centinela_api.contrato` to export the contract the web generates its types
+   from; `tests/test_contrato.py` fails until it does.
 3. Write it in the router of its resource, with `response_model` set, and mount a new router in
    `src/centinela_api/main.py`.
 4. A test beside the others: pure when the logic allows it, `integracion` when it needs Postgres.

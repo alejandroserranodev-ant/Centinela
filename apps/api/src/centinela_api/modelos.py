@@ -5,7 +5,7 @@ from centinela_agents.agents.chat import MAX_QUESTION
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-AlertStatus = Literal["new", "analyzing", "proposed", "approved", "rejected", "executed"]
+AlertStatus = Literal["new", "analyzing", "proposed", "approved", "rejected", "executed", "merged"]
 Severity = Literal["critical", "high", "medium", "low"]
 ConfidenceLevel = Literal["high", "medium", "low"]
 Metric = Literal[
@@ -34,7 +34,7 @@ class AlertEstadoEnum(str, Enum):
 
 
 class Esquema(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", json_schema_serialization_defaults_required=True)
 
 
 class Figure(Esquema):
@@ -109,6 +109,16 @@ class ExecutedAction(Esquema):
     result: str = Field(..., description="Execution outcome: success, failed, or partial")
 
 
+class MergedAlert(Esquema):
+    """Summary of an alert folded into another."""
+    id: str = Field(..., description="ID of the merged alert")
+    metric: Metric = Field(..., description="Metric of the merged alert")
+    simulated_date: str = Field(..., description="Simulated date of the merged alert (ISO 8601)")
+    title: Sentence = Field(..., description="Title of the merged alert")
+    pesos_at_risk: Figure = Field(..., description="Pesos at risk of the merged alert (COP)")
+    cause: Cause = Field(..., description="Cause of the merged alert")
+
+
 class Alert(Esquema):
     """Complete alert lifecycle state."""
     id: str = Field(..., description="Unique alert ID", example="alerta_abc123def456")
@@ -124,6 +134,9 @@ class Alert(Esquema):
     cause: Cause = Field(..., description="Root cause (identified with evidence or no_evidence)")
     actions: list[Action] = Field(default_factory=list, min_length=0, max_length=3, description="Proposed mitigation actions")
     executed_action: ExecutedAction | None = Field(None, description="Action executed (only when status=executed)")
+    changes_requested: bool = Field(False, description="Whether a person asked for changes to the proposal")
+    merged_into: str | None = Field(None, description="ID of the alert this one was merged into")
+    merged_alerts: list[MergedAlert] = Field(default_factory=list, description="Alerts merged into this one")
 
 
 class AgentStep(Esquema):
@@ -178,6 +191,12 @@ class ChatMessage(Esquema):
     date: str = Field(..., description="Message timestamp (ISO 8601)")
 
 
+class AdvanceEnd(Esquema):
+    """Final event of the simulated clock's advance stream."""
+    simulated_day: str = Field(..., description="Simulated day the clock reached (ISO 8601)")
+    new_alerts: list[str] = Field(default_factory=list, description="IDs of the alerts raised on that day")
+
+
 class ChatQuestion(Esquema):
     """User question for Centinela (the agent chat)."""
     question: str = Field(..., min_length=1, max_length=MAX_QUESTION, description="Natural language question about alert or metric")
@@ -187,7 +206,7 @@ class ChatQuestion(Esquema):
 class Query(Esquema):
     """A query of the kernel that produced a figure, recorded when an agent ran it."""
     id: str = Field(..., description="The figure's queryId")
-    source: Literal["kernel"] = Field("kernel", description="Where the query runs: the KPI kernel of packages/tools")
+    source: Literal["kernel", "alertas"] = Field("kernel", description="Where the query runs: the KPI kernel of packages/tools, or the stored alerts")
     sql: str = Field(..., description="The call the kernel ran")
     description: str = Field(..., description="The KPI and the simulated day it was read on")
 

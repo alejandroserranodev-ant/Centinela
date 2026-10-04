@@ -10,7 +10,7 @@ from .. import alertas as alertas_repo
 from .. import bitacora, ciclo_vida, consultas, simulacion
 from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path
 from ..db import obtener_conexion
-from ..modelos import ActorAgent, AgentStep, SimulatedDay
+from ..modelos import ActorAgent, AdvanceEnd, AgentStep, SimulatedDay
 from ..sse import flujo
 
 from centinela_agents.walk import detect
@@ -109,6 +109,6 @@ async def avanzar(
         except Exception as e:
             logger.error(f"Detection phase failed: {e}", exc_info=True)
 
-        yield "end", {"simulatedDay": day_str, "newAlerts": new_alert_ids}
+        yield "end", AdvanceEnd(simulated_day=day_str, new_alerts=new_alert_ids)
 
     return StreamingResponse(flujo(eventos()), media_type="text/event-stream")

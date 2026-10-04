@@ -3,11 +3,11 @@ import { test } from 'node:test';
 
 import { readSse } from './sse.ts';
 
-function streamOf(...chunks: string[]): ReadableStream<Uint8Array> {
+function streamOf(...pieces: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   return new ReadableStream({
     start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      for (const piece of pieces) controller.enqueue(encoder.encode(piece));
       controller.close();
     },
   });
@@ -32,7 +32,7 @@ test('takes the event name from the event line and the payload from the data lin
   ]);
 });
 
-test('joins an event split across chunks', async () => {
+test('joins an event split across pieces', async () => {
   const events = await collect(streamOf('event: en', 'd\ndata: {"newAl', 'erts":[]}\n', '\n'));
   assert.deepEqual(events, [{ event: 'end', data: { newAlerts: [] } }]);
 });

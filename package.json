@@ -13,6 +13,7 @@
     "check:docs": "node scripts/check/check-docs.ts",
     "check:generated": "node scripts/check/check-generated.ts",
     "check:routes": "node scripts/check/check-routes.ts",
+    "check:contract": "node scripts/check/check-contract.ts",
     "test": "node --test \"scripts/check/*.test.ts\"",
     "typecheck": "tsc -p scripts/check"
   },
