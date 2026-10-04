@@ -84,6 +84,9 @@ and what each shows is
   for stays written by hand in the same file. Every number travels as a `Figure` with its
   `queryId`, so the type itself asks each figure for its query. The one place the web's
   `Decision` outgrows the API's is listed under the rules below.
+  The generator runs through `npx` with `openapi-typescript@7.13.0` and `typescript@5.9.3` pinned
+  in the `contract` script, and is no devDependency: it needs the TypeScript 5 compiler API, this
+  app is on TypeScript 7, and npm refuses the peer conflict. A cold `npx` cache needs the network.
 - **The agents' current step is on screen while they work.** `src/shell/CurrentStep.tsx:CurrentStep()`
   renders the `step` events of the day run, which `apps/api` streams by SSE
   ([`../api/AGENTS.md`](../api/AGENTS.md)).
