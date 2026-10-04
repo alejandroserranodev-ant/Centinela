@@ -14,9 +14,9 @@
     --color-primary:#0e5a6b; --color-primary-content:#ffffff;
     --color-secondary:#8f6000; --color-secondary-content:#ffffff;
     --color-neutral:#eaf0f2; --color-neutral-content:#4d5f68;
-    --color-info:#1f5c8b; --color-info-content:#ffffff;
-    --color-success:#1f6b34; --color-success-content:#ffffff;
-    --color-warning:#9a4d00; --color-warning-content:#ffffff;
+    --color-info:#f2c200; --color-info-content:#0f1b21;
+    --color-success:#2e7d32; --color-success-content:#ffffff;
+    --color-warning:#f28c28; --color-warning-content:#0f1b21;
     --color-error:#a51c1c; --color-error-content:#ffffff; --color-error-fill:#a51c1c;
     --color-cat-1:#2a78d6; --color-cat-2:#eb6834; --color-cat-3:#1baf7a; --color-cat-4:#eda100;
     --color-cat-5:#e87ba4; --color-cat-6:#008300; --color-cat-7:#4a3aa7; --color-cat-8:#e34948;
@@ -30,10 +30,10 @@
     --color-primary:#5fb3c4; --color-primary-content:#06191e;
     --color-secondary:#e0b45a; --color-secondary-content:#1f1503;
     --color-neutral:#1a272c; --color-neutral-content:#9db0b8;
-    --color-info:#84b6f4; --color-info-content:#0a1725;
-    --color-success:#79cd93; --color-success-content:#08200f;
+    --color-info:#f5d565; --color-info-content:#241703;
+    --color-success:#81c784; --color-success-content:#0a1f0c;
     --color-warning:#f0a060; --color-warning-content:#241703;
-    --color-error:#f08a8a; --color-error-content:#2a0a0a; --color-error-fill:#d06e6e;
+    --color-error:#f08a8a; --color-error-content:#2a0a0a; --color-error-fill:#f08a8a;
     --color-cat-1:#3987e5; --color-cat-2:#d95926; --color-cat-3:#199e70; --color-cat-4:#c98500;
     --color-cat-5:#d55181; --color-cat-6:#008300; --color-cat-7:#9085e9; --color-cat-8:#e66767;
     background: var(--color-base-200); padding: var(--sp-4); border-radius: var(--r-sm);
@@ -72,6 +72,13 @@
   .sample .voice { display: inline-block; margin-block-start: var(--sp-3); padding: var(--sp-2) var(--sp-4);
                    background: var(--color-primary); color: var(--color-primary-content);
                    border-radius: var(--r-sm); font-weight: 500; }
+  .sev { display: inline-block; border-radius: var(--r-marker); padding: var(--sp-1) calc(var(--sp-1) * 2.5);
+         font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 700;
+         letter-spacing: 0.08em; text-transform: uppercase; }
+  .sev--critical { background: var(--color-error-fill); color: var(--color-error-content); }
+  .sev--high { background: var(--color-warning); color: var(--color-warning-content); }
+  .sev--medium { background: var(--color-info); color: var(--color-info-content); }
+  .sev--low { background: var(--color-success); color: var(--color-success-content); }
 </style>
 </head>
 <body>
@@ -97,8 +104,8 @@
   <code>Distribuidora Andina S.A.S.</code> open it and find each problem already explained,
   ordered by pesos at risk, with a proposal ready to approve, edit or reject. It is an
   application somebody works in: a list of alerts set against a reading column, a pinned chat,
-  an audit log and a settings page. Every piece is furniture Arena ships. The two pieces drawn
-  by hand are the alert row and the chat message.
+  an audit log and a settings page. The rest is furniture Arena ships. The pieces drawn by hand are
+  the alert row with its severity chip, and the chat message.
 </p>
 <p>
   The register starts from Arena's measured <code>inbox</code> entry, because the screen is a
@@ -123,9 +130,9 @@
   <div class="chip"><i style="background: var(--color-neutral)"></i><span>neutral #eaf0f2</span></div>
 </div>
 <div class="row">
-  <div class="chip"><i style="background: var(--color-info)"></i><span>info #1f5c8b</span></div>
-  <div class="chip"><i style="background: var(--color-success)"></i><span>success #1f6b34</span></div>
-  <div class="chip"><i style="background: var(--color-warning)"></i><span>warning #9a4d00</span></div>
+  <div class="chip"><i style="background: var(--color-info)"></i><span>info #f2c200</span></div>
+  <div class="chip"><i style="background: var(--color-success)"></i><span>success #2e7d32</span></div>
+  <div class="chip"><i style="background: var(--color-warning)"></i><span>warning #f28c28</span></div>
   <div class="chip"><i style="background: var(--color-error)"></i><span>error #a51c1c</span></div>
 </div>
 <div class="row">
@@ -159,6 +166,12 @@
     <div class="chip"><i style="background: var(--color-cat-3)"></i><span>cat-3</span></div>
     <div class="chip"><i style="background: var(--color-cat-4)"></i><span>cat-4</span></div>
   </div>
+  <div class="row">
+    <span class="sev sev--critical">Crítica</span>
+    <span class="sev sev--high">Alta</span>
+    <span class="sev sev--medium">Media</span>
+    <span class="sev sev--low">Baja</span>
+  </div>
 </div>
 
 <p>
@@ -167,8 +180,27 @@
   the <code>dataviz</code> validator in both modes. In light mode, three slots sit under 3:1 against
   white, so every Centinela chart carries direct labels and a table view. The "how I got here"
   view is that table. Status colours mean severity and are never series colours, and severity
-  always carries a label and an icon besides its colour.
+  always carries its label, with an icon besides its colour on <code>Crítica</code>.
 </p>
+
+<h2>The severity</h2>
+<p>
+  Every alert carries one of four severities, and each is a <strong>filled</strong> chip reading
+  Arena's status family: <code>--color-error-fill</code> for <code>Crítica</code>,
+  <code>--color-warning</code> for <code>Alta</code>, <code>--color-info</code> for
+  <code>Media</code> and <code>--color-success</code> for <code>Baja</code>, each with its
+  <code>-content</code> as the ink. The family is Arena's status family, re-valued here to the
+  severity scale, so Centinela paints no colour of its own. <code>Crítica</code> adds a warning
+  glyph, because colour alone never tells severity, and it is filled where Arena's danger is an
+  outline: the chip is the loudest mark an alert wears and a hairline does not carry it. Each pair
+  is measured: the four clear 4.5:1 in both themes.
+</p>
+<div class="row">
+  <span class="sev sev--critical">Crítica</span>
+  <span class="sev sev--high">Alta</span>
+  <span class="sev sev--medium">Media</span>
+  <span class="sev sev--low">Baja</span>
+</div>
 
 <h2>The type</h2>
 <p>

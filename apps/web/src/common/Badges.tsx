@@ -1,12 +1,11 @@
-import { ArenaBadge, ArenaTag } from '@dravensoft/arena-react';
-import type { ArenaTone } from '@dravensoft/arena-react';
+import { ArenaTag } from '@dravensoft/arena-react';
 import type { AlertStatus, ConfidenceLevel, Severity as SeverityLevel } from '../api/types';
 
-const SEVERITY: Record<SeverityLevel, { text: string; tone: ArenaTone }> = {
-  critical: { text: 'Crítica', tone: 'danger' },
-  high: { text: 'Alta', tone: 'warning' },
-  medium: { text: 'Media', tone: 'info' },
-  low: { text: 'Baja', tone: 'neutral' },
+const SEVERITY: Record<SeverityLevel, string> = {
+  critical: 'Crítica',
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
 };
 
 const CONFIDENCE: Record<ConfidenceLevel, string> = {
@@ -26,11 +25,11 @@ export const STATUS: Record<AlertStatus, string> = {
 };
 
 export function Severity({ level }: { level: SeverityLevel }) {
-  const { text, tone } = SEVERITY[level];
   return (
-    <ArenaBadge tone={tone} dot>
-      {text}
-    </ArenaBadge>
+    <span className={`severity severity--${level}`}>
+      {level === 'critical' ? <i className="ph-fill ph-warning" aria-hidden /> : null}
+      {SEVERITY[level]}
+    </span>
   );
 }
 
