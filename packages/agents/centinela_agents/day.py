@@ -136,10 +136,10 @@ def run_day(graph, ctx: Context, day: str, *, earlier: Iterable[Earlier] = (), w
         current, detection = next(iter(queue.items()))
         del queue[current]
         verdict, excluded = None, set()
+        yield detected_step(current, detection)
         while True:
             known = {**{other: MERGEABLE for other in candidates}, **{other: "nueva" for other in queue}}
             briefs = {**candidates, **{other: brief_of_detection(pending, ctx) for other, pending in queue.items()}}
-            yield detected_step(current, detection)
             try:
                 for written in stream_alert(
                     graph, detection, alert_id=current, day=day,

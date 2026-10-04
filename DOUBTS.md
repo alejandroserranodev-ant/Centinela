@@ -84,3 +84,9 @@ writes an object by agent, so a row the day run never costed holds a list and a 
 object. Nothing reads the column yet; it costs the first reader a check of both shapes. It is paid
 when the default becomes `'{}'`. Re-derive it with
 `grep -n "costos" apps/api/sql/01_esquema.sql apps/api/src/centinela_api/alertas.py`.
+
+**A model output its schema refuses is not retried.** `packages/agents/centinela_agents/metered.py:RETRIED` lists
+the provider's own errors, and a leaf's `SchemaRefused`, raised after the provider returns, goes
+straight to the fallback, so one malformed answer costs a step its model result where a second
+call might have passed. It is paid when the meter, or the leaf, retries once on `SchemaRefused`.
+Re-derive it with `grep -n "RETRIED\|SchemaRefused" packages/agents/centinela_agents/metered.py packages/agents/centinela_agents/agents/*.py`.

@@ -13,8 +13,8 @@ export const ENTRIES = new Map<string, Budget>([
 ]);
 
 export const ROUTES = new Map<string, Budget>([
-  ["the chat answered, refused or stayed silent when it should not have", [64892, "the chat's agent and its subtree are stated on the agents page and the tree's page"]],
-  ["an alert is missing, wrong, duplicated or fires on the wrong day", [89222, "the agents, the tree and the clock are the three places a detection is decided"]],
+  ["the chat answered, refused or stayed silent when it should not have", [65332, "the chat's agent and its subtree are stated on the agents page and the tree's page"]],
+  ["an alert is missing, wrong, duplicated or fires on the wrong day", [89662, "the agents, the tree and the clock are the three places a detection is decided"]],
   ["a number on screen disagrees with SQL", [52561, "a screen's figure comes from the fetch client or from what the API serves, and both pages say which"]],
   ["a number in an agent's answer or an alert disagrees with SQL", [47000, "a figure comes from the compiler and from the base KPI it compiles"]],
   ["something happened without approval, or the log is missing a step", [33112, "the decision checks, the in-process agents and the bitácora are stated on one page"]],
@@ -24,7 +24,7 @@ export const ROUTES = new Map<string, Budget>([
   ["a table, a CSV, a threshold, a policy document, the database setup, the generator", [24330, "one page owns the dataset, its setup and its generator"]],
   ["a KPI's definition, the kernel's language, a refusal by a guard", [47000, "the language is data's and the compiler is the tools', so both are read"]],
   ["a node, a leaf, a level, a stage or the registry of the decision tree", [23000, "the tree's own page states every rule a node is written by"]],
-  ["an agent, the orchestrator, which model a step uses", [42869, "one page holds the agents, the orchestrator and the model providers"]],
+  ["an agent, the orchestrator, which model a step uses", [43309, "one page holds the agents, the orchestrator and the model providers"]],
   ["the instructions a model step loads, its skill", [6500, "the rules a skill is written by fit one short page"]],
   ["a tool an agent calls: SQL, policy search, impact, an action", [23500, "one page holds every tool, built or decided"]],
   ["sign-in, a role, a 401 or a 403", [33112, "the token, the profiles and who decides are stated on the API's page"]],
@@ -38,12 +38,12 @@ export const ROUTES = new Map<string, Budget>([
   ["adding an endpoint", [33112, "the endpoint table and its rule sit on the API's page"]],
   ["adding a screen", [19699, "the checklist for a screen sits on the web page"]],
   ["adding an evaluation case", [10566, "the checklist for a case sits on the evaluation page"]],
-  ["running the database, the API and the web together on my machine", [3213, "the local run across levels is one short page"]],
+  ["running the database, the API and the web together on my machine", [3265, "the local run across levels is one short page"]],
   ["which model provider the agents call, its key or its variables", [3500, "the variables the providers read are one short page"]],
   ["the guide a developer reads in Docmost, its compose, or one of its chapters", [5500, "the guide's build and its compose are one page"]],
   ["how a page, a spec or a plan is written", [38000, "the practice every page follows is one reference, read whole"]],
   ["whether the file in front of me is mine to edit", [4750, "which half of a file is a person's is one companion page"]],
-  ["I am about to write down that something is wrong", [5580, "what counts as a debt and where it goes is one companion page"]],
+  ["I am about to write down that something is wrong", [6127, "what counts as a debt and where it goes is one companion page"]],
 ]);
 
 export type Row = { question: string; stops: string[] };

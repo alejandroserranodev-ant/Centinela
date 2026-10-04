@@ -52,6 +52,10 @@ Both files are versioned with local values and no secret, so a clone runs with n
 `LLM_MODEL`, a day run logs the provider's error and ends with no new alerts, which looks like a
 quiet day.
 
+A database built before `api.alertas.entidad` existed holds alerts that cover nothing and whose ids
+hash no day, so the next day run raises them again; reset `api.alertas`, `api.bitacora` and
+`api.consultas`, or rebuild the database.
+
 ## Signing in
 
 Each profile of `CENTINELA_USUARIOS`, in the root `.env`, signs in with `Andina2026!`:

@@ -160,6 +160,8 @@ def test_orq_a_refused_merge_runs_the_alert_again_without_that_target():
     first, second = runs(drive(run_day(graph, context(saldo("CLI-001")), DAY, earlier=earlier), answer=answer))
     assert first.alert_id == second.alert_id
     assert (first.state["status"], second.state["status"]) == ("unida", "propuesta")
+    events = drive(run_day(graph, context(saldo("CLI-001")), DAY, earlier=earlier), answer=answer)
+    assert [(e.agent, e.node) for e in events if isinstance(e, Step)].count(("vigia", "detectar")) == 1
 
 
 def test_only_a_proposed_earlier_alert_is_a_merge_candidate():

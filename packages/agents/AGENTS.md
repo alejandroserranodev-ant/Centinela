@@ -407,10 +407,14 @@ alert by [`apps/api`](../../apps/api/AGENTS.md#decisions-and-roles), which state
 **A step fails when its model call fails twice.** The orchestrator wraps each provider in
 `centinela_agents/metered.py:MeteredProvider(inner)`, and `leaf_node` opens
 `centinela_agents/metered.py:metering(agent, spent, cap)` around each leaf, so a call is retried
-once on a timeout, a connection error or an output its schema refuses. The timeout is the
+once on a timeout, a connection error or an answer that is not valid JSON; an output its
+schema refuses goes straight to the fallback, which
+[`DOUBTS.md`](../../DOUBTS.md) files as a debt. The OpenAI client is built with no retries of its
+own, so the meter's one retry is the only one. The timeout is the
 provider's `ModelConfig.timeout_seconds`, because its HTTP client is the only place that can stop a
 call. The cap is `centinela_agents/orchestrator.py:TOKEN_CAP` tokens per alert, checked before
-each call, and once it is reached every model step left takes its fallback. A cached answer
+each call and counted over the whole alert, so once it is reached every model step left takes its
+fallback, an approved `Ejecutor` step after the gate included. A cached answer
 charges nothing, and a failure carries its `attempts`. The rejection classifier runs in an end
 node, not a leaf, so its call is neither retried nor counted in `cost`.
 
@@ -486,7 +490,8 @@ agents alone.
 Langfuse's LangChain handler, which is why `langchain` is a dependency beside `langfuse`, when
 `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, and none otherwise, because a trace
 observes and never decides. A trace groups by session: the alert id for an alert's start and
-resume, its own for a chat question. The detection runs no graph, so it has no trace.
+resume, its own for a chat question. The trace shows the graph's nodes and not the model
+generations, because the leaves call the provider SDKs directly, not through LangChain. The detection runs no graph, so it has no trace.
 
 > **Decided, not built.** The only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.

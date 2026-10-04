@@ -162,6 +162,12 @@ class TestOpenAIProvider:
             with pytest.raises(ValueError, match="OPENAI_API_KEY"):
                 OpenAIProvider(config)
 
+    def test_client_leaves_retries_to_the_meter(self):
+        config = ModelConfig(provider="openai", model="gpt-4o-mini")
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            provider = OpenAIProvider(config, skip_health_check=True)
+        assert provider.client.max_retries == 0
+
     def test_health_check_success(self):
         """health_check returns True when API is reachable."""
         config = ModelConfig(provider="openai", model="gpt-4o-mini")
