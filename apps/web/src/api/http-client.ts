@@ -21,13 +21,14 @@ import type {
   Settings,
 } from './types';
 
-export const STATUS_ESTADO: Record<Exclude<AlertStatus, 'merged'>, string> = {
+export const STATUS_ESTADO: Record<AlertStatus, string> = {
   new: 'nueva',
   analyzing: 'en_analisis',
   proposed: 'propuesta',
   approved: 'aprobada',
   rejected: 'rechazada',
   executed: 'ejecutada',
+  merged: 'unida',
 };
 
 export class ApiError extends Error {
@@ -105,7 +106,7 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
 
 export async function listAlerts(filter: AlertFilter = {}): Promise<Alert[]> {
   const params = new URLSearchParams();
-  if (filter.status && filter.status !== 'merged') {
+  if (filter.status) {
     params.set('estado', STATUS_ESTADO[filter.status]);
   }
 

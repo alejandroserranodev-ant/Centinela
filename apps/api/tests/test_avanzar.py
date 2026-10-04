@@ -38,7 +38,7 @@ def conn():
 @pytest.fixture
 def cliente(conn, monkeypatch):
     orquestador = MagicMock()
-    orquestador.start.side_effect = lambda detection, *, alert_id, day: {
+    orquestador.start.side_effect = lambda detection, *, alert_id, day, **_: {
         "status": "propuesta",
         "transitions": [[alert_id, "nueva"], [alert_id, "en análisis"], [alert_id, "propuesta"]],
         "actions": [],

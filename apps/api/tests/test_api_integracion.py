@@ -207,8 +207,10 @@ def test_un_dia_real_cita_el_kernel_y_aprobar_ejecuta_y_rechazar_clasifica(monke
     finally:
         with conectar() as conn:
             for id_alerta in nuevas:
-                conn.execute("DELETE FROM api.bitacora WHERE alerta_id = %s", (id_alerta,))
-                conn.execute("DELETE FROM api.alertas WHERE id = %s", (id_alerta,))
+                unidas = [fila[0] for fila in conn.execute("SELECT id FROM api.alertas WHERE cuerpo->>'mergedInto' = %s", (id_alerta,))]
+                for id_borrar in (*unidas, id_alerta):
+                    conn.execute("DELETE FROM api.bitacora WHERE alerta_id = %s", (id_borrar,))
+                    conn.execute("DELETE FROM api.alertas WHERE id = %s", (id_borrar,))
             conn.commit()
 
 

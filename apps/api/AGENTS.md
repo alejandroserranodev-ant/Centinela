@@ -76,8 +76,8 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection, an `alert` event with the stored `Alert` once it is recorded, and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock | `advanceDay` |
-| GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection, an `alert` event with each `Alert` stored or updated once it is recorded, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock | `advanceDay` |
+| GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk; without `estado`, every alert but the merged ones, which `estado=unida` lists | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
@@ -193,32 +193,33 @@ recorded, and one cause would raise two alerts.
 before it moves the clock and frees it when the stream ends, fails or the client leaves; the
 response's background task frees it for a stream that never starts.
 
-> **Decided, not built.** The decision below.
+**`avanzar` hands each run the alerts its `Analista` may name as the same cause**: the Spanish state
+of every stored alert that is not final, by id, with its metric, its entity and its cause's
+sentence, `src/centinela_api/agentes.py:brief_of_alert(alerta)`, and each detection of the day not
+yet run as `nueva`, `src/centinela_api/agentes.py:brief_of_detection(detection)`. Each alert the
+run records joins the list for the next.
 
-**The API hands each run what the orchestrator cannot read**: the metric, entity, severity and
-state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps each
-reason with the target the orchestrator classified it to, the metric and the entity. `avanzar`
-calls `start` without them.
+> **Decided, not built.** The API also hands each run the severity of every earlier alert and the
+> rejection reasons kept for the alert's metric, each with the target the orchestrator classified
+> it to, the metric and the entity. `avanzar` hands neither.
 
 ## The alert lifecycle
 
 **The contract and the database speak English statuses**: `new`, `analyzing`, `proposed`,
-`approved`, `rejected`, `executed`. The Spanish names stay at the edge: `estado=propuesta` on
+`approved`, `rejected`, `executed`, `merged`. The Spanish names stay at the edge: `estado=propuesta` on
 `GET /alertas` is the brief's spelling, and
 `src/centinela_api/ciclo_vida.py:ESTADO_A_STATUS` maps it.
 
 **`src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)` refuses a transition
-`TRANSICIONES` does not list**: `new` → `analyzing` → `proposed` → `approved` or `rejected`, and
-`approved` → `executed`. A person's decision and the internal routes call it, and so do the two
+`TRANSICIONES` does not list**: `new` → `analyzing` → `proposed` → `approved` or `rejected`,
+`approved` → `executed`, and `new` or `analyzing` → `merged`. `rejected`, `executed` and `merged`
+are final, `src/centinela_api/ciclo_vida.py:FINALES`. A person's decision and the internal routes call it, and so do the two
 paths the orchestrator drives. `avanzar` hands
 `src/centinela_api/ciclo_vida.py:recorrer(estados)` the statuses the graph took the alert through,
 read from its `transitions` by `src/centinela_api/agentes.py:status_path(alert_id, state)`, and
 stores no alert whose path does not start at `new` or skips a transition. The resume after an
 approval writes `executed` only after `transicionar` accepts it from `approved`. The database
 keeps the last status, not the path.
-
-> **Decided, not built.** The table below and the merge it carries. The graph's `unida` reaches
-> the API as `new`, because `state_to_alert` has no entry for it.
 
 **The API validates every transition and persists it.** The orchestrator proposes the transitions
 an agent causes, because it is the only part that sees an agent finish; the API proposes the ones
@@ -240,12 +241,21 @@ door. How the orchestrator reaches each proposal is
   already explains another alert ends there, pointing to the alert that remains, because the brief
   asks that one cause raise one alert and its lifecycle has no end for the second. `rechazada`
   would claim a decision no person made, so `unida` is final and never counts as decided.
-- **A merge keeps one alert in view and loses nothing.** The API accepts a transition to `unida`
-  only while its target is in `nueva`, `en análisis` or `propuesta`, checked in the transaction
-  that records it, so every alert of one cause points to the one that remains and none points to a
-  merged alert. The inbox lists only the alert that remains, and its detail carries, beside its
-  own, the detection and evidence of each alert in its `merged_alerts`. Its pesos at risk stay its
-  own, because two detections of one cause would count the same pesos twice.
+- **A merge keeps one alert in view and loses nothing.** An alert whose run ends at `fin.unida` is
+  stored `merged` with its `mergedInto` only while its target is `new`, `analyzing` or `proposed`,
+  read with a row lock in the transaction that records it, and the target's `mergedAlerts` gains
+  its summary, `src/centinela_api/agentes.py:merged_summary(alerta)`. So every alert of one cause
+  points to the one that remains and none points to a merged alert. A target already decided
+  refuses the merge: the alert is stored `analyzing`, the last status the record accepted, with its
+  cause and an `alert` row naming the refusal, because the graph has ended and the record wins
+  over the checkpoint.
+- **A detection the remaining alert absorbs never runs.** When `explicar.destino_nuevo` names a
+  detection of the same day, `src/centinela_api/agentes.py:absorbed_alert(alert_id, detection, into, day_str)`
+  stores it `merged` with its detection's title and pesos at risk and the cause "Unida a la alerta
+  …: la misma causa", and the run skips it; a stored alert still `new` is moved to `merged` the same
+  way. `GET /alertas` lists the alert that remains, and its detail carries each merged one's
+  detection and evidence. Its pesos at risk stay its own, because two detections of one cause
+  would count the same pesos twice.
 
 ## Decisions and roles
 
@@ -331,7 +341,7 @@ time, and the alert it belongs to, which a chat question asked from no alert lea
 
 | Type | Written by |
 |---|---|
-| `alert` | `avanzar`, for each alert the orchestrator returns; `POST /interno/alertas` |
+| `alert` | `avanzar`, for each alert the orchestrator returns, and for each merge, under `analista`, naming the alert that remains; `POST /interno/alertas` |
 | `evidence` | `avanzar`, one row per `kpi_consultar` a leaf ran, its SQL as the detail and its `queryId`; `PUT /interno/alertas/{id}/causa` |
 | `proposal` | `PUT /interno/alertas/{id}/propuesta` |
 | `decision` | a person's decision |

@@ -36,6 +36,7 @@ from .modelos import (
     ExecutedAction,
     Figure,
     Impact,
+    MergedAlert,
     Sentence,
 )
 
@@ -135,7 +136,9 @@ _STATUS_MAP: dict[str, str] = {
     "aprobada": "approved",
     "rechazada": "rejected",
     "ejecutada": "executed",
+    "unida": "merged",
 }
+STATUS_A_ESTADO: dict[str, str] = {status: estado for estado, status in _STATUS_MAP.items()}
 
 _UNIT_MAP: dict[str, str] = {
     "COP": "COP", "%": "percent", "percent": "percent", "pts": "points", "points": "points",
@@ -330,4 +333,46 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
         cause=cause,
         actions=actions,
         executed_action=executed_action,
+        merged_into=state.get("merged_into") if status == "merged" else None,
     )
+
+
+def _entity_labels(metric: str, entity: tuple) -> list[str]:
+    ctx = get_context()
+    return _labels(metric, entity, ctx.metrics, ctx.catalog)[1 if metric in ctx.metrics.labels else 0:]
+
+
+def brief_of_alert(alerta: Alert) -> dict[str, Any]:
+    """What Analista reads of an earlier alert: its metric, its entity and the sentence of its cause."""
+    ctx = get_context()
+    skip = 1 if alerta.metric in ctx.metrics.labels and alerta.labels[:1] == [ctx.metrics.labels[alerta.metric]] else 0
+    cause = alerta.cause.sentence.model_dump(by_alias=True) if isinstance(alerta.cause, CauseIdentified) else None
+    return {"metric": alerta.metric, "entity": alerta.labels[skip:], "cause": cause}
+
+
+def brief_of_detection(detection: Detection) -> dict[str, Any]:
+    """What Analista reads of a detection of the day not yet run: its metric and its entity, no cause."""
+    return {"metric": detection.metric, "entity": _entity_labels(detection.metric, detection.entity), "cause": None}
+
+
+def merged_summary(alerta: Alert) -> MergedAlert:
+    return MergedAlert(
+        id=alerta.id,
+        metric=alerta.metric,
+        simulated_date=alerta.simulated_date,
+        title=alerta.title,
+        pesos_at_risk=alerta.pesos_at_risk,
+        cause=alerta.cause,
+    )
+
+
+def absorbed_alert(alert_id: str, detection: Detection, into: str, day_str: str) -> Alert:
+    """A detection of the day another alert's cause absorbed before its run: stored merged, never run."""
+    description = get_context().metrics.descriptions.get(detection.metric, detection.metric)
+    state = {
+        "status": "unida",
+        "merged_into": into,
+        "title": {"text": ": ".join([description, ", ".join(_entity_labels(detection.metric, detection.entity))]), "figures": []},
+        "cause": {"kind": "no_evidence", "reason": f"Unida a la alerta {into}: la misma causa", "queriesReviewed": []},
+    }
+    return state_to_alert(alert_id, state, detection, day_str)

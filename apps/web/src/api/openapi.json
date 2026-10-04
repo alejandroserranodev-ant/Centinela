@@ -690,7 +690,8 @@
           "propuesta",
           "aprobada",
           "rechazada",
-          "ejecutada"
+          "ejecutada",
+          "unida"
         ],
         "title": "AlertEstadoEnum",
         "type": "string"

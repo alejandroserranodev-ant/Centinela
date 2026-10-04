@@ -1,13 +1,14 @@
 import psycopg
 from psycopg.types.json import Jsonb
 
+from .ciclo_vida import FINALES
 from .modelos import Alert, AlertStatus
 
 
 def listar(conn: psycopg.Connection, status: AlertStatus | None) -> list[Alert]:
     if status is None:
         filas = conn.execute(
-            "SELECT id, status, cuerpo FROM api.alertas "
+            "SELECT id, status, cuerpo FROM api.alertas WHERE status <> 'merged' "
             "ORDER BY (cuerpo->'pesosAtRisk'->>'value')::numeric DESC"
         ).fetchall()
     else:
@@ -23,9 +24,18 @@ def ids(conn: psycopg.Connection) -> set[str]:
     return {fila[0] for fila in conn.execute("SELECT id FROM api.alertas").fetchall()}
 
 
-def obtener(conn: psycopg.Connection, id: str) -> Alert | None:
+def abiertas(conn: psycopg.Connection) -> list[Alert]:
+    filas = conn.execute(
+        "SELECT id, status, cuerpo FROM api.alertas WHERE status <> ALL(%s) "
+        "ORDER BY (cuerpo->'pesosAtRisk'->>'value')::numeric DESC",
+        (sorted(FINALES),),
+    ).fetchall()
+    return [_a_alerta(fila) for fila in filas]
+
+
+def obtener(conn: psycopg.Connection, id: str, *, bloquear: bool = False) -> Alert | None:
     fila = conn.execute(
-        "SELECT id, status, cuerpo FROM api.alertas WHERE id = %s", (id,)
+        "SELECT id, status, cuerpo FROM api.alertas WHERE id = %s" + (" FOR UPDATE" if bloquear else ""), (id,)
     ).fetchone()
     return _a_alerta(fila) if fila else None
 

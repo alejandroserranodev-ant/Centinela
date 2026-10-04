@@ -60,7 +60,15 @@ function Merged({ alert }: { alert: MergedAlert }) {
   );
 }
 
-function Outcome({ alert }: { alert: Alert }) {
+function Outcome({ alert, onOpen }: { alert: Alert; onOpen: (id: string) => void }) {
+  if (alert.status === 'merged' && alert.mergedInto) {
+    const into = alert.mergedInto;
+    return (
+      <ArenaAlert tone="info" title="Unida a otra alerta" actionLabel="Ver la alerta que queda" onAction={() => onOpen(into)}>
+        La misma causa explica las dos, así que se decide en la alerta {into}. Esta no espera ninguna decisión.
+      </ArenaAlert>
+    );
+  }
   if (alert.status === 'rejected') {
     return (
       <ArenaAlert tone="info" title="Rechazaste esta propuesta">
@@ -177,7 +185,7 @@ export function AlertDetail({ id }: { id: string }) {
         </div>
       </header>
 
-      <Outcome alert={alert} />
+      <Outcome alert={alert} onOpen={(into) => navigate(`/alertas/${into}`)} />
 
       {analyzing ? (
         <div className="arena-row analyzing">

@@ -4,7 +4,11 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from centinela_agents.walk import Detection
+
+from centinela_api import alertas as alertas_repo_modulo
 from centinela_api import ciclo_vida, db
+from centinela_api.agentes import alert_id_of
 from centinela_api.auth import persona_actual
 from centinela_api.main import app
 from centinela_api.modelos import Action, Alert, CauseNoEvidence, Confidence, Figure, Persona, Sentence
@@ -52,7 +56,7 @@ def guardadas(monkeypatch):
 def _orquestador_que_recorre(monkeypatch, *estados):
     orquestador = MagicMock()
 
-    def start(detection, *, alert_id, day):
+    def start(detection, *, alert_id, day, **_):
         return {"status": estados[-1], "transitions": [[alert_id, e] for e in estados], "actions": []}
 
     orquestador.start.side_effect = start
@@ -149,3 +153,97 @@ def test_pedir_cambios_sin_acciones_nuevas_conserva_las_anteriores(monkeypatch, 
     _con_orquestador(monkeypatch, return_value={"actions": []})
     cuerpo = _pedir().json()
     assert [a["id"] for a in cuerpo["actions"]] == ["accion_1"]
+
+
+def _deteccion(cliente: str, pesos: float) -> Detection:
+    fila = {"cliente_id": cliente, "max_dias_vencido": 40, "saldo_vencido": pesos, "pesos_en_riesgo": pesos}
+    return Detection("saldo_vencido", (cliente,), "hoja.vigia.titular", (), fila)
+
+
+def _dia_con(monkeypatch, detecciones, abiertas=(), destino=None):
+    monkeypatch.setattr(simulacion_router, "detect", lambda ctx, dia: [])
+    monkeypatch.setattr(simulacion_router, "prioritized", lambda detecciones_, known, watched: list(detecciones))
+    monkeypatch.setattr(simulacion_router.alertas_repo, "ids", lambda conn: set())
+    monkeypatch.setattr(simulacion_router.alertas_repo, "abiertas", lambda conn: list(abiertas))
+    monkeypatch.setattr(simulacion_router.alertas_repo, "obtener", lambda conn, id, bloquear=False: destino if destino and id == destino.id else None)
+    monkeypatch.setattr(simulacion_router.consultas, "registrar", MagicMock())
+
+
+def _con_estados(monkeypatch, *estados_por_alerta):
+    orquestador = MagicMock()
+    pendientes = list(estados_por_alerta)
+    orquestador.start.side_effect = lambda detection, **kwargs: pendientes.pop(0)(kwargs["alert_id"])
+    monkeypatch.setattr(simulacion_router, "get_orchestrator", lambda: orquestador)
+    return orquestador
+
+
+def _fin(respuesta) -> list[str]:
+    return [linea for linea in respuesta.text.splitlines() if linea.startswith("data:")][-1]
+
+
+def test_una_alerta_mayor_absorbe_una_deteccion_del_dia_que_no_corre(monkeypatch, guardadas):
+    mayor, menor = _deteccion("C1", 900), _deteccion("C2", 100)
+    id_mayor, id_menor = alert_id_of(mayor), alert_id_of(menor)
+    _dia_con(monkeypatch, [mayor, menor])
+    orquestador = _con_estados(monkeypatch, lambda alerta: {
+        "status": "propuesta",
+        "transitions": [[alerta, "nueva"], [alerta, "en análisis"], [id_menor, "unida"], [alerta, "propuesta"]],
+        "merged_alerts": [id_menor],
+        "actions": [],
+    })
+    respuesta = TestClient(app).post("/simulacion/avanzar")
+    assert orquestador.start.call_count == 1
+    pasado = orquestador.start.call_args.kwargs
+    assert pasado["earlier_alerts"] == {id_menor: "nueva"}
+    assert pasado["alert_briefs"][id_menor]["cause"] is None
+    unida = next(a for a in guardadas if a.id == id_menor)
+    assert unida.status == "merged" and unida.merged_into == id_mayor
+    assert unida.cause.reason == f"Unida a la alerta {id_mayor}: la misma causa"
+    restante = [a for a in guardadas if a.id == id_mayor][-1]
+    assert restante.status == "proposed" and [m.id for m in restante.merged_alerts] == [id_menor]
+    assert restante.pesos_at_risk.value == 900
+    assert f'"newAlerts": ["{id_mayor}"]' in _fin(respuesta)
+
+
+def _unida_a(destino):
+    return lambda alerta: {
+        "status": "unida",
+        "merged_into": destino,
+        "transitions": [[alerta, "nueva"], [alerta, "en análisis"], [alerta, "unida"]],
+        "actions": [],
+    }
+
+
+def test_una_alerta_se_une_a_una_analizada_antes_que_sigue_abierta(monkeypatch, guardadas):
+    deteccion = _deteccion("C1", 500)
+    _dia_con(monkeypatch, [deteccion], abiertas=[_alerta()], destino=_alerta())
+    orquestador = _con_estados(monkeypatch, _unida_a("alerta_1"))
+    respuesta = TestClient(app).post("/simulacion/avanzar")
+    assert orquestador.start.call_args.kwargs["earlier_alerts"] == {"alerta_1": "propuesta"}
+    unida, destino = guardadas
+    assert unida.status == "merged" and unida.merged_into == "alerta_1"
+    assert destino.id == "alerta_1" and [m.id for m in destino.merged_alerts] == [unida.id]
+    assert '"newAlerts": []' in _fin(respuesta)
+    registro = simulacion_router.bitacora.registrar.call_args_list[0]
+    assert registro.args[1] == unida.id and "Unida a la alerta alerta_1" in registro.args[4]
+
+
+def test_no_se_une_a_una_alerta_ya_decidida(monkeypatch, guardadas):
+    rechazada = _alerta().model_copy(update={"status": "rejected"})
+    _dia_con(monkeypatch, [_deteccion("C1", 500)], destino=rechazada)
+    _con_estados(monkeypatch, _unida_a("alerta_1"))
+    TestClient(app).post("/simulacion/avanzar")
+    (propia,) = guardadas
+    assert propia.status == "analyzing" and propia.merged_into is None
+    assert "No se unió a la alerta alerta_1" in simulacion_router.bitacora.registrar.call_args_list[0].args[4]
+
+
+def test_listar_sin_estado_excluye_las_unidas_y_unida_las_lista(monkeypatch, guardadas):
+    conn = MagicMock()
+    alertas_repo_modulo.listar(conn, None)
+    assert "status <> 'merged'" in conn.execute.call_args.args[0]
+    pedidos = []
+    monkeypatch.setattr(alertas_router.alertas_repo, "listar", lambda conn, status: pedidos.append(status) or [])
+    monkeypatch.setattr(alertas_router.permisos, "vistas", lambda conn, persona, alertas: alertas)
+    assert TestClient(app).get("/alertas", params={"estado": "unida"}).status_code == 200
+    assert pedidos == ["merged"]

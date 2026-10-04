@@ -25,13 +25,14 @@ steps.
    whose metric is in `API_METRICS`, because the API's `Alert` model accepts no other, drops those
    whose alert already exists, and keeps the `CENTINELA_ALERTAS_POR_DIA` with the most `pesos_en_riesgo`.
 3. For each detection the stream sends a `step` event, an `AgentStep` of `vigia`. Then
-   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)`
+   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)`
    runs the graph in a worker thread, through `asyncio.to_thread`, so the event loop keeps
    serving the stream. It runs until the approval interrupt or an end. The orchestrator comes from
    `apps/api/src/centinela_api/agentes.py:get_orchestrator()`, which builds it once per process
    with the model provider, the kernel's call, the four action stubs and an in-memory checkpointer.
    Each leaf reads `kpi_consultar` in code and records each query in the state's `queries`. The
-   router passes no earlier alerts and no rejection reasons.
+   router passes the open alerts and the day's detections not yet run, each with its state,
+   metric, entity and cause, for `Analista` to name one as the same cause, and no rejection reasons.
 4. `apps/api/src/centinela_api/agentes.py:state_to_alert(alert_id, state, detection, day_str)`
    turns the graph's state into the API's `Alert`.
    `apps/api/src/centinela_api/ciclo_vida.py:recorrer(estados)` checks the statuses the graph took
@@ -41,6 +42,9 @@ steps.
    `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)` and writes one `alert` row, actor `vigia`, with
    `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id)`,
    under the KPI's `queryId`, then one `evidence` row per query in `queries`, its SQL as the detail.
+   An alert the graph ends `unida` is stored `merged` into the alert that remains, and a detection
+   it absorbed is stored `merged` without running, as the lifecycle in
+   [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle) states.
 5. Another `step`, of `estratega`, reports the proposal, and the stream closes with `end`, which carries the
    simulated day and the ids of the new alerts. `apps/api/src/centinela_api/sse.py:flujo(eventos)`
    writes each event's name on its `event:` line.

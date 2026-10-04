@@ -164,6 +164,10 @@ and what each shows is
   number is an input; the others read as their rule. "Ejecuta" is disabled in every autonomy
   group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md#the-settings)). A
   person `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
+- **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
+  leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta" with the
+  action that opens its `mergedInto`, and the alert that remains lists each merged one under
+  "Alertas con la misma causa", `src/screens/AlertDetail.tsx:AlertDetail({ id })`.
 - **An action type at `inform` shows no Aprobar or Editar**: `src/screens/ProposedActions.tsx:ProposedActions({ alert })`
   reads the settings' autonomy and says the type only informs, because the API refuses its approval.
 

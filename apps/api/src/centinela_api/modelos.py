@@ -33,6 +33,7 @@ class AlertEstadoEnum(str, Enum):
     APROBADA = "aprobada"
     RECHAZADA = "rechazada"
     EJECUTADA = "ejecutada"
+    UNIDA = "unida"
 
 
 class Esquema(BaseModel):

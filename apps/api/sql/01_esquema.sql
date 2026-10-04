@@ -7,12 +7,16 @@ CREATE TABLE IF NOT EXISTS api.simulacion (
 
 CREATE TABLE IF NOT EXISTS api.alertas (
   id text PRIMARY KEY DEFAULT ('alerta_' || replace(gen_random_uuid()::text, '-', '')),
-  status text NOT NULL CHECK (status IN ('new', 'analyzing', 'proposed', 'approved', 'rejected', 'executed')),
+  status text NOT NULL,
   cuerpo jsonb NOT NULL,
   costos jsonb NOT NULL DEFAULT '[]'::jsonb,
   creado_en timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE api.alertas DROP CONSTRAINT IF EXISTS alertas_status_check;
+ALTER TABLE api.alertas ADD CONSTRAINT alertas_status_check
+  CHECK (status IN ('new', 'analyzing', 'proposed', 'approved', 'rejected', 'executed', 'merged'));
 
 CREATE INDEX IF NOT EXISTS idx_alertas_status ON api.alertas (status);
 

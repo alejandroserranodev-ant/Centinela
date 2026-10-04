@@ -666,7 +666,7 @@ export interface components {
          * @description Valid alert estado values (Spanish names for API contract).
          * @enum {string}
          */
-        AlertEstadoEnum: "nueva" | "en_analisis" | "propuesta" | "aprobada" | "rechazada" | "ejecutada";
+        AlertEstadoEnum: "nueva" | "en_analisis" | "propuesta" | "aprobada" | "rechazada" | "ejecutada" | "unida";
         /**
          * CauseIdentified
          * @description Root cause found with evidence.
