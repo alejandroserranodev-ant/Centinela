@@ -27,22 +27,15 @@ the alert, goes to OpenAI's servers unmasked; the decision it departs from is in
 
 ## Which `.env` file is loaded
 
-`apps/api/src/centinela_api/config.py` calls `load_dotenv()` with no path when it is imported. It
-loads the first `.env` it finds walking up from `apps/api/src/centinela_api/`, so an `apps/api/.env`
-hides a `.env` at the root, and a variable already set in the shell wins over both.
-
-- [`.env.example`](./.env.example), at the root, lists the provider's variables. Its `OLLAMA_MODEL`,
-  `LOG_LEVEL` and `ENVIRONMENT` are read by no code.
-- [`apps/api/.env.example`](./apps/api/.env.example) lists the API's own, `DSN_ADMIN` and
-  `AGENT_SECRET_KEY`, and none of the provider's.
-
-So with an `apps/api/.env`, the provider's variables go in it too, or are exported in the shell
-that starts the API.
+The provider's variables live in the `.env` at the root, which is versioned, because the
+competition's rules ask for it, and carries no secret: `LLM_PROVIDER=ollama`, `LLM_MODEL` and
+`OLLAMA_API_URL`, with `OPENAI_API_KEY` empty. How `apps/api` loads it, and the `.env.local` that
+overrides it, is [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands).
 
 ## Keeping the key secret
 
-- **The key lives only in a `.env` or in the shell**: `.gitignore` ignores `.env`, and no file in
-  the tree carries a real key.
+- **The key lives only in `.env.local` or in the shell**: `.gitignore` ignores `.env.local`, the
+  versioned `.env` leaves `OPENAI_API_KEY` empty, and no file in the tree carries a real key.
 - **A key that was pasted into a chat, a commit or a log is rotated** in OpenAI's console, because
   it can no longer be called secret.
 - **The key gets the narrowest scope** OpenAI's console offers for chat completions.

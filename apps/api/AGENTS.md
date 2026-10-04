@@ -12,10 +12,9 @@ comes from the dataset. The sections marked below hold decisions the code does n
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `.env.example` | `DSN_ADMIN` and `AGENT_SECRET_KEY`, which `src/centinela_api/config.py` reads |
 | `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
-| `src/centinela_api/config.py` | loads the nearest `.env` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY` and `ROLES_CON_DECISION` |
+| `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY` and `ROLES_CON_DECISION` |
 | `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
 | `src/centinela_api/modelos.py` | the Pydantic models, the HTTP contract's source; their conventions are [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md) |
 | `src/centinela_api/ciclo_vida.py` | the lifecycle's transitions and the Spanish names it accepts at the edge |
@@ -49,11 +48,13 @@ pytest -m integracion
 - **`sql/01_esquema.sql` runs after the dataset's SQL files**, because the clock seeds
   itself from `centinela.fecha_corte()`. The database setup is
   [`../../data/AGENTS.md`](../../data/AGENTS.md#setting-up-the-database).
-- **`pytest` runs every test.** `tests/test_api_integracion.py` skips itself when `DSN_ADMIN` is unset;
+- **`pytest` runs every test.** `tests/test_api_integracion.py` skips itself when `DSN_ADMIN` reaches no database;
   every test that imports `centinela_api.main` needs `centinela_agents` and LangGraph installed.
-- **`src/centinela_api/config.py` loads the first `.env` found walking up from the package**, so an
-  `apps/api/.env` hides the root `.env`. The orchestrator reads `LLM_PROVIDER` and `LLM_MODEL`
-  ([`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md)), so they go in whichever file loads.
+- **`src/centinela_api/config.py` loads the root's `.env`, then `.env.local` over it**, both by
+  path, so the API reads the same values wherever it starts. The `.env` is versioned without
+  secrets, because the competition's rules ask for it; a key goes in the ignored `.env.local`. The
+  orchestrator reads `LLM_PROVIDER` and `LLM_MODEL` from it
+  ([`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md)).
 
 ## Endpoints
 

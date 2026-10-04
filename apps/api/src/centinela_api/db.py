@@ -7,7 +7,7 @@ from . import config
 
 def conectar() -> psycopg.Connection:
     if not config.DSN_ADMIN:
-        raise RuntimeError("DSN_ADMIN no está configurado; copia .env.example a .env")
+        raise RuntimeError("DSN_ADMIN no está configurado; defínelo en el .env de la raíz")
     return psycopg.connect(config.DSN_ADMIN)
 
 

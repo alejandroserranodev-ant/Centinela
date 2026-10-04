@@ -148,7 +148,6 @@ activemq-data/
 *.sage.py
 
 # Environments
-.env
 .envrc
 .venv
 env/
@@ -222,7 +221,6 @@ __marimo__/
 node_modules/
 apps/web/src/*.generated.css
 data/generator/csv/
-!docs/guide/.env
 
 # Secrets and API Keys
 .env.local

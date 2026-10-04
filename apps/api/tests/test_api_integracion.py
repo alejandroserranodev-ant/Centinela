@@ -3,11 +3,12 @@
 A day advance runs the agents in process only when LLM_MODEL is set; without it, it ends with no alerts.
 
 Needs the Postgres from data/docker-compose.yml with data/sql/01..03 and
-apps/api/sql/01_esquema.sql already applied, and DSN_ADMIN set.
+apps/api/sql/01_esquema.sql already applied; it skips itself when DSN_ADMIN reaches no database.
 """
 import os
 from urllib.parse import quote
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,8 +20,10 @@ from centinela_api.modelos import Action, Alert, CauseNoEvidence, Confidence, Fi
 pytestmark = pytest.mark.integracion
 
 DSN_ADMIN = os.environ.get("DSN_ADMIN")
-if not DSN_ADMIN:
-    pytest.skip("DSN_ADMIN not set", allow_module_level=True)
+try:
+    psycopg.connect(DSN_ADMIN or "", connect_timeout=2).close()
+except psycopg.OperationalError:
+    pytest.skip("DSN_ADMIN reaches no database", allow_module_level=True)
 
 ID_ALERTA = "alerta_prueba_skeleton"
 NOMBRE_GERENTE = "Ana Gómez"

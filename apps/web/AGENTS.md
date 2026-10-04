@@ -22,7 +22,7 @@ and what each shows is
 | `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and the person every decision is sent as |
 | `src/api/types.ts` | the contract the client and the screens share, following `apps/api`'s Pydantic models |
 | `src/api/fixtures/` | the illustrative data the screens ran on before the fetch client; no module imports it |
-| `.env.example` | the `VITE_API_URL` a local `.env` sets |
+| `.env` | the `VITE_API_URL` Vite reads, versioned with the local API's address |
 | `src/format.ts` | every number and date as a person reads it: pesos, percentages, points, days and units in `es-CO`, dates in the time zone of Bogotá |
 | `src/actionParameters.ts` | the Spanish name of each key of an action's `parameters`, for the proposal, the edit dialog and the `bitácora` |
 | `src/app.css` | the layout Arena does not ship, written in Arena's tokens only: the shell's grid, the inbox's two columns, the alert row, the totals, the chat bubbles |

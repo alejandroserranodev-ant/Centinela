@@ -24,7 +24,6 @@ command names:
 
 ```bash
 pip install -e ../../packages/agents -e ".[dev]"
-cp .env.example .env
 uvicorn centinela_api.main:app --reload
 ```
 
@@ -35,7 +34,6 @@ What it serves and refuses is [`apps/api/AGENTS.md`](./apps/api/AGENTS.md).
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
 
@@ -47,9 +45,8 @@ fetch client and the API disagree, is [`apps/web/AGENTS.md`](./apps/web/AGENTS.m
 | Process | Reads | What it needs there |
 |---|---|---|
 | the web | `apps/web/.env`, through Vite | `VITE_API_URL`; without it the client calls `http://localhost:8000` |
-| the API | the nearest `.env` found walking up from `apps/api/src/centinela_api/`, through `apps/api/src/centinela_api/config.py`'s call to `load_dotenv()` | `DSN_ADMIN` and `AGENT_SECRET_KEY`, and the model provider's variables of [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) |
+| the API | the versioned `.env` at the root, then `.env.local` over it, as [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands) says | `DSN_ADMIN`, `AGENT_SECRET_KEY`, the kernel's DSNs and the model provider's variables of [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) |
 
-**`apps/api/.env` hides the root `.env`.** `load_dotenv()` stops at the first file it finds, so
-once `apps/api/.env` exists, the root `.env` is not read, and the model provider's variables
-belong in `apps/api/.env` too or in the shell. Without `LLM_MODEL`, a day run logs the
-provider's error and ends with no new alerts, which looks like a quiet day.
+Both files are versioned with local values and no secret, so a clone runs with no copying. Without
+`LLM_MODEL`, a day run logs the provider's error and ends with no new alerts, which looks like a
+quiet day.
