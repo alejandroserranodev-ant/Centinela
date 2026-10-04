@@ -9,8 +9,11 @@ writing, copied to the seller.
 Write the body in Spanish, in this order and with nothing else:
 
 1. A greeting that names the recipient by the `recipient` parameter.
-2. One sentence that states the fact, as the action's `description` words it.
-3. One sentence that states what is asked, as the action's `title` names it.
+2. One sentence that states the business situation: the payment delay, overdue balance,
+   or supply issue that led to this communication, as the action's `description` provides
+   context. Do not describe the system action, do not mention drafts or internal tools.
+3. One sentence that requests the recipient to contact their account executive to
+   coordinate regularisation of the outstanding balance or to address the situation.
 4. A closing that offers to talk.
 
 ## Rules

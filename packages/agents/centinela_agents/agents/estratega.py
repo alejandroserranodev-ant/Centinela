@@ -48,10 +48,12 @@ def parameters_of(row: ActionRow, values: Mapping[str, Any]) -> dict[str, Any]:
     for token in row.parameters:
         name, _, source = (part.strip() for part in token.partition(":"))
         if source:
-            value = values.get(source, source)
+            value = values.get(source)
         elif name in values:
             value = values[name]
         else:
+            continue
+        if value is None:
             continue
         if isinstance(value, (str, int, float)) and not isinstance(value, bool):
             filled[name] = value
