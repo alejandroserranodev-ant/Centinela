@@ -140,7 +140,7 @@ def test_guardar_escribe_la_fila_y_la_bitacora(monkeypatch):
     assert any("INSERT INTO api.configuracion" in llamada.args[0] for llamada in conn.execute.call_args_list)
     _, alerta_id, tipo, actor, detalle, dia = registrar.call_args.args
     assert (alerta_id, tipo, actor.name, dia) == (None, "configuracion", "Camila", dt.date(2026, 1, 15))
-    assert detalle == "Umbral caida_pts de margen_pct: 3 → 4; Margen deja de vigilarse"
+    assert detalle == "Margen, «Caída frente al promedio de 8 semanas, en puntos»: 3 → 4; Margen deja de vigilarse"
 
 
 @pytest.fixture

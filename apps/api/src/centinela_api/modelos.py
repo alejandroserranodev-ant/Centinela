@@ -209,11 +209,11 @@ class ChatQuestion(Esquema):
 
 
 class Query(Esquema):
-    """A query of the kernel that produced a figure, recorded when an agent ran it."""
+    """The query that produced a figure: a kernel call an agent ran, or a sum over the stored alerts."""
     id: str = Field(..., description="The figure's queryId")
     source: Literal["kernel", "alertas"] = Field("kernel", description="Where the query runs: the KPI kernel of packages/tools, or the stored alerts")
-    sql: str = Field(..., description="The call the kernel ran")
-    description: str = Field(..., description="The KPI and the simulated day it was read on")
+    sql: str = Field(..., description="The kernel call or the SQL over the stored alerts that returned the figure")
+    description: str = Field(..., description="What the query reads and the simulated day it was read on")
 
 
 class InboxSummary(Esquema):

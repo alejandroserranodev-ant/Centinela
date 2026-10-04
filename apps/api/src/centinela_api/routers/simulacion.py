@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, configuracion, consultas, simulacion
+from .. import bitacora, ciclo_vida, configuracion, consultas, permisos, simulacion
 from ..agentes import (
     STATUS_A_ESTADO,
     absorbed_alert,
@@ -24,7 +24,7 @@ from ..agentes import (
 )
 from ..auth import persona_actual
 from ..db import obtener_conexion
-from ..modelos import ActorAgent, AdvanceEnd, AgentStep, Alert, SimulatedDay
+from ..modelos import ActorAgent, AdvanceEnd, AgentStep, Alert, Persona, SimulatedDay
 from ..sse import flujo
 
 from centinela_agents.walk import detect
@@ -91,7 +91,9 @@ async def dia_actual(conn: psycopg.Connection = Depends(obtener_conexion)) -> Si
 
 @router.post("/simulacion/avanzar")
 async def avanzar(
-    dias: int = Query(1, ge=1), conn: psycopg.Connection = Depends(obtener_conexion)
+    dias: int = Query(1, ge=1),
+    persona: Persona = Depends(persona_actual),
+    conn: psycopg.Connection = Depends(obtener_conexion),
 ) -> StreamingResponse:
     if day_run.locked():
         raise HTTPException(status_code=409, detail="Ya hay un día en curso")
@@ -199,13 +201,11 @@ async def avanzar(
                     if alerta.status in UNIBLES:
                         earlier[alert_id] = STATUS_A_ESTADO[alerta.status]
                         briefs[alert_id] = brief_of_alert(alerta)
-                    if alerta.status in UNIBLES:
                         new_alert_ids.append(alert_id)
 
-                    yield "alert", alerta
-                    for otra in (destino, *unidas):
+                    for otra in (alerta, destino, *unidas):
                         if otra is not None:
-                            yield "alert", otra
+                            yield "alert", permisos.vista_con(ajustes, persona, otra)
 
                     yield "step", AgentStep(
                         alert_id=alert_id,

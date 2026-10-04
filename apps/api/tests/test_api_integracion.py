@@ -148,18 +148,67 @@ def test_rechazar_sin_motivo_es_422(cliente):
     assert respuesta.status_code == 422
 
 
-def test_aprobar_mueve_el_estado_y_queda_en_la_bitacora(cliente):
-    respuesta = cliente.post(
-        f"/alertas/{ID_ALERTA}/decision",
-        json={"kind": "approve", "actionId": "accion_prueba"},
-        headers=CABECERAS_GERENTE,
-    )
-    assert respuesta.status_code == 200
-    assert respuesta.json()["status"] == "approved"
+class _OrquestadorQueMiraDesdeOtraConexion:
+    def __init__(self, en_pausa: bool):
+        self.en_pausa = en_pausa
+        self.visto: tuple | None = None
 
-    eventos = cliente.get("/bitacora", params={"alertId": ID_ALERTA}).json()
-    decision = next(e for e in eventos if e["type"] == "decision")
+    def is_awaiting_decision(self, alert_id):
+        return self.en_pausa
+
+    def use_thresholds(self, thresholds):
+        pass
+
+    def resume(self, alert_id, decision):
+        with conectar() as otra:
+            estado = otra.execute("SELECT status FROM api.alertas WHERE id = %s", (alert_id,)).fetchone()[0]
+            decisiones = otra.execute(
+                "SELECT count(*) FROM api.bitacora WHERE alerta_id = %s AND tipo = 'decision'", (alert_id,)
+            ).fetchone()[0]
+        self.visto = (estado, decisiones)
+        return {"executed_action": {"actionId": decision["actionId"], "result": "Tarea creada"}}
+
+
+def _con_orquestador(monkeypatch, en_pausa: bool) -> _OrquestadorQueMiraDesdeOtraConexion:
+    from centinela_api.routers import alertas as alertas_router
+
+    orquestador = _OrquestadorQueMiraDesdeOtraConexion(en_pausa)
+    monkeypatch.setattr(alertas_router, "get_orchestrator", lambda: orquestador)
+    return orquestador
+
+
+def _decisiones(cliente) -> list[dict]:
+    return [e for e in cliente.get("/bitacora", params={"alertId": ID_ALERTA}).json() if e["type"] == "decision"]
+
+
+def test_la_decision_esta_confirmada_antes_de_reanudar(cliente, monkeypatch):
+    orquestador = _con_orquestador(monkeypatch, en_pausa=True)
+    respuesta = cliente.post(f"/alertas/{ID_ALERTA}/decision", json={"kind": "approve", "actionId": "accion_prueba"})
+    assert respuesta.status_code == 200
+    assert respuesta.json()["status"] == "executed"
+    assert orquestador.visto == ("approved", 1)
+    (decision,) = _decisiones(cliente)
     assert decision["actor"] == {"kind": "person", "name": NOMBRE_GERENTE, "role": "gerente"}
+
+
+def test_aprobar_un_analisis_que_no_espera_es_409_y_no_registra_nada(cliente, monkeypatch):
+    from centinela_api.routers.alertas import EN_PAUSA
+
+    _con_orquestador(monkeypatch, en_pausa=False)
+    respuesta = cliente.post(f"/alertas/{ID_ALERTA}/decision", json={"kind": "approve", "actionId": "accion_prueba"})
+    assert respuesta.status_code == 409
+    assert respuesta.json()["detail"] == EN_PAUSA
+    assert cliente.get(f"/alertas/{ID_ALERTA}").json()["status"] == "proposed"
+    assert _decisiones(cliente) == []
+
+
+def test_rechazar_un_analisis_que_no_espera_queda_registrado(cliente, monkeypatch):
+    orquestador = _con_orquestador(monkeypatch, en_pausa=False)
+    respuesta = cliente.post(f"/alertas/{ID_ALERTA}/decision", json={"kind": "reject", "reason": "Ya no aplica"})
+    assert respuesta.status_code == 200
+    assert respuesta.json()["status"] == "rejected"
+    assert orquestador.visto is None
+    assert [e["detail"] for e in _decisiones(cliente)] == ["Rechazada. Motivo: Ya no aplica"]
 
 
 def test_simulacion_avanzar_devuelve_el_evento_end(monkeypatch):
@@ -314,4 +363,4 @@ def test_la_configuracion_guardada_se_lee_de_vuelta(configuracion_previa):
 
     registro = cliente.get("/bitacora", params={"type": "configuracion"}).json()[0]
     assert registro["actor"]["role"] == "analista"
-    assert "Umbral caida_pts de margen_pct" in registro["detail"]
+    assert "«Caída frente al promedio de 8 semanas, en puntos»: " in registro["detail"]

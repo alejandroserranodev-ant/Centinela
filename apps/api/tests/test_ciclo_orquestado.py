@@ -42,7 +42,7 @@ def guardadas(monkeypatch):
         monkeypatch.setattr(modulo.bitacora, "registrar", MagicMock())
         monkeypatch.setattr(modulo.simulacion, "dia_actual", lambda conn: DIA)
     monkeypatch.setattr(simulacion_router.simulacion, "avanzar", lambda conn, dias: DIA)
-    monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id: _alerta())
+    monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id, bloquear=False: guardadas[-1] if guardadas else _alerta())
 
     def conexion():
         yield MagicMock()
@@ -130,7 +130,7 @@ def test_pedir_cambios_una_segunda_vez_responde_409_sin_reanudar(monkeypatch, gu
     orquestador = _con_orquestador(monkeypatch)
     monkeypatch.setattr(
         alertas_router.alertas_repo, "obtener",
-        lambda conn, id: _alerta().model_copy(update={"changes_requested": True}),
+        lambda conn, id, bloquear=False: _alerta().model_copy(update={"changes_requested": True}),
     )
     respuesta = _pedir()
     assert respuesta.status_code == 409
@@ -138,15 +138,63 @@ def test_pedir_cambios_una_segunda_vez_responde_409_sin_reanudar(monkeypatch, gu
     orquestador.resume.assert_not_called()
 
 
-def test_pedir_cambios_conserva_las_acciones_si_el_ciclo_falla(monkeypatch, guardadas):
+def test_pedir_cambios_conserva_las_acciones_y_la_solicitud_si_el_ciclo_falla_en_la_pausa(monkeypatch, guardadas):
     _con_orquestador(monkeypatch, side_effect=RuntimeError("sin modelo"))
     respuesta = _pedir()
     assert respuesta.status_code == 200
     cuerpo = respuesta.json()
-    assert cuerpo["changesRequested"] is True and [a["id"] for a in cuerpo["actions"]] == ["accion_1"]
-    assert [a.changes_requested for a in guardadas] == [True]
+    assert cuerpo["changesRequested"] is False and [a["id"] for a in cuerpo["actions"]] == ["accion_1"]
+    assert [a.changes_requested for a in guardadas] == [True, False]
     registro = alertas_router.bitacora.registrar.call_args_list[-1]
-    assert registro.args[2] == "proposal" and "sin modelo" in registro.args[4]
+    assert registro.args[2] == "proposal" and "se conservan las acciones anteriores: sin modelo" in registro.args[4]
+
+
+def test_pedir_cambios_que_deja_el_ciclo_fuera_de_la_pausa_solo_deja_rechazar(monkeypatch, guardadas):
+    orquestador = _con_orquestador(monkeypatch, side_effect=RuntimeError("se cayó a mitad"))
+    orquestador.is_awaiting_decision.side_effect = [True, False]
+    cuerpo = _pedir().json()
+    assert cuerpo["changesRequested"] is True
+    assert [a.changes_requested for a in guardadas] == [True]
+    assert "solo queda rechazarla" in alertas_router.bitacora.registrar.call_args_list[-1].args[4]
+
+
+def test_una_decision_sobre_un_ciclo_que_no_espera_es_409_y_no_se_registra(monkeypatch, guardadas):
+    orquestador = _con_orquestador(monkeypatch)
+    orquestador.is_awaiting_decision.return_value = False
+    for decision in ({"kind": "approve", "actionId": "accion_1"}, {"kind": "request_changes", "reason": "Otra"}):
+        respuesta = TestClient(app).post("/alertas/alerta_1/decision", json=decision)
+        assert respuesta.status_code == 409
+        assert respuesta.json()["detail"] == alertas_router.EN_PAUSA
+    assert guardadas == []
+    alertas_router.bitacora.registrar.assert_not_called()
+    orquestador.resume.assert_not_called()
+
+
+def test_un_rechazo_sobre_un_ciclo_que_no_espera_se_registra_sin_reanudar(monkeypatch, guardadas):
+    orquestador = _con_orquestador(monkeypatch)
+    orquestador.is_awaiting_decision.return_value = False
+    respuesta = TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "reject", "reason": "No aplica"})
+    assert respuesta.status_code == 200 and respuesta.json()["status"] == "rejected"
+    assert [a.status for a in guardadas] == ["rejected"]
+    orquestador.resume.assert_not_called()
+
+
+def test_una_decision_mientras_otra_reanuda_la_alerta_es_409(monkeypatch, guardadas):
+    orquestador = _con_orquestador(monkeypatch)
+    monkeypatch.setattr(alertas_router, "reanudando", {"alerta_1"})
+    respuesta = TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "approve", "actionId": "accion_1"})
+    assert respuesta.status_code == 409
+    assert respuesta.json()["detail"] == alertas_router.EN_CURSO
+    orquestador.resume.assert_not_called()
+
+
+def test_la_nueva_propuesta_no_pisa_una_alerta_que_ya_no_esta_propuesta(monkeypatch, guardadas):
+    _con_orquestador(monkeypatch, return_value={"actions": [_accion_nueva()], "queries": []})
+    leidas = iter([_alerta(), _alerta(), _alerta().model_copy(update={"status": "rejected"})])
+    monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id, bloquear=False: next(leidas))
+    cuerpo = _pedir().json()
+    assert cuerpo["status"] == "rejected"
+    assert [a.actions[0].id for a in guardadas] == ["accion_1"]
 
 
 def test_pedir_cambios_sin_acciones_nuevas_conserva_las_anteriores(monkeypatch, guardadas):

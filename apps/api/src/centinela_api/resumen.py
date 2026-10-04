@@ -27,15 +27,18 @@ TOTALES = (
 
 
 def calcular(conn: psycopg.Connection) -> InboxSummary:
-    dia = simulacion.dia_actual(conn)
+    with conn.transaction():
+        conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+        dia = simulacion.dia_actual(conn)
+        valores = [float(conn.execute(sql).fetchone()[0]) for _, _, sql in TOTALES]
     cifras = []
-    for kpi, unidad, sql in TOTALES:
-        valor = float(conn.execute(sql).fetchone()[0])
+    for (kpi, unidad, sql), valor in zip(TOTALES, valores):
         id = "q_" + hashlib.sha256(f"{sql}|{dia.isoformat()}|{valor}".encode()).hexdigest()[:12]
-        consultas.registrar(
-            conn,
-            [{"queryId": id, "kpi": kpi, "dia": dia, "consulta": sql, "fuente": "alertas"}],
-        )
+        with conn.transaction():
+            consultas.registrar(
+                conn,
+                [{"queryId": id, "kpi": kpi, "dia": dia, "consulta": sql, "fuente": "alertas"}],
+            )
         cifras.append(Figure(value=valor, unit=unidad, query_id=id))
     return InboxSummary(
         money_at_risk=cifras[0], recoverable_per_month=cifras[1], pending_decisions=cifras[2]

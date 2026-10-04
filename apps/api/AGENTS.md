@@ -76,10 +76,10 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection, an `alert` event with each `Alert` stored or updated once it is recorded, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk; without `estado`, every alert but the merged ones, which `estado=unida` lists | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
-| POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
+| POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`, when its graph no longer waits for a decision, or while another decision resumes it; 422 for a failed check | `decide` |
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
 | GET | `/bandeja/resumen` | the inbox totals, as `InboxSummary` | | `getInboxSummary` |
 | GET | `/consultas/{queryId}` | the call behind a figure, as `Query`, whose `source` is `kernel` or `alertas` | 404 for an unknown query | `getQuery` |
@@ -135,10 +135,19 @@ thresholds of `data/metricas.yaml`, which the saved settings replace, the kernel
 event loop keeps streaming SSE meanwhile. Running in-process saves a service boundary, its
 transport and its secret, and is the answer to whether the agents run here or as a service.
 
+- **No transaction stays open across a model call.** `src/centinela_api/db.py:conectar()` opens
+  every connection with `autocommit`, so each `with conn.transaction()` is a real transaction that
+  commits when its block ends, and no block holds an `await` or a `yield`. The routers run their
+  SQL synchronously on the event loop, so a row lock is taken and released in one uninterrupted
+  stretch of it, and a `FOR UPDATE` on the loop never waits for a holder that needs the loop to
+  finish; running the SQL off the loop instead would cost a connection per thread for no gain.
+- **The API runs one worker.** The day lock, the set of alerts a decision is resuming, the paused
+  graphs and the random signing key live in the process, so a second worker would not see them.
+
 - **The checkpointer is `InMemorySaver`**, the saver that needs no schema. A paused alert lives
-  only in this process: after a restart its decision is recorded but the resume finds no state, a
-  `result` row of `ejecutor` records that the approved action did not run, and the alert stays
-  `approved`.
+  only in this process: after a restart its graph waits for nothing, so the decision route refuses
+  its approval, edit or request for changes and records only its rejection, as decisions and roles
+  states.
 - **A day raises the alerts `src/centinela_api/agentes.py:prioritized(detections, known, watched)` keeps**:
   the detections of the watched metrics of `API_METRICS` whose alert does not exist, the most `pesos_en_riesgo` first, at
   most `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. An alert's id is
@@ -168,7 +177,8 @@ dropped, and only a threshold that is one number is editable; the others always 
 **`src/centinela_api/configuracion.py:guardar(conn, nuevo, persona)` refuses with 422** an
 `execute` autonomy, a changed non-editable threshold, a negative or non-finite value, an owner
 outside `owners` and a list of metrics that differs, then writes the row and a `configuracion` row
-of the `bitácora` naming each change.
+of the `bitácora` naming each change by the metric's name, the threshold's label and the action
+type's Spanish name, because a person reads it.
 
 **Settings take effect on the next day run and the next decision.** `avanzar` reads them once,
 drops the unwatched metrics and detects on `src/centinela_api/agentes.py:with_thresholds(ctx, thresholds)`.
@@ -189,7 +199,7 @@ orchestrator as the argument of each run.
 **One day run at a time.** A call to `/simulacion/avanzar` while a day run is in course is refused
 with 409, because the second run would detect against earlier alerts the first has not
 recorded, and one cause would raise two alerts.
-`src/centinela_api/routers/simulacion.py:avanzar(dias, conn)` takes the module's `asyncio.Lock`
+`src/centinela_api/routers/simulacion.py:avanzar(dias, persona, conn)` takes the module's `asyncio.Lock`
 before it moves the clock and frees it when the stream ends, fails or the client leaves; the
 response's background task frees it for a stream that never starts.
 
@@ -297,10 +307,21 @@ requires the alert in `proposed` (409), a rejection to carry a reason (422), and
 edit to name one of the alert's actions (422) whose type the settings do not set to `inform`
 (422 "Este tipo de acción solo informa"). "Ejecuta" is refused for every action type, with 422 on
 saving the settings, because the challenge keeps every action at `Propone`
-([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its responsible AI section). The decision and its `bitácora` row, whose actor is
-the person's name and role, commit in one transaction before the orchestrator resumes, so no action
-runs without a recorded decision; an approval or an edit then resumes into `Ejecutor`, and a
-rejection resumes to close the graph.
+([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its responsible AI section).
+
+**A decision is recorded only where it can act, and committed before anything resumes.**
+`src/centinela_api/routers/alertas.py:decidir(id, decision, persona, conn)` answers 409 "Esta alerta
+está procesando otra decisión" while another decision on the same alert is resuming its graph, and
+409 "El análisis de esta alerta ya no está en pausa: no puede reanudarse" to an approval, an edit or
+a request for changes when
+`packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.is_awaiting_decision(alert_id)`
+is false, after a restart or a resume that failed midway, so no decision is recorded that nothing
+would carry out. A rejection is still recorded there, without a resume, because it runs nothing and
+otherwise the alert would wait forever. The decision transaction re-reads the alert with a row lock
+and runs `aplicar` on it, so two concurrent decisions cannot both pass, and commits the alert and
+its `bitácora` row, whose actor is the person's name and role, before the orchestrator resumes, so
+no action runs without a recorded decision; an approval or an edit then resumes into `Ejecutor`,
+and a rejection resumes to close the graph.
 
 **A `request_changes` carries a reason, and is capped at one per alert**, because a person who
 still disagrees after one new proposal has the decision in hand: an edit says what to change and a
@@ -309,8 +330,10 @@ request (409 "Ya se pidieron cambios una vez"). The alert stays `propuesta` with
 `changesRequested` set while the decision route resumes the graph, `Estratega` proposes again
 with the reason among the rejection reasons it reads, and `src/centinela_api/routers/alertas.py:_reproponer(conn, alerta, motivo, ajustes, dia)`
 stores the new actions with a `proposal` row of `Estratega` and the `evidence` rows of the new
-queries. When the resume fails or returns no action, the alert keeps its previous actions and a
-`proposal` row records the failure.
+queries, only while the alert is still `proposed`. When the resume fails or returns no action,
+the alert keeps its previous actions and a `proposal` row records the failure: a graph still at
+the gate that never consumed the request gives `changesRequested` back, and a graph the failure
+left off the gate leaves only the rejection, which the row says.
 
 > **Decided, not built.** The rules below, where the code differs as each one says.
 
@@ -326,7 +349,8 @@ reads goes through it, in this level or in `packages/tools`, whose page owns mas
 ## The inbox totals
 
 **The API computes the inbox totals**: `src/centinela_api/resumen.py:calcular(conn)` runs three
-statements over `api.alertas` where `status` is `proposed`, and `GET /bandeja/resumen` serves them.
+statements over `api.alertas` where `status` is `proposed`, in one `REPEATABLE READ` snapshot so a
+day run cannot split them, and `GET /bandeja/resumen` serves them.
 They are pesos at risk and recoverable per month, each a sum, and the count of decisions pending.
 They are sums over alerts rather than a `v_*` view, so each figure's query is recorded in
 `api.consultas` with the source `alertas`, its SQL and the simulated day, under a `queryId`

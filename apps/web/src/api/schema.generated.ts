@@ -178,7 +178,7 @@ export interface paths {
         };
         /**
          * Obtener
-         * @description The kernel query that produced a figure, as the agent that cited it recorded it.
+         * @description The query that produced a figure, as the API recorded it when the figure was cited.
          */
         get: operations["obtener_consultas__query_id__get"];
         put?: never;
@@ -1151,12 +1151,12 @@ export interface components {
         };
         /**
          * Query
-         * @description A query of the kernel that produced a figure, recorded when an agent ran it.
+         * @description The query that produced a figure: a kernel call an agent ran, or a sum over the stored alerts.
          */
         Query: {
             /**
              * Description
-             * @description The KPI and the simulated day it was read on
+             * @description What the query reads and the simulated day it was read on
              */
             description: string;
             /**
@@ -1173,7 +1173,7 @@ export interface components {
             source: "kernel" | "alertas";
             /**
              * Sql
-             * @description The call the kernel ran
+             * @description The kernel call or the SQL over the stored alerts that returned the figure
              */
             sql: string;
         };

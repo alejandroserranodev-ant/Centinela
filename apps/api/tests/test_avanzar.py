@@ -103,4 +103,5 @@ def test_el_evento_alert_lleva_la_alerta_guardada(cliente):
     dato = eventos[primera][1]
     Alert.model_validate(dato)
     assert dato["id"] == guardada.id
-    assert dato == guardada.model_dump(by_alias=True, mode="json")
+    assert (dato["decidedBy"], dato["canDecide"]) == ("Gerencia", False)
+    assert dato == {**guardada.model_dump(by_alias=True, mode="json"), "decidedBy": "Gerencia", "canDecide": False}

@@ -1,5 +1,7 @@
 # Sign-in against the profiles of the root .env, replaced here by two profiles hashed with few
 # iterations so the suite stays fast, and the signed token every other route reads its person from.
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -104,14 +106,16 @@ def test_un_perfil_retirado_invalida_su_token(perfiles, monkeypatch):
     assert perfiles.get("/auth/sesion", headers={"Authorization": f"Bearer {token}"}).status_code == 401
 
 
-@pytest.mark.parametrize("ruta", ["/simulacion/dia-actual", "/alertas", "/alertas/x", "/bitacora", "/consultas/q"])
-def test_una_ruta_protegida_sin_token_es_401(perfiles, ruta):
-    respuesta = perfiles.get(ruta)
+PROTEGIDAS = [
+    (metodo.upper(), re.sub(r"\{[^}]+\}", "x", ruta))
+    for ruta, metodos in app.openapi()["paths"].items()
+    if ruta != "/auth/login" and not ruta.startswith("/interno/")
+    for metodo in metodos
+]
+
+
+@pytest.mark.parametrize("metodo, ruta", PROTEGIDAS)
+def test_una_ruta_protegida_sin_token_es_401(perfiles, metodo, ruta):
+    respuesta = perfiles.request(metodo, ruta)
     assert respuesta.status_code == 401
     assert respuesta.json() == {"detail": "Inicia sesión para continuar"}
-
-
-def test_avanzar_decidir_y_preguntar_sin_token_son_401(perfiles):
-    assert perfiles.post("/simulacion/avanzar").status_code == 401
-    assert perfiles.post("/alertas/x/decision", json={"kind": "reject", "reason": "r"}).status_code == 401
-    assert perfiles.post("/chat", json={"question": "¿Cuánto?"}).status_code == 401

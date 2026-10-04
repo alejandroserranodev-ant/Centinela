@@ -64,7 +64,7 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       changed();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        notify({ tone: 'danger', title: 'Esta alerta ya se decidió', message: 'Recargamos su estado actual.' });
+        notify({ tone: 'danger', title: 'No se registró la decisión', message: `${e.message}. Recargamos su estado actual.` });
         setEditing(false);
         setRejecting(false);
         setRequesting(false);

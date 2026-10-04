@@ -22,7 +22,7 @@ steps.
 ## One simulated day
 
 1. `POST /simulacion/avanzar` reaches
-   `apps/api/src/centinela_api/routers/simulacion.py:avanzar(dias, conn)`. The day moves in its own
+   `apps/api/src/centinela_api/routers/simulacion.py:avanzar(dias, persona, conn)`. The day moves in its own
    transaction, through `apps/api/src/centinela_api/simulacion.py:avanzar(conn, dias)`, before
    anything detects.
 2. Detection runs in the API's process.
@@ -65,8 +65,9 @@ steps.
    An alert the graph ends `unida` is stored `merged` into the alert that remains, and a detection
    it absorbed is stored `merged` without running, as the lifecycle in
    [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle) states.
-5. Each stored alert goes out as an `alert` event carrying the `Alert`, the one that remains after a
-   merge and each alert merged into it included, so a screen shows the alert before the day ends.
+5. Each stored alert goes out as an `alert` event carrying the `Alert` with the signed-in person's
+   `decidedBy` and `canDecide`, the one that remains after a merge and each alert merged into it
+   included, so a screen shows the alert before the day ends.
    Another `step`, of `estratega`, reports the proposal, and the stream closes with `end`, which carries the
    simulated day and the ids of the new alerts. `apps/api/src/centinela_api/sse.py:flujo(eventos)`
    writes each event's name on its `event:` line.
@@ -84,8 +85,12 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    `apps/api/src/centinela_api/permisos.py:puede_decidir(conn, persona, alerta)`, which reads the owner from the settings, and
    `apps/api/src/centinela_api/decisiones.py:aplicar(alerta, decision, autonomia)` checks the
    decision against the autonomy the settings give each action type and returns the alert as `approved` or `rejected`, or still `proposed` with its changes requested, together with its log event.
-2. One transaction stores the alert and writes the `decision` row, whose actor is the signed-in
-   person's name and role.
+   An approval, an edit or a request for changes whose graph no longer waits at the gate,
+   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.is_awaiting_decision(alert_id)`,
+   is answered 409 and recorded nowhere; a rejection is recorded and resumes nothing.
+2. One transaction re-reads the alert with a row lock, runs `aplicar` on it again, stores the alert
+   and writes the `decision` row, whose actor is the signed-in person's name and role, and commits
+   before anything resumes.
 3. The graph resumes with
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.resume(alert_id, decision)`,
    in a worker thread. On an approval or an edit, a state that carries an `executed_action` turns
@@ -95,10 +100,10 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    `apps/api/src/centinela_api/routers/alertas.py:_reproponer(conn, alerta, motivo, ajustes, dia)`:
    the orchestrator receives the reason as `request_changes`, `Estratega` proposes again, and the
    alert keeps its status with the new actions, a `proposal` row and the queries the proposal added;
-   a resume that fails or returns no actions writes a `proposal` row saying the earlier actions stay.
-4. A failed approval resume writes a `result` row of `ejecutor` saying the action did not run. That
-   includes the state the in-memory checkpointer loses when the process restarts, so the alert
-   stays `approved`. A failed rejection resume is logged.
+   a resume that fails or returns no actions writes a `proposal` row saying what the person can
+   still do.
+4. A failed approval resume writes a `result` row of `ejecutor` saying the action did not run, and
+   the alert stays `approved`. A failed rejection resume is logged.
 
 ## One chat question
 

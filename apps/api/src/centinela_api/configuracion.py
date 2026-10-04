@@ -16,6 +16,12 @@ from .modelos import ActionType, ActorPerson, AutonomyLevel, Persona, Settings, 
 PILOTO = "Ninguna acción puede ejecutarse sola durante el piloto: el máximo es Propone"
 GERENCIA = "Gerencia"
 NIVELES: dict[AutonomyLevel, str] = {"inform": "Informa", "propose": "Propone", "execute": "Ejecuta"}
+TIPOS: dict[ActionType, str] = {
+    "email_draft": "Borrador de correo",
+    "task": "Tarea",
+    "purchase_order_draft": "Borrador de orden de compra",
+    "price_change_draft": "Borrador de ajuste de precio",
+}
 ETIQUETAS = {
     "caida_pts": "Caída frente al promedio de 8 semanas, en puntos",
     "margen_pct": "Margen mínimo de la línea",
@@ -147,17 +153,17 @@ def cambios(actual: Settings, nuevo: Settings) -> list[str]:
     lineas = []
     for metrica in nuevo.metrics:
         previa = previas[metrica.metric]
-        antes = {u.key: u.value for u in previa.thresholds}
+        antes = {u.key: u for u in previa.thresholds}
         for umbral in metrica.thresholds:
-            if umbral.value is not None and umbral.value != antes[umbral.key]:
-                lineas.append(f"Umbral {umbral.key} de {metrica.metric}: {_numero(antes[umbral.key])} → {_numero(umbral.value)}")
+            if umbral.value is not None and umbral.value != antes[umbral.key].value:
+                lineas.append(f"{previa.name}, «{antes[umbral.key].label}»: {_numero(antes[umbral.key].value)} → {_numero(umbral.value)}")
         if metrica.watched != previa.watched:
             lineas.append(f"{previa.name} {'vuelve a vigilarse' if metrica.watched else 'deja de vigilarse'}")
         if metrica.owner != previa.owner:
             lineas.append(f"Responsable de {previa.name}: {previa.owner or GERENCIA} → {metrica.owner or GERENCIA}")
     for tipo, nivel in nuevo.autonomy.items():
         if nivel != actual.autonomy[tipo]:
-            lineas.append(f"Autonomía de {tipo}: {NIVELES[actual.autonomy[tipo]]} → {NIVELES[nivel]}")
+            lineas.append(f"Autonomía de {TIPOS.get(tipo, tipo)}: {NIVELES[actual.autonomy[tipo]]} → {NIVELES[nivel]}")
     return lineas
 
 

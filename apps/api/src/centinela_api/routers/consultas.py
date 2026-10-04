@@ -11,7 +11,7 @@ router = APIRouter(tags=["queries"], dependencies=[Depends(persona_actual)])
 
 @router.get("/consultas/{query_id}", response_model=Query)
 async def obtener(query_id: str, conn: psycopg.Connection = Depends(obtener_conexion)) -> Query:
-    """The kernel query that produced a figure, as the agent that cited it recorded it."""
+    """The query that produced a figure, as the API recorded it when the figure was cited."""
     consulta = consultas_repo.obtener(conn, query_id)
     if consulta is None:
         raise HTTPException(404, "No existe esa consulta")

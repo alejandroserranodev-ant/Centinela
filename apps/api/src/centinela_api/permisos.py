@@ -46,9 +46,13 @@ def _vista(persona: Persona, alerta: Alert, area: str | None) -> Alert:
     return alerta.model_copy(update={"decided_by": area or GERENCIA, "can_decide": _decide(persona, area)})
 
 
+def vista_con(ajustes: Settings, persona: Persona, alerta: Alert) -> Alert:
+    return _vista(persona, alerta, _area(ajustes, alerta.metric))
+
+
 def vistas(conn: psycopg.Connection, persona: Persona, alertas: list[Alert]) -> list[Alert]:
     ajustes = configuracion.leer(conn)
-    return [_vista(persona, alerta, _area(ajustes, alerta.metric)) for alerta in alertas]
+    return [vista_con(ajustes, persona, alerta) for alerta in alertas]
 
 
 def vista(conn: psycopg.Connection, persona: Persona, alerta: Alert) -> Alert:
