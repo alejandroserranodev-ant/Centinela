@@ -1,8 +1,9 @@
 # apps/web: the decision inbox
 
-This level is Centinela's interface: a **decision inbox, not a dashboard**. Its screens run whole
-on a simulated API, built from illustrative fixtures, until `apps/api` serves the real one. Which
-screens the challenge asks for and what each shows is
+This level is Centinela's interface: a **decision inbox, not a dashboard**. Its screens read and
+write `apps/api` over HTTP through one fetch client. Running the web against the API and the database is
+[`../../CONEXION_WEB_API.md`](../../CONEXION_WEB_API.md). Which screens the challenge asks for
+and what each shows is
 [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its screens section.
 
 ## Why each file exists
@@ -15,9 +16,12 @@ screens the challenge asks for and what each shows is
 | `src/shell/` | what wraps every route: the bar with the simulated day, the navigation, and the agents' current step |
 | `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog, the series chart |
 | `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
-| `src/api/client.ts` | the simulated API, one function per endpoint |
-| `src/api/types.ts` | the draft contract the client and the screens share |
-| `src/api/fixtures/` | the illustrative data the simulated API serves: alerts, chat answers, the clock and its user, the queries behind each figure, the settings |
+| `src/api/client.ts` | the one module the screens import the API from; it re-exports `src/api/http-client.ts` |
+| `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
+| `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and the person every decision is sent as |
+| `src/api/types.ts` | the contract the client and the screens share, following `apps/api`'s Pydantic models |
+| `src/api/fixtures/` | the illustrative data the screens ran on before the fetch client; no module imports it |
+| `.env.example` | the `VITE_API_URL` a local `.env` sets |
 | `src/format.ts` | every number and date as a person reads it: pesos, percentages, points, days and units in `es-CO`, dates in the time zone of Bogotá |
 | `src/actionParameters.ts` | the Spanish name of each key of an action's `parameters`, for the proposal, the edit dialog and the `bitácora` |
 | `src/app.css` | the layout Arena does not ship, written in Arena's tokens only: the shell's grid, the inbox's two columns, the alert row, the totals, the chat bubbles |
@@ -46,47 +50,58 @@ screens the challenge asks for and what each shows is
   shape, each with its reason. A change to the config or the plugin starts there and is approved
   there. It reads the stylesheet `arena-to-prod` writes, which imports Arena's sheets by package
   name, so it is opened through `npm run dev` at `/design/identity.html`, never from `file://`.
-- **The screens run on a simulated API until `apps/api` serves one.** `src/api/client.ts` exports
-  one function per endpoint: `advanceDay`, `listAlerts`, `getAlert`, `decide`, `chat` and
-  `listBitacora` for the brief's minimal API, and `getSimulationState`, `getInboxSummary`,
-  `getSettings`, `saveSettings` and `getQuery` for what the screens need beyond it. Each endpoint,
-  its route and what it refuses are [`../api/AGENTS.md`](../api/AGENTS.md), its endpoint table.
-  The client streams agent progress and chat as async iterators shaped like SSE events, reveals
-  each alert when the simulated day reaches its date, and refuses what the API refuses with the
-  same status. It is replaced by a fetch client without touching a screen.
-- **`src/api/types.ts` is a draft contract**: `apps/api`'s Pydantic models are the source, and
-  these types follow them. Every number travels as a `Figure` with its `queryId`, so the type
-  itself asks each figure for its query.
+- **The screens import the API from `src/api/client.ts` alone**, which re-exports the fetch
+  client, so the client behind it changes without touching a screen. It exports `advanceDay`,
+  `listAlerts`, `getAlert`, `decide`, `chat` and `listBitacora` for the brief's minimal API, and
+  `getSimulationState`, `getInboxSummary`, `getSettings`, `saveSettings` and `getQuery` for what
+  the screens need beyond it. Each endpoint, its route and what it refuses are
+  [`../api/AGENTS.md`](../api/AGENTS.md), its endpoint table. A refusal reaches a screen as
+  `src/api/http-client.ts:ApiError(status, message)` with the API's status.
+- **Some functions answer inside the client**, because the API serves no endpoint for them:
+  `getSimulationState` reads the day from `GET /simulacion/dia-actual` and takes the person from
+  the client; `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
+  `saveSettings` refuses `execute` with 422 and stores nothing; `getQuery` refuses every id with
+  404, so "how I got here" and the query dialog show their error state.
+- **There is no login.** `src/api/config.ts:getDecisionHeaders()` sends every decision as
+  `DEFAULT_USER`, a `gerente`, its name percent-encoded in `X-User-Name` because a header is
+  ASCII-only.
+- **`src/api/types.ts` is the contract the screens read**: `apps/api`'s Pydantic models are the
+  source, and these types follow them field for field. Every number travels as a `Figure` with its
+  `queryId`, so the type itself asks each figure for its query. Where the types and the API
+  disagree is listed under the rules below.
 - **The agents' current step is on screen while they work.** `src/shell/CurrentStep.tsx:CurrentStep()`
   renders the `step` events of the day run, which `apps/api` streams by SSE
-  ([`../api/AGENTS.md`](../api/AGENTS.md)).
+  ([`../api/AGENTS.md`](../api/AGENTS.md)). The fetch client yields none, as the rules
+  below say.
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
   including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
-  fixtures. The words the data names keep their Spanish in code too: the agents (`vigia`,
+  fixtures and of the settings the client returns. The words the data names keep their Spanish in code too: the agents (`vigia`,
   `analista`, `estratega`, `ejecutor`), the metrics (`margen_pct`…), the `v_*` views and the
   `alertas` table, because a translation would make a second name for one thing.
-- **The draft contract is English except its routes.** Field names and values in
+- **The contract is English except its routes.** Field names and values in
   `src/api/types.ts` are English (`status: 'proposed'`, `severity: 'critical'`), so the
   `apps/api` models and the web read one vocabulary of code. The endpoint paths and their query
   string stay as the brief writes them, because the jury calls them by those names; where the
-  brief's query string carries a lifecycle value, the fetch client sends the brief's spelling.
+  brief's query string carries a lifecycle value, `src/api/http-client.ts:listAlerts(filter)` sends
+  the brief's spelling (`proposed` travels as `estado=propuesta`).
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
 - **Fixture files and ids are English** (`src/api/fixtures/alerts.json`, `alert-hogar-margin`,
   `q-hogar-drop`); the line name stays as the data spells it. An id never reaches a manager's
   screen.
-- **The fixtures in `src/api/fixtures/` are illustrative.** They are built from the brief's public
-  example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
+- **The fixtures in `src/api/fixtures/` are illustrative**, and no module imports them. They are
+  built from the brief's public example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
   examples, never from the dataset, because figures read from `data/csv/` would name the seeded
   scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
-  figure cites an example query against a real `v_*` view, so "how I got here" has something to
-  show; the queries are not run.
-- **The screen computes no figure.** The inbox totals arrive from `getInboxSummary` as `Figure`s
-  the API computes ([`../api/AGENTS.md`](../api/AGENTS.md)), and their queries read the alerts
+  figure cites an example query against a real `v_*` view; the queries are not run.
+- **The screen computes no figure.** The inbox totals are `Figure`s the API computes
+  ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
   table, which is why `src/api/types.ts:QuerySource` also takes `alertas`. A sum taken on screen
-  would be a figure with no query behind it.
+  would be a figure with no query behind it. Until the API serves the totals,
+  `src/api/http-client.ts:getInboxSummary()` takes those sums in the browser, under query ids no
+  query answers.
 - **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's
@@ -136,10 +151,10 @@ a table view.
    `arena:design` skill.
 2. Give it a Spanish route in `src/App.tsx`, inside the shell. A screen the navigation reaches
    also gets an entry in `src/shell/Shell.tsx:DESTINATIONS`.
-3. Read its data through a new function of `src/api/client.ts`, backed by a fixture in
-   `src/api/fixtures/`, with its shapes in `src/api/types.ts`. Every number is a `Figure` with a
-   query in `src/api/fixtures/queries.json`. The endpoint behind the function is a row in
-   [`../api/AGENTS.md`](../api/AGENTS.md) before the function exists.
+3. Read its data through a new function of `src/api/http-client.ts`, re-exported by
+   `src/api/client.ts`, with its shapes in `src/api/types.ts` following the endpoint's Pydantic
+   model. Every number is a `Figure` with a `queryId` the API answers. The endpoint behind the
+   function is a row in [`../api/AGENTS.md`](../api/AGENTS.md) before the function exists.
 4. Place each piece by who renders it: a piece only this screen renders stays in `src/screens/`
    beside it; a piece another screen or the shell also renders goes in `src/common/`; what wraps
    every route goes in `src/shell/`.
@@ -158,6 +173,18 @@ a table view.
   vocabulary reaches a manager's screen.
 - **A rejection and a request for changes go through `src/screens/ReasonDialog.tsx:ReasonDialog()`**,
   which sends nothing without a reason, and the reason travels in the `Decision`.
+- **What the client sends and reads matches the API.** *No gate holds this*, and these
+  places break it, each costing the step of the demo named:
+  - `advanceDay` and `chat`, the async generators of `src/api/http-client.ts`, read an
+    SSE event's name from its JSON body, but `apps/api` writes it on the `event:` line, and names
+    the day run's step `agent_step` where the types say `step`. A day run
+    therefore yields nothing: the simulated day on screen does not move, the inbox does not
+    refresh and no notice appears until the page is reloaded; a chat answer never arrives.
+  - `chat` sends `alertId`, which the API's `ChatQuestion` forbids, so a question asked from an
+    alert is refused with 422; any other question reaches a chat stream that fails in the API
+    ([`../api/AGENTS.md`](../api/AGENTS.md)).
+  - `decide` sends a `request_changes` as a `reject` carrying the same reason, because the API has
+    no `request_changes`: asking for another proposal closes the alert as rejected.
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.
 - **Arena's rules hold in every source file**: tokens only, no class of ours on an Arena
   component, one primary action per view, danger as outline. `npm run arena:audit` holds the ones
