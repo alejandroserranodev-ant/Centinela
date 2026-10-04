@@ -25,6 +25,16 @@ def started(recorder, alert_id="A1", earlier=None, **options):
     return graph, state
 
 
+def test_orq_start_reports_each_agent_as_it_runs():
+    entered = []
+    graph = compiled(Recorder())
+
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY, on_step=lambda agent, node: entered.append(agent))
+
+    assert entered == ["vigia", "analista", "estratega"]
+    assert awaiting_decision(graph, "A1")
+
+
 def test_orq_a_tree_with_a_missing_no_is_refused_at_startup():
     data = base_data()
     node_of(data, "explicar.con_evidencia").pop("no")
@@ -172,7 +182,7 @@ def test_orq_a_tool_or_connection_error_gives_its_own_reason_not_the_schema_one(
         raise ConnectionError("pgvector")
 
     graph, state = started(Recorder(), overrides={("analista", "explicar"): broken})
-    assert state["cause"]["reason"] == "El análisis no terminó: falló una herramienta o la conexión."
+    assert state["cause"]["reason"] == "El análisis no terminó: no se pudo consultar la información necesaria."
     assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error"}]
 
 
@@ -195,7 +205,7 @@ def test_orq_every_metric_has_the_owner_of_its_manual_review():
     assert set(owners) == set(load_metrics(METRICAS).names)
     assert owners["margen_pct"] == "Comercial"
 
-def test_orq_a_failed_execution_leaves_the_alert_aprobada():
+def test_orq_a_failed_execution_leaves_the_alert_aprobada(caplog):
     def broken(state):
         raise RuntimeError("sandbox")
 
@@ -204,6 +214,7 @@ def test_orq_a_failed_execution_leaves_the_alert_aprobada():
     final = resume(graph, "A1", approve())
     assert final["fin"] == "fin.fallo_ejecucion"
     assert final["status"] == "aprobada"
+    assert any(record.levelname == "WARNING" and "A1" in record.getMessage() and "sandbox" in record.getMessage() for record in caplog.records)
 
 
 RETRASO = Kpi(entity=("cliente_id",), columns=frozenset({"cliente_id", "dias_sobre_habito"}), thresholds={"dias_sobre_habito": 0})

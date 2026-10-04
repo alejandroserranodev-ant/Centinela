@@ -141,6 +141,37 @@ class TestAnalista:
 
         assert [item["claim"] for item in cause["evidence"]] == ["La mora de C1 coincide con pagos a {0} días."]
 
+    def test_a_claim_placeholder_past_its_figures_is_dropped(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured(
+            {
+                "kind": "identified",
+                "sentence": "La mora de C1 coincide con pagos a {0} días.",
+                "sentence_figures": ["f6"],
+                "evidence": [{"claim": "El saldo abierto de C1 es de {1}.", "figures": ["f6"]}],
+                "confidence": "low",
+            }
+        )
+
+        cause = explain_cause(provider, STATE, sources())["cause"]
+
+        assert [item["claim"] for item in cause["evidence"]] == ["La mora de C1 coincide con pagos a {0} días."]
+
+    def test_a_cause_sentence_placeholder_past_its_figures_is_refused(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured(
+            {
+                "kind": "identified",
+                "sentence": "La mora de C1 coincide con pagos a {0} días y un saldo de {1}.",
+                "sentence_figures": ["f6"],
+                "evidence": [{"claim": "El promedio de pago subió a {0} días.", "figures": ["f6"]}],
+                "confidence": "low",
+            }
+        )
+
+        with pytest.raises(SchemaRefused):
+            explain_cause(provider, STATE, sources())
+
     def test_no_evidence_lists_every_query_reviewed(self):
         provider = MagicMock()
         provider.generate_structured.return_value = structured({"kind": "no_evidence", "reason": "Nada coincide.", "confidence": "low"})
@@ -272,6 +303,16 @@ class TestEjecutor:
 
         assert result["executed_action"]["type"] == "task"
         assert result["executed_action"]["actionId"] == "a1"
+        assert result["executed_action"]["result"] == "Tarea «Revisar cliente» creada para Jefe de cartera."
+
+    def test_a_task_with_no_owner_says_so_and_reaches_the_tool_with_its_title(self):
+        tool = MagicMock()
+        action = {"id": "act-revision-manual", "type": "task", "title": "Revisión manual de la alerta", "parameters": {}}
+
+        result = execute_action(MagicMock(), action, {"kind": "approve", "actionId": "act-revision-manual"}, ToolRegistry(task=tool))
+
+        assert result["executed_action"]["result"] == "Tarea «Revisión manual de la alerta» creada, sin responsable asignado."
+        tool.execute.assert_called_once_with(owner=None, title="Revisión manual de la alerta", description=None, parameters={})
 
     def test_execute_email_draft(self):
         """Ejecutor writes email body."""
@@ -298,7 +339,18 @@ class TestEjecutor:
         result = execute_action(provider, action, decision, tools)
 
         assert result["executed_action"]["type"] == "email_draft"
-        assert "Estimado" in result["executed_action"]["result"]
+        assert result["executed_action"]["result"].startswith("Borrador de correo para cliente_123 guardado: Estimado")
+
+    def test_an_email_draft_reaches_its_tool(self):
+        provider = MagicMock()
+        provider.generate_text.return_value = MagicMock(text="Estimado cliente.")
+        tool = MagicMock()
+        action = {"id": "a2", "type": "email_draft", "title": "Email de cobro", "parameters": {"recipient": "C1"}}
+
+        result = execute_action(provider, action, {"kind": "approve", "actionId": "a2"}, ToolRegistry(email_draft=tool))
+
+        assert result["executed_action"]["result"] == "Borrador de correo para C1 guardado: Estimado cliente."
+        tool.execute.assert_called_once_with(recipient="C1", body="Estimado cliente.")
 
 
 class TestOrquestador:

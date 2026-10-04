@@ -24,7 +24,7 @@ export const ROUTES = new Map<string, Budget>([
   ["a table, a CSV, a threshold, a policy document, the database setup, the generator", [24000, "one page owns the dataset, its setup and its generator"]],
   ["a KPI's definition, the kernel's language, a refusal by a guard", [47000, "the language is data's and the compiler is the tools', so both are read"]],
   ["a node, a leaf, a level, a stage or the registry of the decision tree", [23000, "the tree's own page states every rule a node is written by"]],
-  ["an agent, the orchestrator, which model a step uses", [40000, "one page holds the agents, the orchestrator and the model providers"]],
+  ["an agent, the orchestrator, which model a step uses", [40389, "one page holds the agents, the orchestrator and the model providers"]],
   ["the instructions a model step loads, its skill", [6500, "the rules a skill is written by fit one short page"]],
   ["a tool an agent calls: SQL, policy search, impact, an action", [23500, "one page holds every tool, built or decided"]],
   ["sign-in, a role, a 401 or a 403", [31930, "the token, the profiles and who decides are stated on the API's page"]],

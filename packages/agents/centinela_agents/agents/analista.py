@@ -14,7 +14,7 @@ import json
 import logging
 from typing import Any, Mapping
 
-from centinela_agents.evidence import Sources, UnknownFigure, cited, merged_queries, stray_digits
+from centinela_agents.evidence import Sources, UnknownFigure, cited, fills, merged_queries, stray_digits
 from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
 from centinela_agents.schema import CauseIdentified, CauseNoEvidence
@@ -58,13 +58,19 @@ def build_cause(answer: Mapping[str, Any], ledger, queries: list[str], allowed: 
             reason = "Ningún KPI del día muestra una causa para esta alerta."
         return CauseNoEvidence(kind="no_evidence", reason=reason, queriesReviewed=queries).model_dump()
     sentence = str(answer.get("sentence") or "")
-    sentence_refs = cited(sentence, list(answer.get("sentence_figures") or []))
+    sentence_figures = list(answer.get("sentence_figures") or [])
+    sentence_refs = cited(sentence, sentence_figures)
     if stray_digits(sentence, allowed):
         raise SchemaRefused("Analista wrote a figure outside a placeholder in its sentence")
+    if not fills(sentence, len(sentence_figures)):
+        raise SchemaRefused("Analista's sentence cites a placeholder past its figures")
     claims = [
         item
         for item in answer.get("evidence") or []
-        if item.get("figures") and item.get("claim") and not stray_digits(str(item["claim"]), allowed)
+        if item.get("figures")
+        and item.get("claim")
+        and not stray_digits(str(item["claim"]), allowed)
+        and fills(str(item["claim"]), len(item["figures"]))
     ] or ([{"claim": sentence, "figures": sentence_refs}] if sentence_refs else [])
     try:
         cause = CauseIdentified.model_validate(

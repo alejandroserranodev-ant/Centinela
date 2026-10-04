@@ -11,8 +11,8 @@ model's instructions, and calls the provider
 `apps/api` builds that orchestrator in its own process and runs the day. `uv run pytest` holds the
 tree and the graph with stub leaves, and the leaves with a mocked provider and kernel;
 `uv run pytest -m modelo` runs the five agents against OpenAI and the kernel. What is decided,
-not built: the retry and the token cap, cost in an alert's state, Langfuse traces, `AgentStep`
-emission from the alert graph, log events beyond `same_cause_dropped`, a policy search in the chat,
+not built: the retry and the token cap, cost in an alert's state, Langfuse traces, the end of a
+leaf as an `AgentStep`, log events beyond `same_cause_dropped`, a policy search in the chat,
 and self-expansion. Each section that states one opens
 with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
 instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
@@ -112,8 +112,9 @@ product's path.
 - **The code reads the kernel, and the model chooses and words.** A leaf reads its figures through
   `kpi_consultar` before the model runs, and hands them as numbered facts; the model cites a fact by
   its ref and writes `{0}` where it goes. `centinela_agents/evidence.py:Ledger` refuses a ref no
-  query returned, and `centinela_agents/evidence.py:stray_digits(text, allowed)` a figure written
-  outside a placeholder, because a model copies a number wrong more often than it chooses a fact
+  query returned, `centinela_agents/evidence.py:stray_digits(text, allowed)` a figure written
+  outside a placeholder, and `centinela_agents/evidence.py:fills(text, figures)` a placeholder with
+  no figure, never renumbered, because a model copies a number wrong more often than it chooses a fact
   wrong, and one call per leaf is faster and cheaper than a loop of tool calls.
 - **A repeated request pays once.** `centinela_agents/provider_factory.py:cached(provider)` puts
   every provider behind `centinela_agents/cache.py:CachingProvider(inner, size)`, an LRU of
@@ -302,6 +303,7 @@ and the only context is the alert it is anchored to.
   `centinela_agents/action_tools.py` name each draft by its inputs,
   `centinela_agents/action_tools.py:stable_id(prefix, parts)`, so a second run names the same
   draft. The prompt of an email draft is masked by `centinela_agents/security.py:mask_data(text, placeholder_prefix)`.
+- **Result:** a Spanish sentence code composes from the parameters, plus an email's body.
 - **Never:** chooses between actions, recomputes, adds a recipient, runs without a recorded decision.
 
 ## The orchestrator
@@ -380,7 +382,7 @@ for `Ejecutor`. The tree routes each at `explicar.con_evidencia`, `proponer.con_
 `ejecutar.resultado`. The failure lands in `failures` with its step and kind,
 `centinela_agents/graph.py:failure_kind(error)` over the exceptions of
 `centinela_agents/failures.py`, and the `reason` of a failed `explicar` is the Spanish sentence
-`centinela_agents/graph.py:REASONS` holds for that kind.
+`centinela_agents/graph.py:REASONS` holds for that kind, worded for a manager; the error itself is logged as a warning.
 
 **A resume is refused** for each case of `centinela_agents/graph.py:decision_problem(decision,
 state)`, and when nothing awaits a decision; `ejecutar.vigente` reads the KPI on the day the
@@ -451,8 +453,11 @@ of model; the rest fire again on a later day, when the earlier ones are in the i
 completion tokens and the latency in `costs`, `centinela_agents/agents/chat.py:costed(provider, request, step)`,
 and `apps/api` logs it.
 
-> **Decided, not built.** An alert's state has no `cost`, no trace is opened, the alert graph emits
-> no `AgentStep`, and the only event the graph writes is `same_cause_dropped`, in
+**Each leaf's start reaches `on_step(agent, node_id)`** of
+`centinela_agents/graph.py:start_alert(graph, detection, alert_id, day, on_step)`.
+
+> **Decided, not built.** An alert's state has no `cost`, no trace is opened, the end of a leaf is
+> not reported, and the only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.
 > `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
 > and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; no running path

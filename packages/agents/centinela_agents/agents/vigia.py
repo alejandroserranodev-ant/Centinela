@@ -7,10 +7,9 @@ when every placeholder points to one of them.
 """
 
 import logging
-import re
 from typing import Any, Mapping
 
-from centinela_agents.evidence import Sources, merged_queries, stray_digits
+from centinela_agents.evidence import Sources, fills, merged_queries, placeholders, stray_digits
 from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import LLMProvider, LLMRequest
 from centinela_agents.skills import skill
@@ -18,14 +17,13 @@ from centinela_agents.state import subject
 
 logger = logging.getLogger(__name__)
 
-PLACEHOLDER = re.compile(r"\{(\d+)\}")
 TITLE_TOKENS = 80
 
 
 def placeholders_problem(text: str, figures: int) -> str | None:
-    cited = {int(index) for index in PLACEHOLDER.findall(text)}
-    stray = sorted(index for index in cited if index >= figures)
-    return f"cites {stray} with {figures} figures" if stray else None
+    if fills(text, figures):
+        return None
+    return f"cites {sorted(index for index in placeholders(text) if index >= figures)} with {figures} figures"
 
 
 def redact_title(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) -> dict[str, Any]:

@@ -14,7 +14,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Mapping
 
-from centinela_agents.evidence import Sources, cited, merged_queries, stray_digits, unit_of
+from centinela_agents.evidence import Sources, cited, merged_queries, placeholders, stray_digits, unit_of
 from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
 from centinela_agents.schema import ROOT, ChatAnswer
 from centinela_agents.security import SENSITIVE_PATTERNS, SecurePrompt, check_prompt_injection
@@ -233,8 +233,7 @@ def written(parsed: Mapping[str, Any], facts: Facts, allowed: tuple[str, ...]) -
     for item in (parsed.get("sentences") or [])[:MAX_SENTENCES]:
         text = str(item.get("text") or "").strip()
         refs = cited(text, list(item.get("figures") or []))
-        indexes = {int(index) for index in re.findall(r"\{(\d+)\}", text)}
-        if not refs or indexes != set(range(len(refs))) or stray_digits(text, allowed) or any(ref not in facts.figures for ref in refs):
+        if not refs or placeholders(text) != set(range(len(refs))) or stray_digits(text, allowed) or any(ref not in facts.figures for ref in refs):
             continue
         offset = len(figures)
         texts.append(re.sub(r"\{(\d+)\}", lambda match: f"{{{int(match.group(1)) + offset}}}", text))

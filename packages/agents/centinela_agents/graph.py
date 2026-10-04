@@ -1,7 +1,9 @@
 import hashlib
+import logging
 import re
 from typing import Any, Callable, Mapping
 
+from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
@@ -12,17 +14,20 @@ from .schema import CHAT_ROOT, ENDS, GATE, ROOT, Leaf, Node, Tree, reachable
 from .state import AlertState, ChatState, approved_action
 from .walk import Context, Detection, state_holds
 
+logger = logging.getLogger(__name__)
+
 LeafFunction = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 Classifier = Callable[[Mapping[str, Any]], str]
+StepListener = Callable[[str, str], None]
 DECISION_KINDS = ("approve", "edit", "reject", "request_changes")
 REJECTION_TARGETS = ("causa", "propuesta", "ambos", "ninguno")
 DECIDED_STATUS = {"approve": "aprobada", "edit": "aprobada", "reject": "rechazada"}
 ACCUMULATED = ("camino", "transitions", "failures", "events")
 REASONS = {
-    "timeout": "El análisis no terminó: se agotó el tiempo de respuesta del modelo.",
-    "token_cap": "El análisis no terminó: la alerta alcanzó su tope de tokens.",
-    "schema": "El análisis no terminó: el modelo no devolvió una respuesta válida.",
-    "error": "El análisis no terminó: falló una herramienta o la conexión.",
+    "timeout": "El análisis no terminó a tiempo.",
+    "token_cap": "El análisis no terminó: la alerta agotó el trabajo que tiene asignado.",
+    "schema": "El análisis no terminó: no se pudo redactar una causa respaldada por cifras.",
+    "error": "El análisis no terminó: no se pudo consultar la información necesaria.",
 }
 MANUAL_REVIEW_OWNERS = "## The owner of a manual review"
 BOUND_NODES = frozenset({"explicar.destino_nuevo", "proponer.retorno_disponible", "aprobar.recarga_disponible", GATE})
@@ -141,6 +146,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context):
     leaf = node.hoja
 
     def run(state: Mapping[str, Any]) -> dict[str, Any]:
+        get_stream_writer()({"agent": leaf.agente, "node": node.id})
         given = (
             {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
             if leaf.agente == "ejecutor"
@@ -150,6 +156,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context):
         try:
             update, failures = {**cleared, **function(given)}, []
         except Exception as error:
+            logger.warning("Leaf %s failed for %s: %s", node.id, state.get("alert_id") or "chat", error, exc_info=error)
             update, failures = {**cleared, **fallback(leaf, state, error, ctx)}, [{"step": node.id, "kind": failure_kind(error)}]
         return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures})
 
@@ -265,7 +272,7 @@ def thread(alert_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": alert_id}}
 
 
-def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=()) -> dict[str, Any]:
+def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), on_step: StepListener | None = None) -> dict[str, Any]:
     earlier = {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id}
     initial = {
         "alert_id": alert_id,
@@ -288,7 +295,9 @@ def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier
         "merged_alerts": [],
     }
     fresh(graph, alert_id)
-    graph.invoke(initial, thread(alert_id))
+    for entered in graph.stream(initial, thread(alert_id), stream_mode="custom"):
+        if on_step is not None:
+            on_step(entered["agent"], entered["node"])
     return graph.get_state(thread(alert_id)).values
 
 

@@ -42,7 +42,7 @@ from .agents.orquestador import classify_rejection
 from .agents.vigia import redact_title
 from .catalog import KernelCall
 from .evidence import Sources, call_from_reader
-from .graph import Compiler, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
+from .graph import Compiler, StepListener, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
 from .llm_provider import LLMProvider
 from .metrics import Metrics
 from .schema import Tree, index
@@ -153,6 +153,7 @@ class CentinelaOrchestrator:
         alert_briefs: Mapping[str, Mapping[str, Any]] | None = None,
         cause_rejections: list[dict] | None = None,
         proposal_rejections: list[dict] | None = None,
+        on_step: StepListener | None = None,
     ) -> dict[str, Any]:
         """
         Start processing an alert.
@@ -165,6 +166,7 @@ class CentinelaOrchestrator:
             alert_briefs: Metric, entity and cause of each earlier alert, by id, which Analista reads as data
             cause_rejections: Rejection reasons about causes (from API)
             proposal_rejections: Rejection reasons about proposals (from API)
+            on_step: Called with the agent and the node id as each leaf starts
 
         Returns:
             Alert state after reaching first human decision point (or end)
@@ -187,6 +189,7 @@ class CentinelaOrchestrator:
                 alert_briefs=alert_briefs or {},
                 cause_rejections=cause_rejections or [],
                 proposal_rejections=proposal_rejections or [],
+                on_step=on_step,
             )
 
             if awaiting_decision(self.graph, alert_id):

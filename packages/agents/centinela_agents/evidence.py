@@ -44,8 +44,16 @@ def stray_digits(text: str, allowed: tuple[str, ...] = ()) -> bool:
     return re.search(r"\d", text) is not None
 
 
+def placeholders(text: str) -> set[int]:
+    return {int(index) for index in re.findall(r"\{(\d+)\}", text)}
+
+
+def fills(text: str, figures: int) -> bool:
+    return all(index < figures for index in placeholders(text))
+
+
 def cited(text: str, refs: list[str]) -> list[str]:
-    indexes = [int(index) for index in re.findall(r"\{(\d+)\}", text)]
+    indexes = placeholders(text)
     return refs[: max(indexes) + 1] if indexes else []
 
 

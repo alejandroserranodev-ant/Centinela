@@ -224,7 +224,7 @@ class ExecutedAction(BaseModel):
 
     actionId: str
     type: Literal["email_draft", "task", "purchase_order_draft", "price_change_draft", "nota_manual"]
-    result: str | dict[str, Any]
+    result: str
     parameters: dict[str, str | int | float]
 
 
