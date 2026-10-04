@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from centinela_tools.masking import get_run_masking
 from .catalog import Catalog, KernelCall, KpiReader
 from .metrics import Metrics
 from .predicate import is_kpi, kpi_column
@@ -98,8 +99,17 @@ class Ledger:
             raise RuntimeError(f"the kernel refused {kpi} on {day}: {answer['rechazado']['guarda']}: {answer['rechazado']['detalle']}")
         qid = query_id(answer["consulta"], day)
         rows = list(answer["filas"])
-        self.queries[qid] = {"queryId": qid, "kpi": kpi, "dia": day, "consulta": answer["consulta"], "filas": [dict(row) for row in rows[:SHOWN_ROWS]]}
-        return qid, rows
+
+        # Mask PII before storing for agent prompts
+        try:
+            masking = get_run_masking()
+            masked_rows = masking.mask_rows([dict(row) for row in rows])
+        except RuntimeError:
+            # No masking context (e.g., in non-agent code path)
+            masked_rows = [dict(row) for row in rows]
+
+        self.queries[qid] = {"queryId": qid, "kpi": kpi, "dia": day, "consulta": answer["consulta"], "filas": masked_rows[:SHOWN_ROWS]}
+        return qid, masked_rows
 
     def add(self, kpi: str, row: Mapping[str, Any], qid: str, columns: tuple[str, ...] | None = None) -> list[Fact]:
         entity_columns = self.catalog.kpis[kpi].entity
@@ -152,6 +162,16 @@ def merged_queries(state: Mapping[str, Any], ledger: Ledger) -> list[dict[str, A
     known = {query["queryId"]: query for query in state.get("queries") or [] if isinstance(query, Mapping)}
     known.update(ledger.queries)
     return list(known.values())
+
+
+def mask_entity(entity: tuple[Any, ...]) -> tuple[str, ...]:
+    """Mask entity tuple for prompts (cliente_id, sku, etc)."""
+    try:
+        masking = get_run_masking()
+        return tuple(masking.mask(str(e)) if isinstance(e, str) else str(e) for e in entity)
+    except RuntimeError:
+        # No masking context
+        return tuple(str(e) for e in entity)
 
 
 @dataclass(frozen=True)

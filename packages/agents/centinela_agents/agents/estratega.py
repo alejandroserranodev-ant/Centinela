@@ -11,7 +11,7 @@ import logging
 import re
 from typing import Any, Mapping
 
-from centinela_agents.evidence import Sources, merged_queries, stray_digits
+from centinela_agents.evidence import Sources, merged_queries, stray_digits, mask_entity
 from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
 from centinela_agents.schema import Action
@@ -82,8 +82,11 @@ def propose_actions(provider: LLMProvider, state: Mapping[str, Any], cause: Mapp
     values = {**dict(zip(sources.catalog.kpis[metric].entity, detection["entity"])), **kpi_row}
     listed = "\n".join(f"{ref}: [{action.type}] {action.condition} ({action.policy})" for ref, action in rows.items())
     rejections = "\n".join(f"- {reason}" for reason in state.get("proposal_rejections") or []) or "- ninguno"
+
+    # Use masked entity in prompt
+    masked_entity = ", ".join(mask_entity(detection["entity"]))
     prompt = f"""detection.metric: {metric}
-detection.entity: {entity}
+detection.entity: {masked_entity}
 simulated_day: {day}
 fila del KPI: {kpi_row}
 causa: {cause_text(cause)}
