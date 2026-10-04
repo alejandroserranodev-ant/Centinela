@@ -13,7 +13,7 @@ from centinela_agents.agents.analista import explain_cause
 from centinela_agents.agents.chat import ACTION_WORDS, NO_EVIDENCE, answer, classify, screen
 from centinela_agents.agents.ejecutor import execute_action
 from centinela_agents.agents.estratega import IMPACT_ASSUMPTION, described, propose_actions
-from centinela_agents.agents.orquestador import classify_rejection
+from centinela_agents.agents.orquestador import classify_rejection, classifier_input
 from centinela_agents.agents.vigia import redact_title
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse, ModelConfig
 from centinela_agents.evidence import Sources, query_id
@@ -460,6 +460,20 @@ class TestOrquestador:
 
         assert result["error"] is not None
         assert result["destino"] == "ninguno"
+
+    def test_the_classifier_reads_reason_cause_and_actions_with_each_figure_in_place(self):
+        cause = {
+            "kind": "identified",
+            "sentence": {"text": "Debe {0} desde enero.", "figures": [{"value": 800000, "unit": "COP", "queryId": "q1"}]},
+            "evidence": [{"claim": {"text": "Lleva {0} vencido.", "figures": [{"value": 20, "unit": "days", "queryId": "q1"}]}}],
+        }
+        actions = [{"id": "a1", "title": "Recordatorio", "type": "email_draft", "impact": {"value": 800000, "unit": "COP", "queryId": "q1"}, "parameters": {"recipient": "CLI-001"}}]
+        assert classifier_input("No es ese cliente", cause, actions) == {
+            "motivo": "No es ese cliente",
+            "causa": {"kind": "identified", "sentence": "Debe 800000 COP desde enero.", "evidence": ["Lleva 20 days vencido."]},
+            "acciones": [{"title": "Recordatorio", "impact": "800000 COP", "parameters": {"recipient": "CLI-001"}}],
+        }
+        assert classifier_input("x", {"kind": "no_evidence", "reason": "Sin datos"}, None) == {"motivo": "x", "causa": {"kind": "no_evidence", "reason": "Sin datos"}, "acciones": []}
 
 
 ALERT = {"id": "A1", "metric": "saldo_vencido", "entity": ["C1"], "status": "propuesta"}
