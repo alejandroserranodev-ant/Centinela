@@ -21,6 +21,7 @@ and what each shows is
 | `src/roles.ts` | the Spanish label of each role |
 | `src/api/client.ts` | the one module the screens import the API from; it re-exports `src/api/http-client.ts` |
 | `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
+| `src/api/error-message.ts` | `messageOfError`, which turns an error response into the message of `ApiError`; `src/api/http-client.test.ts` tests it |
 | `src/api/sse.ts` | `readSse(body)`, which reads a server-sent event stream as `event` and parsed `data` pairs, the name from each event's `event:` line; `src/api/sse.test.ts` tests it with Node's test runner |
 | `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and `authHeaders()` with the bearer token |
 | `src/api/types.ts` | the contract the client and the screens share: aliases over `src/api/schema.generated.ts`, plus the types the API has no model for |
@@ -67,7 +68,10 @@ and what each shows is
   client, so the client behind it changes without touching a screen. Which function serves which
   endpoint, and what each refuses, is the endpoint table of [`../api/AGENTS.md`](../api/AGENTS.md).
   A refusal reaches a screen as `src/api/http-client.ts:ApiError(status, message)`, with the API's
-  status and `detail`.
+  status and `detail`, which `src/api/error-message.ts:messageOfError(body, statusText)` reads: a string
+  `detail` as it comes, the first `msg` of a validation list, otherwise the body or the status
+  text. The SSE calls throw the same error before their stream starts, so a screen shows the API's
+  own Spanish, such as the 409 of a second day run.
 - **Some functions answer inside the client**, because the API serves no endpoint for them:
   `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
   `saveSettings` refuses `execute` with 422 and stores nothing. `getQuery` gets 404 for a total's

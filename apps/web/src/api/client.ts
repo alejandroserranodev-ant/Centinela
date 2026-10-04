@@ -1,4 +1,4 @@
-export { ApiError } from './http-client';
+export { ApiError, STATUS_ESTADO } from './http-client';
 export {
   advanceDay,
   chat,

@@ -3,13 +3,14 @@ import { useParams } from 'react-router-dom';
 import {
   ArenaButton,
   ArenaEmptyState,
+  ArenaErrorState,
   ArenaPageHead,
   ArenaSegmentedControl,
   ArenaSkeleton,
   ArenaStatCard,
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
-import { getInboxSummary, listAlerts } from '../api/client';
+import { ApiError, getInboxSummary, listAlerts } from '../api/client';
 import type { Alert, Figure, InboxSummary } from '../api/types';
 import { useSimulation } from '../state/Simulation';
 import { formatCompactPesos, formatDate, formatNumber, formatPesos } from '../format';
@@ -80,15 +81,41 @@ export function Inbox() {
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [summary, setSummary] = useState<InboxSummary | null>(null);
 
+  const [failure, setFailure] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
-    listAlerts().then(setAlerts);
-    getInboxSummary().then(setSummary);
-  }, [version]);
+    setFailure(null);
+    Promise.all([listAlerts(), getInboxSummary()]).then(
+      ([loaded, totals]) => {
+        setAlerts(loaded);
+        setSummary(totals);
+      },
+      (e: unknown) => {
+        if (!(e instanceof ApiError && e.status === 401)) {
+          setFailure(e instanceof Error ? e.message : 'No se pudo cargar la bandeja.');
+        }
+      },
+    );
+  }, [version, attempt]);
 
   if (mobile && id) {
     return (
       <div className="arena-band page">
         <AlertDetail id={id} />
+      </div>
+    );
+  }
+
+  if (failure !== null && alerts === null) {
+    return (
+      <div className="arena-band page">
+        <ArenaErrorState
+          title="No pudimos cargar la bandeja"
+          message={failure}
+          retryLabel="Reintentar"
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
       </div>
     );
   }

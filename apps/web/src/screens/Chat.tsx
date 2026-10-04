@@ -8,7 +8,7 @@ import {
   ArenaTextarea,
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
-import { chat, getAlert, getQuery } from '../api/client';
+import { ApiError, chat, getAlert, getQuery } from '../api/client';
 import type { ChatMessage, ChatOutcome, Query } from '../api/types';
 import { SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
@@ -22,7 +22,7 @@ type Entry =
   | { id: number; role: 'user'; text: string }
   | { id: number; role: 'centinela'; status: 'searching' | 'writing'; step: string; text: string; path: string[] }
   | { id: number; role: 'centinela'; status: 'ready'; message: ChatMessage; path: string[] }
-  | { id: number; role: 'centinela'; status: 'error' };
+  | { id: number; role: 'centinela'; status: 'error'; message: string };
 
 const ALERT_SUGGESTIONS = ['¿Por qué se generó esta alerta?', '¿Qué propones hacer?', '¿Cuál es la causa?'];
 
@@ -74,7 +74,7 @@ function Answer({ entry }: { entry: Exclude<Entry, { role: 'user' }> }) {
   if (entry.status === 'error') {
     return (
       <ArenaAlert tone="danger" title="No pude responder">
-        Intenta de nuevo en unos segundos.
+        {entry.message}
       </ArenaAlert>
     );
   }
@@ -112,7 +112,7 @@ function Answer({ entry }: { entry: Exclude<Entry, { role: 'user' }> }) {
 
 export function Chat() {
   const mobile = useArenaViewportBelow('lg');
-  const { chat: state, closeChat, clearChatContext } = useSimulation();
+  const { chat: state, closeChat, clearChatContext, changed } = useSimulation();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [question, setQuestion] = useState('');
   const [answering, setAnswering] = useState(false);
@@ -176,6 +176,7 @@ export function Chat() {
           );
         } else {
           const message = event.data;
+          changed();
           update(answerId, (e) => ({
             id: answerId,
             role: 'centinela',
@@ -185,8 +186,9 @@ export function Chat() {
           }));
         }
       }
-    } catch {
-      update(answerId, () => ({ id: answerId, role: 'centinela', status: 'error' }));
+    } catch (e: unknown) {
+      const message = e instanceof ApiError ? e.message : 'Intenta de nuevo en unos segundos.';
+      update(answerId, () => ({ id: answerId, role: 'centinela', status: 'error', message }));
     } finally {
       setAnswering(false);
     }

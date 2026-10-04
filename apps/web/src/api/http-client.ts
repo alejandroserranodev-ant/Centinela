@@ -1,3 +1,4 @@
+import { messageOfError } from './error-message';
 import { API_BASE_URL, API_HEADERS, authHeaders } from './config';
 import { getToken, notifyUnauthorized } from './session';
 import { readSse } from './sse';
@@ -6,6 +7,7 @@ import type {
   AgentStep,
   Alert,
   AlertFilter,
+  AlertStatus,
   ChatEvent,
   ChatMessage,
   ChatQuestion,
@@ -19,6 +21,15 @@ import type {
   Settings,
 } from './types';
 
+export const STATUS_ESTADO: Record<Exclude<AlertStatus, 'merged'>, string> = {
+  new: 'nueva',
+  analyzing: 'en_analisis',
+  proposed: 'propuesta',
+  approved: 'aprobada',
+  rejected: 'rechazada',
+  executed: 'ejecutada',
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -31,15 +42,7 @@ export class ApiError extends Error {
 
 async function errorMessage(response: Response): Promise<string> {
   const text = await response.text().catch(() => '');
-  try {
-    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
-    if (typeof detail === 'string') {
-      return detail;
-    }
-  } catch {
-    return text || response.statusText;
-  }
-  return text || response.statusText;
+  return messageOfError(text, response.statusText);
 }
 
 async function request(url: string, options?: RequestInit, anonymous = false): Promise<Response> {
@@ -102,16 +105,8 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
 
 export async function listAlerts(filter: AlertFilter = {}): Promise<Alert[]> {
   const params = new URLSearchParams();
-  if (filter.status) {
-    const statusMap: Record<string, string> = {
-      new: 'nueva',
-      analyzing: 'en_analisis',
-      proposed: 'propuesta',
-      approved: 'aprobada',
-      rejected: 'rechazada',
-      executed: 'ejecutada',
-    };
-    params.set('estado', statusMap[filter.status]);
+  if (filter.status && filter.status !== 'merged') {
+    params.set('estado', STATUS_ESTADO[filter.status]);
   }
 
   const url = new URL(`${API_BASE_URL}/alertas`);

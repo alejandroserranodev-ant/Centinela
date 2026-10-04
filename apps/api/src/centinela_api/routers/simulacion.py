@@ -3,7 +3,7 @@ import datetime
 import logging
 
 import psycopg
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
@@ -18,6 +18,8 @@ from centinela_agents.walk import detect
 
 router = APIRouter(dependencies=[Depends(persona_actual)])
 logger = logging.getLogger(__name__)
+
+day_run = asyncio.Lock()
 
 
 @router.get("/simulacion/dia-actual", response_model=SimulatedDay)
@@ -34,7 +36,25 @@ async def dia_actual(conn: psycopg.Connection = Depends(obtener_conexion)) -> Si
 async def avanzar(
     dias: int = Query(1, ge=1), conn: psycopg.Connection = Depends(obtener_conexion)
 ) -> StreamingResponse:
+    if day_run.locked():
+        raise HTTPException(status_code=409, detail="Ya hay un día en curso")
+    await day_run.acquire()
+    held = True
+
+    def release() -> None:
+        nonlocal held
+        if held:
+            held = False
+            day_run.release()
+
     async def eventos():
+        try:
+            async for evento in corrida():
+                yield evento
+        finally:
+            release()
+
+    async def corrida():
         with conn.transaction():
             nuevo_dia = simulacion.avanzar(conn, dias)
 
@@ -91,6 +111,8 @@ async def avanzar(
 
                     new_alert_ids.append(alert_id)
 
+                    yield "alert", alerta
+
                     yield "step", AgentStep(
                         alert_id=alert_id,
                         agent="estratega",
@@ -112,4 +134,6 @@ async def avanzar(
 
         yield "end", AdvanceEnd(simulated_day=day_str, new_alerts=new_alert_ids)
 
-    return StreamingResponse(flujo(eventos()), media_type="text/event-stream")
+    cierre = BackgroundTasks()
+    cierre.add_task(release)
+    return StreamingResponse(flujo(eventos()), media_type="text/event-stream", background=cierre)

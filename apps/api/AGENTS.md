@@ -74,7 +74,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection, an `alert` event with the stored `Alert` once it is recorded, and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
@@ -165,11 +165,14 @@ days. The day it moves replaces `fecha_corte()` (see
 [`../../data/AGENTS.md`](../../data/AGENTS.md#the-simulated-clock)), and it reaches the
 orchestrator as the argument of each run.
 
-> **Decided, not built.** The two decisions below.
-
 **One day run at a time.** A call to `/simulacion/avanzar` while a day run is in course is refused
 with 409, because the second run would detect against earlier alerts the first has not
 recorded, and one cause would raise two alerts.
+`src/centinela_api/routers/simulacion.py:avanzar(dias, conn)` takes the module's `asyncio.Lock`
+before it moves the clock and frees it when the stream ends, fails or the client leaves; the
+response's background task frees it for a stream that never starts.
+
+> **Decided, not built.** The decision below.
 
 **The API hands each run what the orchestrator cannot read**: the metric, entity, severity and
 state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps each

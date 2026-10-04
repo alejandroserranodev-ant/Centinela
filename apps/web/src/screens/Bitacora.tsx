@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArenaErrorState,
   ArenaPageHead,
   ArenaSelect,
   ArenaSkeleton,
@@ -10,7 +11,7 @@ import {
   ArenaTag,
   type ArenaTableColumn,
 } from '@dravensoft/arena-react';
-import { listAlerts, listBitacora } from '../api/client';
+import { ApiError, listAlerts, listBitacora } from '../api/client';
 import type { Actor, Agent, Alert, LogEvent, LogEventType } from '../api/types';
 import { useSimulation } from '../state/Simulation';
 import { formatShortDate, formatShortDateTime } from '../format';
@@ -68,13 +69,21 @@ export function Bitacora() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [events, setEvents] = useState<LogEvent[] | null>(null);
 
-  useEffect(() => {
-    listAlerts().then(setAlerts);
-  }, [version]);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    listBitacora({ ...(alertId ? { alertId } : {}), ...(type ? { type } : {}) }).then(setEvents);
-  }, [alertId, type, version]);
+    listAlerts().then(setAlerts, () => setAlerts([]));
+  }, [version, attempt]);
+
+  useEffect(() => {
+    setFailure(null);
+    listBitacora({ ...(alertId ? { alertId } : {}), ...(type ? { type } : {}) }).then(setEvents, (e: unknown) => {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setFailure(e instanceof Error ? e.message : 'No se pudo cargar la bitácora.');
+      }
+    });
+  }, [alertId, type, version, attempt]);
 
   const titles = new Map(alerts.map((a) => [a.id, a.title.text]));
   const visible = events?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? [];
@@ -102,7 +111,15 @@ export function Bitacora() {
           }}
         />
       </div>
-      {events === null ? (
+      {failure !== null && events === null ? (
+        <ArenaErrorState
+          headingLevel="h2"
+          title="No pudimos cargar la bitácora"
+          message={failure}
+          retryLabel="Reintentar"
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      ) : events === null ? (
         <ArenaSkeleton variant="text" lines={10} />
       ) : (
         <ArenaTable

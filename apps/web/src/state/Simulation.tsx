@@ -103,7 +103,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       .then(setSimulatedDay)
       .catch((e: unknown) => {
         if (!(e instanceof ApiError && e.status === 401)) {
-          notify({ tone: 'danger', title: 'No se pudo leer el día simulado', message: 'Revisa que la API esté en marcha y recarga la página.' });
+          notify({
+            tone: 'danger',
+            title: 'No se pudo leer el día simulado',
+            message: e instanceof Error ? e.message : 'Revisa que la API esté en marcha y recarga la página.',
+          });
         }
       });
   }, [notify]);
@@ -143,8 +147,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-    } catch {
-      notify({ tone: 'danger', title: 'No se pudo avanzar el día', message: 'Inténtalo de nuevo en unos segundos.' });
+    } catch (e: unknown) {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        notify({
+          tone: 'danger',
+          title: 'No se pudo avanzar el día',
+          message: e instanceof Error ? e.message : 'Inténtalo de nuevo en unos segundos.',
+        });
+      }
     } finally {
       setStep(null);
       setAdvancing(false);

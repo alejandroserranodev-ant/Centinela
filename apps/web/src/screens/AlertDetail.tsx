@@ -9,7 +9,7 @@ import {
   ArenaSpinner,
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
-import { getAlert, getQuery } from '../api/client';
+import { ApiError, getAlert, getQuery } from '../api/client';
 import type { Alert, Evidence, MergedAlert, Query } from '../api/types';
 import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
@@ -84,12 +84,17 @@ export function AlertDetail({ id }: { id: string }) {
   const mobile = useArenaViewportBelow('lg');
   const { version, openChat } = useSimulation();
   const [alert, setAlert] = useState<Alert | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<Error | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    setFailed(false);
-    getAlert(id).then(setAlert, () => setFailed(true));
-  }, [id, version]);
+    setFailure(null);
+    getAlert(id).then(setAlert, (e: unknown) => {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setFailure(e instanceof Error ? e : new Error('No se pudo cargar la alerta.'));
+      }
+    });
+  }, [id, version, attempt]);
 
   useEffect(() => {
     setAlert(null);
@@ -103,7 +108,21 @@ export function AlertDetail({ id }: { id: string }) {
     </div>
   ) : null;
 
-  if (failed) {
+  if (failure && !(failure instanceof ApiError && failure.status === 404)) {
+    return (
+      <div className="arena-stack">
+        {back}
+        <ArenaErrorState
+          title="No pudimos cargar la alerta"
+          message={failure.message}
+          retryLabel="Reintentar"
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </div>
+    );
+  }
+
+  if (failure) {
     return (
       <div className="arena-stack">
         {back}
