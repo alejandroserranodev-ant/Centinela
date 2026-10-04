@@ -14,9 +14,10 @@ challenge in full is [`docs/challenge/AGENTS.md`](./docs/challenge/AGENTS.md).
 
 The tree is a monorepo: `apps/web`, `apps/api`, `packages/agents`, `packages/tools`, `data` and
 `evals`, plus the gates in `scripts/check` and the guide in `docs/guide`. `apps/web` runs its
-screens on a simulated API, `packages/agents` holds the tree's validator, walk and graph compiler,
-`packages/tools` holds the KPI kernel, `data` holds the database's SQL and the generator, and
-`apps/api` and `evals` hold no code. Each page opens with what runs on its level and marks with
+screens against `apps/api`, `apps/api` serves the endpoints, the clock, the lifecycle and the
+`bitácora` and runs the agents in its own process, `packages/agents` holds the tree's validator,
+walk and graph compiler and the model leaves, `packages/tools` holds the KPI kernel, `data` holds
+the database's SQL and the generator, and `evals` holds no code. Each page opens with what runs on its level and marks with
 `> **Decided, not built.**` every section that no code implements.
 
 **This file routes. Read only what your task needs.**
@@ -46,6 +47,8 @@ screens on a simulated API, `packages/agents` holds the tree's validator, walk a
 | adding an endpoint | [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#adding-an-endpoint) |
 | adding a screen | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md#adding-a-screen) |
 | adding an evaluation case | [`evals/AGENTS.md`](./evals/AGENTS.md#adding-a-case) |
+| running the database, the API and the web together on my machine | [`CONEXION_WEB_API.md`](./CONEXION_WEB_API.md) |
+| which model provider the agents call, its key or its variables | [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) |
 | the guide a developer reads in Docmost, its compose, or one of its chapters | [`docs/guide/AGENTS.md`](./docs/guide/AGENTS.md) |
 | how a page, a spec or a plan is written | [`docs_guide.md`](./docs_guide.md) |
 | whether the file in front of me is mine to edit | [`GENERATED.md`](./GENERATED.md), before the edit |
@@ -73,9 +76,9 @@ approves, edits or rejects it on screen; `apps/api` records the decision and res
 approval, `Ejecutor` runs a draft or sandbox action from `packages/tools`. Every step lands in the
 `bitácora`, which `apps/api` owns.
 
-**Still undecided, and owned by no page:** who embeds the policies into pgvector and when, and
-whether `apps/api` runs the agents in its own process or calls them as a service. Whoever settles
-one writes the decision on the page of the level that owns it.
+**Still undecided, and owned by no page:** who embeds the policies into pgvector and when. Whoever
+settles it writes the decision on the page of the level that owns it. The path one day and one
+decision take through today's code is [`FLUJO_DATOS.md`](./FLUJO_DATOS.md).
 
 ## Commands
 

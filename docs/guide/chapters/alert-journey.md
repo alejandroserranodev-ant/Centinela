@@ -26,9 +26,10 @@ Each arrow is a call, and nothing calls back up the chain. The rule and what hol
 
 ## One alert, from the clock to the log
 
-> **Decided, not built.** The day run, every model call, `calcular_impacto`, the action tools and
-> all of `apps/api`. Of this diagram, the walk of `detectar`, the pause at `aprobar.decision` and
-> the resume with a recorded decision run, with stub leaves and no model.
+> **Decided, not built.** Reading the day's measures through the kernel, the earlier alerts and
+> rejection reasons handed to each run, `calcular_impacto` and the action tools. Of this diagram,
+> `apps/api` advances the day, walks `detectar` over demo rows, runs the model leaves to the pause
+> at `aprobar.decision`, records the decision and resumes, over stub tools.
 
 ```mermaid
 sequenceDiagram
