@@ -1,7 +1,7 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { Alert } from '../api/types';
-import { Confidence, Severity, Status } from '../common/Badges';
+import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { formatDate, formatPesos } from '../format';
 
 interface Props {
@@ -52,6 +52,7 @@ export function AlertList({ alerts, selected }: Props) {
           >
             <span className="arena-row alert-row__head">
               <Severity level={alert.severity} />
+              <Labels labels={alert.labels} />
               {alert.status === 'proposed' ? null : <Status status={alert.status} />}
               <time className="text-muted" dateTime={alert.simulatedDate}>
                 {formatDate(alert.simulatedDate)}

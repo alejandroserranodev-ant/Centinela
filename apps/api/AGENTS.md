@@ -146,7 +146,7 @@ stop at `approved` for human decision. After decision, only `Ejecutor` can move 
 
 **Output model** (same for all endpoints):
 
-- **`Alert`**: Immutable snapshot with id, status, severity, metric, title, pesosAtRisk, cause, actions[], executedAction. Reflects current state after the endpoint transitions it.
+- **`Alert`**: Immutable snapshot with id, status, severity, metric, `labels` (the metric's short name and the affected entity, e.g. `['Margen', 'línea Hogar']`), title, pesosAtRisk, cause, actions[], executedAction. Reflects current state after the endpoint transitions it.
 
 ### Data masking (Ley 1581)
 

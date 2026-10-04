@@ -43,6 +43,8 @@ the screens are built on and the skin they wear. Which screens exist and what ea
   `/alertas/{id}/decision`, `/chat`, `/bitacora`), because the jury calls them by those names;
   where the brief's query string carries a lifecycle value, the fetch client sends the brief's
   spelling.
+- **An alert shows its identity labels beside its urgency.** `Alert.labels` carries the metric's
+  short name and the affected entity, composed by `apps/api`; the web renders each as an `ArenaTag`.
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
