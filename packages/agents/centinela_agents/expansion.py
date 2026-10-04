@@ -255,6 +255,10 @@ def fingerprint(grounds: Grounds, growth: Growth) -> str:
         "base": grounds.base.model_dump(mode="json"),
         "registry": sorted(grounds.registry),
         "metrics": asdict(grounds.metrics),
+        "catalog": {
+            name: {"entity": list(kpi.entity), "columns": sorted(kpi.columns), "descriptive": kpi.descriptive, "thresholds": dict(kpi.thresholds)}
+            for name, kpi in grounds.catalog.kpis.items()
+        },
         "growth": {"repetitions": dict(growth.repetitions), "caps": asdict(growth.caps)},
         "skills": {name: (skills / name).read_text(encoding="utf-8") for name in files},
     }

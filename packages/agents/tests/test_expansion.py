@@ -190,6 +190,20 @@ def test_the_fingerprint_moves_when_the_base_the_registry_the_metrics_or_the_gro
     assert len({digest(), *changed.values()}) == len(changed) + 1
 
 
+def test_the_fingerprint_moves_when_the_catalog_changes():
+    kpis = KERNEL_CATALOG.kpis
+    kpi = kpis["saldo_vencido"]
+    changed = {
+        "dropped kpi": {name: value for name, value in kpis.items() if name != "saldo_vencido"},
+        "dropped column": {**kpis, "saldo_vencido": replace(kpi, columns=kpi.columns - {"max_dias_vencido"})},
+        "threshold": {**kpis, "saldo_vencido": replace(kpi, thresholds={"x": 1})},
+        "descriptive": {**kpis, "saldo_vencido": replace(kpi, descriptive=not kpi.descriptive)},
+    }
+    digests = {digest(catalog=Catalog(value)) for value in changed.values()}
+    assert len({digest(), *digests}) == len(changed) + 1
+    assert digest(catalog=Catalog(dict(reversed(kpis.items())))) == digest()
+
+
 @pytest.mark.parametrize("name", ["estratega/acciones.md", "vigia/contrato.md", "analista/saldo_vencido.md", "analista/politicas.md"])
 def test_the_fingerprint_moves_when_a_skill_it_reads_changes(tmp_path, name):
     skills = skills_copy(tmp_path)

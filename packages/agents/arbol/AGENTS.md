@@ -312,7 +312,7 @@ that breaks any row below, and a refused move never becomes a version a run walk
 | the evidence reached its count | `centinela_agents/growth.py:grow(tree, grounds, growth, rejections, consumed)` |
 
 `centinela_agents/expansion.py:fingerprint(grounds, growth)` digests everything the validator and
-the replay read: the base, the registry, the metrics, the caps and repetitions, `skills/estratega/acciones.md`, the
+the replay read: the base, the registry, the metrics, the KPI catalogue, the caps and repetitions, `skills/estratega/acciones.md`, the
 skills the base leaves load and `skills/analista/*.md`. A digest that differs from the one a
 version was built under says its criteria may have moved.
 

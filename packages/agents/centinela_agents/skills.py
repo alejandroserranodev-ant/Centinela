@@ -25,8 +25,13 @@ def cells(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
+@cache
+def actions_table(root: Path) -> str:
+    return (root / "estratega" / "acciones.md").read_text(encoding="utf-8").strip().split("\n## ", 1)[0]
+
+
 def action_rows(metric: str, root: Path = SKILLS) -> list[ActionRow]:
-    table = (root / "estratega" / "acciones.md").read_text(encoding="utf-8").strip().split("\n## ", 1)[0]
+    table = actions_table(root)
     rows = []
     for line in table.splitlines():
         if not line.startswith(f"| `{metric}` |"):
