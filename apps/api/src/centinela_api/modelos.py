@@ -19,7 +19,7 @@ Metric = Literal[
 FigureUnit = Literal["COP", "points", "percent", "days", "units"]
 ActionType = Literal["email_draft", "task", "purchase_order_draft", "price_change_draft"]
 Agent = Literal["vigia", "analista", "estratega", "ejecutor", "chat"]
-LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result", "question", "answer", "refusal", "configuracion"]
+LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result", "question", "answer", "refusal", "configuracion", "arbol"]
 ChatOutcome = Literal["answered", "no_evidence", "out_of_scope", "refused"]
 Role = Literal["gerente", "lider_proceso", "analista", "auditor"]
 AutonomyLevel = Literal["inform", "propose", "execute"]
@@ -177,7 +177,7 @@ class LogEvent(Esquema):
     date: str = Field(..., description="UTC timestamp of event (ISO 8601)")
     simulated_day: str = Field(..., description="Simulated date when event occurred")
     alert_id: str | None = Field(None, description="Alert ID, null for a chat question asked from no alert")
-    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion")
+    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion, arbol")
     actor: Actor = Field(..., description="Who/what performed the action (agent or person)")
     detail: str = Field(..., description="Spanish sentence of the event, with a {0} placeholder per figure")
     query_id: str | None = Field(None, description="SQL query ID if relevant to this event")
@@ -201,6 +201,7 @@ class AdvanceEnd(Esquema):
     """Final event of the simulated clock's advance stream."""
     simulated_day: str = Field(..., description="Simulated day the clock reached (ISO 8601)")
     new_alerts: list[str] = Field(default_factory=list, description="IDs of the alerts raised on that day")
+    failure: str | None = Field(None, description="Why the day's analysis did not run to its end, in Spanish for the person who advanced the clock; null when it did")
 
 
 class ChatQuestion(Esquema):
@@ -349,3 +350,28 @@ class Settings(Esquema):
     metrics: list[WatchedMetric] = Field(..., description="The API's metrics, in the order of data/metricas.yaml")
     owners: list[str] = Field(..., description="The areas that can own a metric: those a lider_proceso profile leads")
     autonomy: dict[ActionType, AutonomyLevel] = Field(..., description="Per action type: inform, propose, or execute, which the pilot refuses")
+
+
+class ExpansionEvidence(Esquema):
+    """An alert whose rejection counted toward an expansion of the decision tree."""
+    alert_id: str = Field(..., description="The rejected alert")
+    title: Sentence = Field(..., description="The alert's title with its figures, or its id when the alert is gone")
+
+
+class TreeExpansion(Esquema):
+    """A change an agent made to the decision tree, and whether it still holds."""
+    id: str = Field(..., description="The version the change wrote")
+    agent: Agent = Field(..., description="The agent whose stage the change grew")
+    simulated_date: str | None = Field(..., description="The simulated day the change was drafted on")
+    created_at: str = Field(..., description="When it was written, real time")
+    description: str = Field(..., description="What the change does, in Spanish")
+    evidence: list[ExpansionEvidence] = Field(..., description="The alerts whose rejections drafted it")
+    status: Literal["active", "retired", "inactive"] = Field(..., description="Whether the change still holds: active; retired by a person; or inactive, when a change to the base or to anything else the validator reads dropped it, or a retired change it nests under left it unreachable")
+    inactive_reason: Literal["dropped_by_base", "parent_retired"] | None = Field(None, description="Why an inactive change no longer holds: a change to the base or to anything else the validator reads dropped it, or a retired change it nests under left it unreachable; null unless inactive")
+    retired_by: str | None = Field(None, description="Who retired it")
+    retire_reason: str | None = Field(None, description="Why it was retired")
+
+
+class RetireExpansion(Esquema):
+    """Why a person retires an expansion of the decision tree."""
+    reason: str = Field(..., max_length=500, description="Why the expansion is retired")

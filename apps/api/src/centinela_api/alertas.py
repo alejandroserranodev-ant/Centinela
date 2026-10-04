@@ -34,6 +34,10 @@ def fijar_costo(conn: psycopg.Connection, id: str, costo) -> None:
     conn.execute("UPDATE api.alertas SET costos = %s WHERE id = %s", (Jsonb(dict(costo)), id))
 
 
+def fijar_version(conn: psycopg.Connection, id: str, version: int | None) -> None:
+    conn.execute("UPDATE api.alertas SET arbol_version = %s WHERE id = %s", (version, id))
+
+
 def obtener(conn: psycopg.Connection, id: str, *, bloquear: bool = False) -> Alert | None:
     fila = conn.execute(
         "SELECT id, status, cuerpo FROM api.alertas WHERE id = %s" + (" FOR UPDATE" if bloquear else ""), (id,)

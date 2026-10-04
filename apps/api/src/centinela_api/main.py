@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import alertas, auth, bandeja, bitacora, chat, configuracion, consultas, interno, simulacion
+from .routers import alertas, arbol, auth, bandeja, bitacora, chat, configuracion, consultas, interno, simulacion
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 for ruidoso in ("httpx", "httpx2", "httpcore", "openai"):
@@ -23,4 +23,5 @@ app.include_router(chat.router)
 app.include_router(bitacora.router)
 app.include_router(consultas.router)
 app.include_router(configuracion.router)
+app.include_router(arbol.router)
 app.include_router(interno.router)

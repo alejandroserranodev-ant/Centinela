@@ -1,0 +1,11 @@
+repeticiones:
+  estratega:
+    valor: 3
+    fuente: "supuesto: a setting of the method, decided by a person; it decides when a split is drafted, never whether an alert fires"
+topes:
+  profundidad:
+    valor: 40
+    fuente: "supuesto: the nodes of the longest path, sized so a walk and its skill fit the context of the model the machine runs"
+  nodos_por_etapa:
+    valor: 64
+    fuente: "supuesto: the nodes of one stage, sized as the depth is"

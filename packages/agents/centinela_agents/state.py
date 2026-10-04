@@ -8,6 +8,7 @@ STATE_FIELDS = DERIVED_FIELDS | frozenset(
     {
         "estado.candidato.metrica",
         "estado.candidato.descriptivo",
+        "estado.detection.metric",
         "estado.cause.kind",
         "estado.same_cause_as",
         "estado.insufficient_cause",
@@ -30,6 +31,7 @@ class AlertState(TypedDict, total=False):
     alert_id: str
     simulated_day: str
     entry: str
+    arbol_version: int | None
     earlier_alerts: dict[str, str]
     alert_briefs: dict[str, dict[str, Any]]
     detection: dict[str, Any]

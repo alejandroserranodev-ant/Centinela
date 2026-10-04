@@ -36,6 +36,27 @@ def node_of(data: dict, node_id: str) -> dict:
     return next(node for node in data["nodos"] if node["id"] == node_id)
 
 
+PROPOSER = "hoja.estratega.proponer"
+
+
+def split_data(data: dict, metric: str = "saldo_vencido", family: str = "cartera", excluye=("act-saldo_vencido-r1",), number: int = 1, leaf: str = PROPOSER) -> dict:
+    node_id, new_leaf = f"proponer.{family}.{metric}.division_{number}", f"hoja.estratega.proponer.{metric}.{number}"
+    old = node_of(data, leaf)
+    for node in data["nodos"]:
+        for key in ("si", "no", "sigue"):
+            if node.get(key) == leaf:
+                node[key] = node_id
+    data["nodos"] += [
+        {"id": node_id, "fundamento": "iso31000.6.5.2", "predicado": {"lee": "estado.detection.metric", "op": "=", "valor": metric}, "si": new_leaf, "no": leaf, "divide": leaf},
+        {"id": new_leaf, "hoja": {**old["hoja"], "excluye": list(excluye)}, "sigue": old["sigue"]},
+    ]
+    return data
+
+
+def split_tree(**options) -> Tree:
+    return Tree.model_validate(split_data(base_data(), **options))
+
+
 def grounds(catalog: Catalog = KERNEL_CATALOG, metrics=None) -> Grounds:
     return Grounds(
         base=base_tree(),

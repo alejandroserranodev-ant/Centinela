@@ -5,6 +5,7 @@ const WITHOUT_ALERT: Partial<Record<LogEventType, string>> = {
   question: 'Chat, sin alerta',
   answer: 'Chat, sin alerta',
   refusal: 'Chat, sin alerta',
+  arbol: 'Árbol de decisión',
 };
 
 export function withoutAlert(type: LogEventType): string {

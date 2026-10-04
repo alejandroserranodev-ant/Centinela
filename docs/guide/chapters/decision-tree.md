@@ -4,7 +4,7 @@ The decision tree holds every route of an alert in one artefact that is **data, 
 and walked by a deterministic interpreter**. How it is written, validated and grown is
 [the tree's page](../../../packages/agents/arbol/AGENTS.md); how the compiled graph runs an alert is
 [packages/agents](../../../packages/agents/AGENTS.md). This chapter keeps what founds the tree,
-drawings of its stages, its levels and one walk, and the part of its growth no level page states.
+drawings of its stages, its levels and one walk.
 
 ## What founds it
 
@@ -72,49 +72,20 @@ flowchart TB
 
 *Draws: `packages/agents/arbol/AGENTS.md` § The levels; `packages/agents/arbol/AGENTS.md` § How the tree grows*
 
-The dashed arrows are self-expansion, decided and not built. The laws L0 holds are the `leyes` of
+The dashed arrows are self-expansion, which `Estratega` drafts today. The laws L0 holds are the `leyes` of
 `packages/agents/arbol/base.yaml`, each on its registry entry; what never grows at runtime, and
 why, is [the tree's page](../../../packages/agents/arbol/AGENTS.md), *How the tree grows*.
 
 ## How the tree grows
 
-> **Decided, not built.** No code grows the tree. Who may expand which stage, what an expansion
-> rests on, why no person approves it before it runs, and the caps on growth are
-> [the tree's page](../../../packages/agents/arbol/AGENTS.md), *How the tree grows*. This section
-> holds the moves, the trigger and the record, which no level page states.
-
-An expansion is one of three moves and no other:
-
-| Move | What it does | Why it is safe |
-|---|---|---|
-| add a branch | a new L3 node under an L2 family of the agent's stage, or a new L2 family | no existing path changes |
-| split a leaf | a leaf of the agent's label becomes a node whose one branch is the old leaf and whose other is a new leaf of the same label | the old behaviour survives on one branch |
-| retire a branch | an L2 or L3 branch is marked `retirado` with a reason and stops being walked | the `bitácora` of past alerts still names the nodes it walked |
-
-An agent never edits or deletes a node in place, because an edit is a delete plus an add with no
-record that the old path existed.
-
-**An expansion is triggered by repetition counted in code**, never by one run. The orchestrator
-counts the recurring evidence per agent and stage, and the leaf `expandir` runs only when a count
-reaches its setting N, which decides when an expansion is drafted, never whether an alert fires:
-
-| Agent | Recurring evidence | Typical move |
-|---|---|---|
-| `Vigía` | an approved KPI that no `detectar` node reads | add a branch comparing it with its `umbral` |
-| `Analista` | the same hypothesis confirmed for the same metric across N alerts | split its `explicar` leaf so that metric tests it first |
-| `Estratega` | the same rejection of the same action row across N alerts | split its `proponer` leaf so the row is not offered under that condition |
-| `Ejecutor` | the same action type ending in `nota_manual` across N alerts | none alone: a missing tool is a pull request to `packages/tools`, and the count is reported |
-
-A refused expansion returns to its agent once with the criterion named; a second refusal drops it.
-Each version records its parent, the client, the move, the agent and the evidence that triggered
-it, the hash of L0 and L1, and the date. Each alert carries the `arbol_version` it walked, and each
-agent step names the node that started it, so "how I got here" shows the path. The base is shared,
-and a client's versions live in `apps/api`, keyed by client.
+How an expansion is drafted, checked, capped, recorded and retired is
+[the tree's page](../../../packages/agents/arbol/AGENTS.md), *How the tree grows*; where a client's
+versions live is [the API's page](../../../apps/api/AGENTS.md), *The tree's versions*.
 
 ## Walkthrough: a customer who paid in 30 days is 6 days late
 
 > **Decided, not built.** `detectar.cartera.retraso_habito` and the KPI it reads are in no file:
-> steps 1 and 2 need the birth of a KPI and self-expansion. From `hoja.vigia.titular` on, the walk
+> steps 1 and 2 need the birth of a KPI and `Vigía`'s draft of `agregar_rama`. From `hoja.vigia.titular` on, the walk
 > follows nodes of the base, and every model step runs only as a stub.
 
 ```mermaid

@@ -11,6 +11,8 @@ export {
   getSimulatedDay,
   listAlerts,
   listBitacora,
+  listExpansions,
   login,
+  retireExpansion,
   saveSettings,
 } from './http-client';

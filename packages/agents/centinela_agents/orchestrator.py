@@ -118,13 +118,13 @@ class CentinelaOrchestrator:
         self._chat_graph = None
 
         owners = dict(owners) if owners is not None else manual_owners(skill("estratega", "acciones"))
-        sources = Sources(kernel or call_from_reader(reader), catalog, self.metrics, index(tree))
+        self.sources = Sources(kernel or call_from_reader(reader), catalog, self.metrics, index(tree))
         reasoning = reasoning_provider or provider
 
         self.leaves = {
-            ("vigia", "titular"): lambda state: redact_title(provider, state, sources),
-            ("analista", "explicar"): lambda state: explain_cause(reasoning, state, sources),
-            ("estratega", "proponer"): lambda state: propose_actions(reasoning, state, state.get("cause"), sources),
+            ("vigia", "titular"): lambda state: redact_title(provider, state, self.sources),
+            ("analista", "explicar"): lambda state: explain_cause(reasoning, state, self.sources),
+            ("estratega", "proponer"): lambda state: propose_actions(reasoning, state, state.get("cause"), self.sources),
             ("estratega", "revision_manual"): lambda state: {
                 "actions": [manual_review(state["detection"]["metric"], owners)],
                 "insufficient_cause": None,
@@ -135,8 +135,8 @@ class CentinelaOrchestrator:
             ("ejecutor", "nota_manual"): lambda state: execute_action(
                 provider, state.get("action"), state.get("decision"), tools
             ),
-            ("chat", "clasificar"): lambda state: classify(provider, state, sources),
-            ("chat", "responder"): lambda state: answer(reasoning, state, sources),
+            ("chat", "clasificar"): lambda state: classify(provider, state, self.sources),
+            ("chat", "responder"): lambda state: answer(reasoning, state, self.sources),
         }
 
         self.compiler = Compiler(
@@ -150,11 +150,23 @@ class CentinelaOrchestrator:
             token_cap=token_cap,
         )
 
-        self.graph = self.compiler.graph(tree)
+        self._graphs: dict[int, Any] = {}
+        self.use_tree(tree)
         logger.info(f"Orchestrator initialized with tree v{tree.version}")
 
     def use_thresholds(self, thresholds: Mapping[str, Mapping[str, Any]]) -> None:
         self._thresholds.update({name: dict(values) for name, values in thresholds.items()})
+
+    def use_tree(self, tree: Tree) -> None:
+        graph = self.compiler.graph(tree)
+        self._graphs[tree.version] = graph
+        self.sources = replace(self.sources, nodes=index(tree))
+        self.tree = tree
+        self.graph = graph
+
+    def graph_of(self, alert_id: str):
+        version = (self.graph.get_state(thread(alert_id)).values or {}).get("arbol_version")
+        return self._graphs.get(version)
 
     def start(
         self,
@@ -200,6 +212,7 @@ class CentinelaOrchestrator:
                 cause_rejections=cause_rejections or [],
                 proposal_rejections=proposal_rejections or [],
                 tracer=self.tracer,
+                arbol_version=self.tree.version,
             )
 
             if awaiting_decision(self.graph, alert_id):
@@ -223,15 +236,8 @@ class CentinelaOrchestrator:
         Returns:
             True if alert is at approval gate (aprobar.decision)
         """
-        return awaiting_decision(self.graph, alert_id)
-
-    def has_no_graph_state(self, alert_id: str) -> bool:
-        """
-        Returns True when InMemorySaver has no state for this alert — e.g. after an API
-        restart.  In that case the alert may still be proposed in the DB, so the decision
-        should be allowed to proceed; orq.resume() will either recover or fail gracefully.
-        """
-        return not bool(self.graph.get_state(thread(alert_id)).values)
+        graph = self.graph_of(alert_id)
+        return graph is not None and awaiting_decision(graph, alert_id)
 
     def resume(
         self,
@@ -262,9 +268,12 @@ class CentinelaOrchestrator:
         )
 
         try:
-            state = resume(self.graph, alert_id, decision, tracer=self.tracer)
+            graph = self.graph_of(alert_id)
+            if graph is None:
+                raise LookupError(f"Alert {alert_id} started on a version of the tree this orchestrator does not hold")
+            state = resume(graph, alert_id, decision, tracer=self.tracer)
 
-            if awaiting_decision(self.graph, alert_id):
+            if awaiting_decision(graph, alert_id):
                 logger.info(f"Alert {alert_id} awaits next decision")
             else:
                 logger.info(f"Alert {alert_id} processing complete")
@@ -285,7 +294,8 @@ class CentinelaOrchestrator:
         Returns:
             Complete alert state
         """
-        return self.graph.get_state(thread(alert_id)).values
+        graph = self.graph_of(alert_id)
+        return graph.get_state(thread(alert_id)).values if graph is not None else {}
 
     def ask(self, question: str, day: str, alert: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """
@@ -342,4 +352,5 @@ class CentinelaOrchestrator:
         }
 
     def run_day(self, ctx: Context, day: str, *, earlier=(), watched=None, limit: int = 3, cause_rejections=None, proposal_rejections=None):
+        ctx = replace(ctx, nodes=index(self.tree), version=self.tree.version)
         return run_day(self.graph, ctx, day, earlier=earlier, watched=watched, limit=limit, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=self.tracer)

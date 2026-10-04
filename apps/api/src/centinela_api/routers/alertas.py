@@ -8,7 +8,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, configuracion, consultas, decisiones, permisos, simulacion
+from .. import bitacora, ciclo_vida, configuracion, consultas, decisiones, permisos, rechazos, simulacion
 from ..agentes import converted_actions, detalle_de_consulta, get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..auth import persona_actual
@@ -72,13 +72,7 @@ reanudando: set[str] = set()
 
 def _en_pausa(id: str) -> bool:
     try:
-        orq = get_orchestrator()
-        if orq.is_awaiting_decision(id):
-            return True
-        # If InMemorySaver has no state for this alert (e.g. after an API restart), the
-        # alert may still be proposed in the DB.  Let the decision proceed: the DB update
-        # will go through and orq.resume() will fail gracefully inside its own try/except.
-        return orq.has_no_graph_state(id)
+        return get_orchestrator().is_awaiting_decision(id)
     except Exception as e:
         logger.error(f"Orchestrator state unreadable for {id}: {e}", exc_info=True)
         return False
@@ -180,14 +174,22 @@ async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: ps
             try:
                 orq = get_orchestrator()
                 orq.use_thresholds(configuracion.umbrales(ajustes))
-                await asyncio.to_thread(orq.resume, id, {
+                estado = await asyncio.to_thread(orq.resume, id, {
                     "id": f"dec_{uuid.uuid4().hex[:8]}",
                     "kind": "reject",
                     "reason": decision.reason,
                     "simulated_day": dia.isoformat(),
                 })
+                destino = (estado or {}).get("rejection_target")
             except Exception as e:
                 logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
+                destino = None
+            if destino:
+                try:
+                    with conn.transaction():
+                        rechazos.registrar(conn, id, nueva.metric, destino, [accion.id for accion in nueva.actions], decision.reason.strip(), dia)
+                except Exception as e:
+                    logger.error(f"Rejection evidence write failed for {id}: {e}", exc_info=True)
 
     elif isinstance(decision, DecisionRequestChanges):
         nueva = await _reproponer(conn, nueva, decision.reason, ajustes, dia)

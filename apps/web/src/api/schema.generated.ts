@@ -60,6 +60,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/arbol/expansiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_arbol_expansiones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/arbol/expansiones/{id}/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retirar */
+        post: operations["retirar_arbol_expansiones__id__retiro_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -432,6 +466,12 @@ export interface components {
          * @description Final event of the simulated clock's advance stream.
          */
         AdvanceEnd: {
+            /**
+             * Failure
+             * @description Why the day's analysis did not run to its end, in Spanish for the person who advanced the clock; null when it did
+             * @default null
+             */
+            failure: string | null;
             /**
              * Newalerts
              * @description IDs of the alerts raised on that day
@@ -991,6 +1031,19 @@ export interface components {
             result: string;
         };
         /**
+         * ExpansionEvidence
+         * @description An alert whose rejection counted toward an expansion of the decision tree.
+         */
+        ExpansionEvidence: {
+            /**
+             * Alertid
+             * @description The rejected alert
+             */
+            alertId: string;
+            /** @description The alert's title with its figures, or its id when the alert is gone */
+            title: components["schemas"]["Sentence-Output"];
+        };
+        /**
          * Figure
          * @description Quantitative measurement with unit and traceability.
          */
@@ -1091,10 +1144,10 @@ export interface components {
             simulatedDay: string;
             /**
              * Type
-             * @description Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion
+             * @description Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion, arbol
              * @enum {string}
              */
-            type: "alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion";
+            type: "alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion" | "arbol";
         };
         /**
          * MergedAlert
@@ -1195,6 +1248,17 @@ export interface components {
             units: {
                 [key: string]: "COP" | "points" | "percent" | "days" | "units";
             };
+        };
+        /**
+         * RetireExpansion
+         * @description Why a person retires an expansion of the decision tree.
+         */
+        RetireExpansion: {
+            /**
+             * Reason
+             * @description Why the expansion is retired
+             */
+            reason: string;
         };
         /**
          * Sentence
@@ -1328,6 +1392,64 @@ export interface components {
              * @description The value in force when the threshold is one number; null when it is read from a column or by class
              */
             value: number | null;
+        };
+        /**
+         * TreeExpansion
+         * @description A change an agent made to the decision tree, and whether it still holds.
+         */
+        TreeExpansion: {
+            /**
+             * Agent
+             * @description The agent whose stage the change grew
+             * @enum {string}
+             */
+            agent: "vigia" | "analista" | "estratega" | "ejecutor" | "chat";
+            /**
+             * Createdat
+             * @description When it was written, real time
+             */
+            createdAt: string;
+            /**
+             * Description
+             * @description What the change does, in Spanish
+             */
+            description: string;
+            /**
+             * Evidence
+             * @description The alerts whose rejections drafted it
+             */
+            evidence: components["schemas"]["ExpansionEvidence"][];
+            /**
+             * Id
+             * @description The version the change wrote
+             */
+            id: string;
+            /**
+             * Inactivereason
+             * @description Why an inactive change no longer holds: a change to the base or to anything else the validator reads dropped it, or a retired change it nests under left it unreachable; null unless inactive
+             */
+            inactiveReason: ("dropped_by_base" | "parent_retired") | null;
+            /**
+             * Retirereason
+             * @description Why it was retired
+             */
+            retireReason: string | null;
+            /**
+             * Retiredby
+             * @description Who retired it
+             */
+            retiredBy: string | null;
+            /**
+             * Simulateddate
+             * @description The simulated day the change was drafted on
+             */
+            simulatedDate: string | null;
+            /**
+             * Status
+             * @description Whether the change still holds: active; retired by a person; or inactive, when a change to the base or to anything else the validator reads dropped it, or a retired change it nests under left it unreachable
+             * @enum {string}
+             */
+            status: "active" | "retired" | "inactive";
         };
         /** ValidationError */
         ValidationError: {
@@ -1507,6 +1629,74 @@ export interface operations {
             };
         };
     };
+    listar_arbol_expansiones_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeExpansion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retirar_arbol_expansiones__id__retiro_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetireExpansion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeExpansion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_auth_login_post: {
         parameters: {
             query?: never;
@@ -1608,7 +1798,7 @@ export interface operations {
                 /** @description Filter by alert ID (UUID-like identifier) */
                 alertId?: string | null;
                 /** @description Filter by event type */
-                type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion") | null;
+                type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion" | "arbol") | null;
             };
             header?: {
                 authorization?: string | null;

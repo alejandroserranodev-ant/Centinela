@@ -13,8 +13,8 @@ behind a meter of its retry, cost and token cap. The day run,
 is a generator `apps/api` drives in its own process. `uv run pytest` holds the tree and the graph
 with stub leaves, and the leaves with a mocked provider and kernel; `uv run pytest -m modelo` runs
 the five agents against OpenAI and the kernel. What is decided, not built: log events beyond
-`same_cause_dropped`, a policy search in the chat, and self-expansion. Each section that states one
-opens with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
+`same_cause_dropped`, a policy search in the chat, and the drafts of self-expansion other than
+`Estratega`'s. Each section that states one opens with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
 instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
 each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md); how a provider
 is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
@@ -37,6 +37,8 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/walk.py` | the walk of `detectar`, and the check that a detection still breaks |
 | `centinela_agents/severity.py` | the severity and the `tramo` of a KPI row, and the refusals of a `severidad` or `tramos` block |
 | `centinela_agents/day.py` | the alert id, the coverage by earlier alerts, the order of a day and the day run |
+| `centinela_agents/expansion.py` | the three moves of self-expansion, their criteria, the caps and the replay of a client's moves over the base |
+| `centinela_agents/growth.py` | the drafter of self-expansion: `Estratega`'s split from repeated rejections of one action row |
 | `centinela_agents/metered.py` | the retry, the cost and the token cap of a model call |
 | `centinela_agents/tracing.py` | the tracer the host injects |
 | `centinela_agents/graph.py` | the compilers of the alert graph and of the chat graph, the interrupt, the resume, the fallbacks |
@@ -45,7 +47,7 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/schema.py` | also the output models of the leaves: `Cause`, `Action`, `ExecutedAction`, `Decision` ([`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md)) |
 | `centinela_agents/tools.py`, `centinela_agents/sql_vistas.py`, `centinela_agents/buscar_politica.py`, `centinela_agents/calcular_impacto.py`, `centinela_agents/action_tools.py` | the tool interfaces, their registry, the action stubs `Ejecutor` drafts with, and stubs of three tools no leaf calls ([`PHASE_3_SETUP.md`](./PHASE_3_SETUP.md)) |
 | `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, `centinela_agents/agents/chat.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
-| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `run_day`, `resume`, `ask` and `use_thresholds`, which swaps the thresholds the compiled graph reads and keeps the paused alerts ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
+| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `run_day`, `resume`, `ask`, `use_tree`, which swaps the version it walks and keeps each graph a paused alert started on, and `use_thresholds`, which swaps the thresholds the compiled graph reads and keeps the paused alerts ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
 | `centinela_agents/security.py` | masking, secret detection, the screen of a prompt injection and a prompt builder by trust level; `Ejecutor` masks an email's prompt with it, and `Chat` screens and wraps a question with it ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
 | `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs; no running path uses it ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
 | `centinela_agents/output_validator.py` | checks of a leaf's output that only the tests run ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
@@ -282,7 +284,9 @@ and the only context is the alert it is anchored to.
   KPI's row and the entity, and the impact is the KPI's `pesos_en_riesgo` with its `queryId`.
 - **Ceiling:** every action is a row of `skills/estratega/acciones.md` for the metric and cites
   its policy section. No percentage is chosen by the model. With no formula, `impact` is `null` and
-  the reason is stated.
+  the reason is stated. A leaf a split gave `excluye` offers no row it names; one that excludes
+  every row of the metric proposes nothing and calls no model, so the alert reaches
+  `revision_manual`.
 
 > **Limit.** The formulas `skills/estratega/acciones.md` names are not computed: every row with a
 > formula takes the KPI's `pesos_en_riesgo` as its impact, and `price_increase_pct` and `units`,
@@ -320,7 +324,15 @@ It is code, except the step that classifies a rejection reason.
   alerts with their briefs, and the metric's rejection reasons, already split by the agent that
   reads them. To resume one,
   `centinela_agents/graph.py:resume(graph, alert_id, decision, tracer)` with the decision `apps/api`
-  recorded. The version of the tree comes through `centinela_agents/graph.py:Compiler`. A start on
+  recorded. The version of the tree is the one
+  `centinela_agents/orchestrator.py:CentinelaOrchestrator.use_tree(tree)` last received: `run_day`
+  walks it whatever nodes its context carries, and a decision resumes on the graph of the version
+  the alert started on, `centinela_agents/orchestrator.py:CentinelaOrchestrator.graph_of(alert_id)`,
+  because the checkpoint is that graph's; an alert whose version the orchestrator does not hold
+  has no paused graph (`is_awaiting_decision` is false and `resume` raises `LookupError`), and the
+  graphs are kept for the life of the process, so memory grows by one compiled graph per version
+  and nothing evicts one while a paused alert may still need it. `use_tree` also points the
+  evidence's `Sources` at the nodes of that tree. A start on
   an alert whose thread has ended runs on a fresh thread, `centinela_agents/graph.py:fresh(graph, alert_id)`,
   so nothing of the earlier run stays, and a start on one that awaits a decision is refused.
 - **Tools: none.** No step needs a query, a policy or an action, so the graph gives it no tool.
@@ -368,6 +380,7 @@ declare is dropped without a trace, so the leaves return none.
 | Field | Written by | Read by |
 |---|---|---|
 | `alert_id`, `simulated_day`, `entry` (the leaf `detectar` reached) | `start_alert` | every node, `apps/api` |
+| `arbol_version` | `start_alert`, from the version `run_day` walks | `apps/api`, which stores it |
 | `detection`: `metric`, `entity`, `path` (each node of `detectar` and its branch), `row` (the KPI row), `cifra`, `regla`, `fuente_umbral`, `severity`, `tramo`, `pesos_en_riesgo` | `start_alert`, from the detection | the leaves, `ejecutar.vigente` through `still_breaks` |
 | `earlier_alerts`: the state of each earlier alert, by id | `start_alert` | `estado.same_cause_as.status`, `Analista` |
 | `alert_briefs`: the metric, entity and cause of each earlier alert, by id | `start_alert` | `Analista` |
@@ -474,6 +487,14 @@ inbox first, and because a merge keeps the alert analysed first, which is the la
 dataset's last day breaks a threshold in some two hundred and fifty rows and an alert costs seconds
 of model; the rest fire again on a later day, when the earlier ones are in the inbox.
 
+### The growth of a day
+
+**The drafter runs before each day run, never inside one**, because rejections arrive with
+decisions, between days, and a day run is the next walk that can use a new version. What it takes
+and returns, and how a move is written, checked and capped, is
+[`arbol/AGENTS.md`](./arbol/AGENTS.md#how-the-tree-grows); what `apps/api` hands it and stores is
+[`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md#the-trees-versions).
+
 ### Cost, trace and log
 
 **The chat's leaves report their cost**: each returns the step, the model, the prompt and
@@ -506,7 +527,8 @@ generations, because the leaves call the provider SDKs directly, not through Lan
 `apps/api` consumes the day run and answers each result with the verdict of what it recorded,
 checks that a decision's role may make it and that an edit keeps the action's keys, calls the
 resume, keeps the rejection reasons, validates and persists each transition the orchestrator
-proposes, stores the checkpoint, persists cost, streams the steps and owns the `bitácora`: its
+proposes, stores the checkpoint, persists cost, persists the tree's versions and the rejections,
+streams the steps and owns the `bitácora`: its
 page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action and
 masking personal data are decided to be `packages/tools`'; `centinela_agents/action_tools.py` and
 `centinela_agents/security.py` hold them in this package instead.

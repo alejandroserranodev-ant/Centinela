@@ -14,8 +14,9 @@ from centinela_tools.tools import catalogue_of, kpi_catalogo, load_entries
 from centinela_api import agentes
 from centinela_api.routers import simulacion as simulacion_router
 
+ARBOL = Tree.model_validate(load_yaml(agentes._ARBOL))
 CONTEXTO = Context.of(
-    Tree.model_validate(load_yaml(agentes._ARBOL)),
+    ARBOL,
     load_metrics(agentes.METRICAS),
     catalog_from_kernel({"kpis": kpi_catalogo(catalogue_of(load_entries(agentes.METRICAS), load_sources()))}),
     lambda metric, day: [],
@@ -54,4 +55,6 @@ def dia_con(monkeypatch, *eventos, anteriores=()):
     monkeypatch.setattr(simulacion_router.alertas_repo, "fijar_entidad", MagicMock())
     monkeypatch.setattr(simulacion_router.alertas_repo, "fijar_costo", MagicMock())
     monkeypatch.setattr(simulacion_router.consultas, "registrar", MagicMock())
+    monkeypatch.setattr(simulacion_router.arboles, "del_dia", lambda conn, dia: ARBOL)
+    monkeypatch.setattr(simulacion_router.alertas_repo, "fijar_version", MagicMock())
     return veredictos, llamadas

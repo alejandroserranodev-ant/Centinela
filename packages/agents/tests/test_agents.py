@@ -282,6 +282,28 @@ class TestEstrategA:
         assert result["insufficient_cause"] is True
         provider.generate_structured.assert_not_called()
 
+    def test_an_excluded_row_reaches_no_model_and_no_proposal(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured(
+            {"actions": [{"row": "r1", "title": "Recordatorio", "description": "Enviar."}, {"row": "r5", "title": "Revisar el cupo", "description": "Revisar."}], "insufficient_cause": False}
+        )
+        state = {**STATE, "excluye": ["act-saldo_vencido-r1"]}
+
+        result = propose_actions(provider, state, {"kind": "identified", "sentence": "Paga tarde"}, sources())
+
+        prompt = provider.generate_structured.call_args.args[0].user_prompt
+        assert "r1: [" not in prompt and "r2: [" in prompt
+        assert [action["id"] for action in result["actions"]] == ["act-saldo_vencido-r5"]
+
+    def test_every_row_excluded_proposes_nothing_and_calls_no_model(self):
+        provider = MagicMock()
+        state = {**STATE, "excluye": [f"act-saldo_vencido-r{n}" for n in range(1, 6)]}
+
+        result = propose_actions(provider, state, {"kind": "identified", "sentence": "Paga tarde"}, sources())
+
+        assert result == {"actions": None, "insufficient_cause": None}
+        provider.generate_structured.assert_not_called()
+
 
 class TestEjecutor:
     """Tests for Ejecutor agent."""

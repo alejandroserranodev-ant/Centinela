@@ -37,7 +37,7 @@ ALTER TABLE api.bitacora ALTER COLUMN alerta_id DROP NOT NULL;
 ALTER TABLE api.bitacora ADD COLUMN IF NOT EXISTS figuras jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE api.bitacora DROP CONSTRAINT IF EXISTS bitacora_tipo_check;
 ALTER TABLE api.bitacora ADD CONSTRAINT bitacora_tipo_check
-  CHECK (tipo IN ('alert', 'evidence', 'proposal', 'decision', 'action', 'result', 'question', 'answer', 'refusal', 'configuracion', 'costo'));
+  CHECK (tipo IN ('alert', 'evidence', 'proposal', 'decision', 'action', 'result', 'question', 'answer', 'refusal', 'configuracion', 'costo', 'arbol'));
 
 CREATE INDEX IF NOT EXISTS idx_bitacora_alerta ON api.bitacora (alerta_id);
 
@@ -59,4 +59,36 @@ CREATE TABLE IF NOT EXISTS api.configuracion (
   cuerpo jsonb NOT NULL,
   guardado_por jsonb,
   actualizado_en timestamptz
+);
+
+ALTER TABLE api.alertas ADD COLUMN IF NOT EXISTS arbol_version bigint;
+
+CREATE TABLE IF NOT EXISTS api.arbol_versiones (
+  id bigserial PRIMARY KEY,
+  cliente text NOT NULL,
+  padre bigint REFERENCES api.arbol_versiones (id),
+  origen text NOT NULL CHECK (origen IN ('base', 'expansion', 'retiro', 'descartada')),
+  agente text,
+  autor jsonb,
+  movimiento jsonb,
+  evidencia jsonb NOT NULL DEFAULT '[]'::jsonb,
+  retira bigint REFERENCES api.arbol_versiones (id),
+  base_version int NOT NULL,
+  base_hash text NOT NULL,
+  hash_l01 text NOT NULL,
+  arbol jsonb NOT NULL,
+  dia_simulado date,
+  creado_en timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_arbol_versiones_cliente ON api.arbol_versiones (cliente, id);
+
+CREATE TABLE IF NOT EXISTS api.rechazos (
+  alerta_id text PRIMARY KEY REFERENCES api.alertas (id) ON DELETE CASCADE,
+  metrica text NOT NULL,
+  destino text NOT NULL CHECK (destino IN ('causa', 'propuesta', 'ambos', 'ninguno')),
+  acciones jsonb NOT NULL,
+  motivo text NOT NULL,
+  dia_simulado date NOT NULL,
+  creado_en timestamptz NOT NULL DEFAULT now()
 );

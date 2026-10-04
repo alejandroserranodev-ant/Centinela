@@ -1,13 +1,13 @@
 import asyncio
 import datetime as dt
 import json
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from centinela_agents.day import Step
-from corridas import corrida, deteccion, dia_con
+from corridas import ARBOL, corrida, deteccion, dia_con
 
 from centinela_api import db
 from centinela_api.auth import persona_actual
@@ -68,6 +68,7 @@ def test_el_dia_transmite_pasos_y_un_fin(cliente):
     for nombre, dato in eventos[:-1]:
         (AgentStep if nombre == "step" else Alert).model_validate(dato)
     assert eventos[-1][1]["newAlerts"]
+    assert "failure" in eventos[-1][1] and eventos[-1][1]["failure"] is None
 
 
 def test_el_fin_del_dia_no_es_un_error(cliente, caplog):
@@ -168,3 +169,20 @@ def test_el_reloj_se_siembra_antes_del_ultimo_dia_de_datos(monkeypatch, dias, es
     conn.execute.side_effect = execute
     assert simulacion.dia_actual(conn) == esperado
     assert sembrados == [esperado]
+
+
+def test_el_dia_corre_sobre_la_version_que_crecio_y_guarda_la_de_cada_alerta(cliente, monkeypatch):
+    arbol = ARBOL.model_copy(update={"version": 9})
+    dia_con(monkeypatch, corrida("alerta_a", deteccion(), "nueva", "en análisis", "propuesta", arbol_version=9))
+    monkeypatch.setattr(simulacion_router.arboles, "del_dia", lambda conn, dia: arbol)
+    cliente.post("/simulacion/avanzar?dias=1")
+    simulacion_router.get_orchestrator().use_tree.assert_called_once_with(arbol)
+    simulacion_router.alertas_repo.fijar_version.assert_called_once_with(ANY, "alerta_a", 9)
+
+
+def test_un_dia_cuya_version_del_arbol_no_carga_lo_dice_en_el_fin(cliente, monkeypatch, caplog):
+    monkeypatch.setattr(simulacion_router.arboles, "del_dia", MagicMock(side_effect=RuntimeError("roto")))
+    eventos = _eventos(cliente.post("/simulacion/avanzar?dias=1").text)
+    assert [nombre for nombre, _ in eventos] == ["end"]
+    assert eventos[0][1]["newAlerts"] == [] and eventos[0][1]["failure"] == simulacion_router.DIA_FALLIDO
+    assert "Detection phase failed" in caplog.text
