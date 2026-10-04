@@ -365,6 +365,11 @@ class TreeExpansion(Esquema):
     created_at: str = Field(..., description="When it was written, real time")
     description: str = Field(..., description="What the change does, in Spanish")
     evidence: list[ExpansionEvidence] = Field(..., description="The alerts whose rejections drafted it")
-    status: Literal["active", "retired", "inactiva"] = Field(..., description="Whether the change still holds: active; retired by a person; or inactiva, when a merged base dropped it or a retired change it nests under left it unreachable")
+    status: Literal["active", "retired", "inactive"] = Field(..., description="Whether the change still holds: active; retired by a person; or inactive, when a merged base dropped it or a retired change it nests under left it unreachable")
     retired_by: str | None = Field(None, description="Who retired it")
     retire_reason: str | None = Field(None, description="Why it was retired")
+
+
+class RetireExpansion(Esquema):
+    """Why a person retires an expansion of the decision tree."""
+    reason: str = Field(..., max_length=500, description="Why the expansion is retired")

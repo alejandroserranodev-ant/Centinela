@@ -167,7 +167,7 @@ def estados(filas: list[Version]) -> dict[int, str]:
     vivos = live(index(Tree.model_validate(ultima.arbol)), [ROOT]) if ultima else set()
     caidas, retiradas = descartadas(filas), retiros(filas)
     return {
-        fila.id: "retired" if fila.id in retiradas else "inactiva" if fila.id in caidas or entry_of(MOVE.validate_python(fila.movimiento)) not in vivos else "active"
+        fila.id: "retired" if fila.id in retiradas else "inactive" if fila.id in caidas or entry_of(MOVE.validate_python(fila.movimiento)) not in vivos else "active"
         for fila in filas
         if fila.origen == "expansion"
     }

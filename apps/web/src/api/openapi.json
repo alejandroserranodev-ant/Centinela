@@ -1240,6 +1240,27 @@
         "title": "ExecutedAction",
         "type": "object"
       },
+      "ExpansionEvidence": {
+        "additionalProperties": false,
+        "description": "An alert whose rejection counted toward an expansion of the decision tree.",
+        "properties": {
+          "alertId": {
+            "description": "The rejected alert",
+            "title": "Alertid",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Sentence-Output",
+            "description": "The alert's title with its figures, or its id when the alert is gone"
+          }
+        },
+        "required": [
+          "alertId",
+          "title"
+        ],
+        "title": "ExpansionEvidence",
+        "type": "object"
+      },
       "Figure": {
         "additionalProperties": false,
         "description": "Quantitative measurement with unit and traceability.",
@@ -1625,6 +1646,23 @@
         "title": "Query",
         "type": "object"
       },
+      "RetireExpansion": {
+        "additionalProperties": false,
+        "description": "Why a person retires an expansion of the decision tree.",
+        "properties": {
+          "reason": {
+            "description": "Why the expansion is retired",
+            "maxLength": 500,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RetireExpansion",
+        "type": "object"
+      },
       "Sentence-Input": {
         "additionalProperties": false,
         "description": "Natural language statement with optional supporting figures.",
@@ -1836,6 +1874,106 @@
           "rule"
         ],
         "title": "Threshold",
+        "type": "object"
+      },
+      "TreeExpansion": {
+        "additionalProperties": false,
+        "description": "A change an agent made to the decision tree, and whether it still holds.",
+        "properties": {
+          "agent": {
+            "description": "The agent whose stage the change grew",
+            "enum": [
+              "vigia",
+              "analista",
+              "estratega",
+              "ejecutor",
+              "chat"
+            ],
+            "title": "Agent",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "When it was written, real time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "description": {
+            "description": "What the change does, in Spanish",
+            "title": "Description",
+            "type": "string"
+          },
+          "evidence": {
+            "description": "The alerts whose rejections drafted it",
+            "items": {
+              "$ref": "#/components/schemas/ExpansionEvidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "id": {
+            "description": "The version the change wrote",
+            "title": "Id",
+            "type": "string"
+          },
+          "retireReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it was retired",
+            "title": "Retirereason"
+          },
+          "retiredBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who retired it",
+            "title": "Retiredby"
+          },
+          "simulatedDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The simulated day the change was drafted on",
+            "title": "Simulateddate"
+          },
+          "status": {
+            "description": "Whether the change still holds: active; retired by a person; or inactive, when a merged base dropped it or a retired change it nests under left it unreachable",
+            "enum": [
+              "active",
+              "retired",
+              "inactive"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agent",
+          "simulatedDate",
+          "createdAt",
+          "description",
+          "evidence",
+          "status",
+          "retiredBy",
+          "retireReason"
+        ],
+        "title": "TreeExpansion",
         "type": "object"
       },
       "ValidationError": {
@@ -2186,6 +2324,127 @@
         "summary": "Decidir",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/arbol/expansiones": {
+      "get": {
+        "operationId": "listar_arbol_expansiones_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TreeExpansion"
+                  },
+                  "title": "Response Listar Arbol Expansiones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listar",
+        "tags": [
+          "tree"
+        ]
+      }
+    },
+    "/arbol/expansiones/{id}/retiro": {
+      "post": {
+        "operationId": "retirar_arbol_expansiones__id__retiro_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetireExpansion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreeExpansion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retirar",
+        "tags": [
+          "tree"
         ]
       }
     },

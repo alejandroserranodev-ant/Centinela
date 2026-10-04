@@ -175,7 +175,7 @@ def test_un_borrador_rechazado_se_descarta_una_vez_y_su_evidencia_no_vuelve_a_co
     assert arboles.expansiones(almacen.filas, {}) == []
 
 
-def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactiva_y_no_se_retira(almacen, monkeypatch):
+def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactive_y_no_se_retira(almacen, monkeypatch):
     tres_rechazos(monkeypatch)
     arboles.del_dia(MagicMock(), DIA)
     base_nueva(monkeypatch, 2)
@@ -185,7 +185,7 @@ def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactiva_y_no_se_ret
     assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "base", "descartada"]
     assert arboles.bitacora.registrar.call_count == 2
     (expansion,) = arboles.expansiones(almacen.filas, {})
-    assert (expansion.id, expansion.status) == ("2", "inactiva")
+    assert (expansion.id, expansion.status) == ("2", "inactive")
     with pytest.raises(arboles.RetiroRechazado):
         arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
 
@@ -204,16 +204,16 @@ def test_una_division_que_reusa_el_id_de_una_descartada_no_choca_con_ella(almace
     assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "base", "descartada", "expansion", "base"]
     hoja = next(nodo for nodo in arbol.nodos if nodo.id == "hoja.estratega.proponer.saldo_vencido.1")
     assert hoja.hoja.excluye == ("act-saldo_vencido-r2",)
-    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("5", "active"), ("2", "inactiva")]
+    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("5", "active"), ("2", "inactive")]
 
 
-def test_una_division_anidada_bajo_una_retirada_queda_inactiva_y_no_se_retira(almacen, monkeypatch):
+def test_una_division_anidada_bajo_una_retirada_queda_inactive_y_no_se_retira(almacen, monkeypatch):
     rechazos = tres_rechazos(monkeypatch)
     arboles.del_dia(MagicMock(), DIA)
     tres_rechazos(monkeypatch, "r2", 3, rechazos)
     arboles.del_dia(MagicMock(), DIA)
     assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "expansion"]
     arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
-    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactiva"), ("2", "retired")]
+    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive"), ("2", "retired")]
     with pytest.raises(arboles.RetiroRechazado):
         arboles.retirar(MagicMock(), 3, "No ayudó", GERENTE, DIA, {})

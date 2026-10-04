@@ -60,6 +60,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/arbol/expansiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_arbol_expansiones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/arbol/expansiones/{id}/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retirar */
+        post: operations["retirar_arbol_expansiones__id__retiro_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -991,6 +1025,19 @@ export interface components {
             result: string;
         };
         /**
+         * ExpansionEvidence
+         * @description An alert whose rejection counted toward an expansion of the decision tree.
+         */
+        ExpansionEvidence: {
+            /**
+             * Alertid
+             * @description The rejected alert
+             */
+            alertId: string;
+            /** @description The alert's title with its figures, or its id when the alert is gone */
+            title: components["schemas"]["Sentence-Output"];
+        };
+        /**
          * Figure
          * @description Quantitative measurement with unit and traceability.
          */
@@ -1197,6 +1244,17 @@ export interface components {
             };
         };
         /**
+         * RetireExpansion
+         * @description Why a person retires an expansion of the decision tree.
+         */
+        RetireExpansion: {
+            /**
+             * Reason
+             * @description Why the expansion is retired
+             */
+            reason: string;
+        };
+        /**
          * Sentence
          * @description Natural language statement with optional supporting figures.
          */
@@ -1328,6 +1386,59 @@ export interface components {
              * @description The value in force when the threshold is one number; null when it is read from a column or by class
              */
             value: number | null;
+        };
+        /**
+         * TreeExpansion
+         * @description A change an agent made to the decision tree, and whether it still holds.
+         */
+        TreeExpansion: {
+            /**
+             * Agent
+             * @description The agent whose stage the change grew
+             * @enum {string}
+             */
+            agent: "vigia" | "analista" | "estratega" | "ejecutor" | "chat";
+            /**
+             * Createdat
+             * @description When it was written, real time
+             */
+            createdAt: string;
+            /**
+             * Description
+             * @description What the change does, in Spanish
+             */
+            description: string;
+            /**
+             * Evidence
+             * @description The alerts whose rejections drafted it
+             */
+            evidence: components["schemas"]["ExpansionEvidence"][];
+            /**
+             * Id
+             * @description The version the change wrote
+             */
+            id: string;
+            /**
+             * Retirereason
+             * @description Why it was retired
+             */
+            retireReason: string | null;
+            /**
+             * Retiredby
+             * @description Who retired it
+             */
+            retiredBy: string | null;
+            /**
+             * Simulateddate
+             * @description The simulated day the change was drafted on
+             */
+            simulatedDate: string | null;
+            /**
+             * Status
+             * @description Whether the change still holds: active; retired by a person; or inactive, when a merged base dropped it or a retired change it nests under left it unreachable
+             * @enum {string}
+             */
+            status: "active" | "retired" | "inactive";
         };
         /** ValidationError */
         ValidationError: {
@@ -1494,6 +1605,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Alert"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_arbol_expansiones_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeExpansion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retirar_arbol_expansiones__id__retiro_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetireExpansion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeExpansion"];
                 };
             };
             /** @description Validation Error */
