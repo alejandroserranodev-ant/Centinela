@@ -29,6 +29,26 @@ ol {
   color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
 }
 
+.severity {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--sp-1) * 1.5);
+  flex: none;
+  border-radius: var(--r-marker);
+  padding-inline: calc(var(--sp-1) * 2.5);
+  padding-block: var(--sp-1);
+  font-family: var(--ff-label);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-label);
+  text-transform: var(--tt-label);
+}
+
+.severity--critical { background: var(--color-error-fill); color: var(--color-error-content); } /* arena-audit allow: a filled danger surface, the loudest mark an alert wears */
+.severity--high { background: var(--color-warning); color: var(--color-warning-content); }
+.severity--medium { background: var(--color-info); color: var(--color-info-content); }
+.severity--low { background: var(--color-success); color: var(--color-success-content); }
+
 .brand {
   font-family: var(--ff-heading);
   font-weight: var(--fw-heading);

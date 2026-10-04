@@ -47,6 +47,13 @@ and what each shows is
   rather than compact, because the inbox holds a handful of costly decisions rather than hundreds
   of messages, and it is read on a phone. Components are never styled by hand. Load the
   `arena:design` skill before building or changing a screen. Charts follow the `dataviz` skill.
+- **Severity is Arena's status family, re-valued to Centinela's scale.** Each severity is a filled
+  chip reading `--color-error-fill` (`Crítica`), `--color-warning` (`Alta`), `--color-info`
+  (`Media`) and `--color-success` (`Baja`), with its `-content` as the ink, so the web paints no
+  colour of its own and Arena's own contrast gates measure the four pairs. `Crítica` carries a
+  Phosphor glyph beside its label, because colour alone never tells severity. Filling `Crítica`
+  departs from Arena, whose danger is an outline; it is the loudest mark an alert wears, and the
+  one `arena-audit allow` marker in `src/app.css` carries it.
 - **`design/identity.html` is the approved appearance**: palette, faces, character, air and page
   shape, each with its reason. A change to the config or the plugin starts there and is approved
   there. It reads the stylesheet `arena-to-prod` writes, which imports Arena's sheets by package
