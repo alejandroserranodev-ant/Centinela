@@ -19,9 +19,13 @@ from centinela_agents.llm_provider import (
     LLMRequest,
 )
 from centinela_agents.schema import ExecutedAction
+from centinela_agents.security import mask_data
+from centinela_agents.skills import skill
 from centinela_agents.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+EMAIL_TOKENS = 400
 
 
 class EjecutorError(Exception):
@@ -82,94 +86,48 @@ def execute_action(
     po_tool = tools.purchase_order_draft if hasattr(tools, 'purchase_order_draft') else None
     price_tool = tools.price_change_draft if hasattr(tools, 'price_change_draft') else None
 
-    try:
-        if action_type == "email_draft":
-            return _execute_email_draft(
-                provider,
-                action_id,
-                parameters,
-                email_tool
-            )
-        elif action_type == "task":
-            return _execute_task(action_id, parameters, task_tool)
-        elif action_type == "purchase_order_draft":
-            return _execute_po_draft(action_id, parameters, po_tool)
-        elif action_type == "price_change_draft":
-            return _execute_price_draft(action_id, parameters, price_tool)
-        else:
-            raise ValueError(f"Unknown action type: {action_type}")
-
-    except Exception as e:
-        logger.error(f"Ejecutor: execution failed: {e}")
-        return {
-            "executed_action": None,
-        }
+    if action_type == "email_draft":
+        return _execute_email_draft(provider, action, parameters, email_tool)
+    if action_type == "task":
+        return _execute_task(action_id, parameters, task_tool)
+    if action_type == "purchase_order_draft":
+        return _execute_po_draft(action_id, parameters, po_tool)
+    if action_type == "price_change_draft":
+        return _execute_price_draft(action_id, parameters, price_tool)
+    raise ValueError(f"Unknown action type: {action_type}")
 
 
 def _execute_email_draft(
     provider: LLMProvider,
-    action_id: str,
+    action: dict[str, Any],
     parameters: dict[str, Any],
     email_tool: Any,
 ) -> dict[str, Any]:
-    """Execute email_draft: LLM writes body, tool creates draft."""
+    """Execute email_draft: the model writes the body over masked text, the tool keeps the draft."""
+    action_id = action.get("id")
     recipient = parameters.get("recipient")
-    vendedor_id = parameters.get("vendedor_id")
+    listed = "\n".join(f"- {name}: {value}" for name, value in parameters.items())
+    prompt = mask_data(f"""action.title: {action.get("title")}
+action.description: {action.get("description")}
+action.parameters:
+{listed}
 
-    prompt = f"""Redacta el cuerpo de un email según FIN-POL-004 §6.
-
-PARÁMETROS:
-- Destinatario: {recipient}
-- Vendedor: {vendedor_id}
-
-REGLAS:
-1. Cortés, redactado, firmado por vendedor
-2. No uses nombres reales (están enmascarados como IDs)
-3. Refiere los parámetros por sus placeholders
-4. Tono profesional
-5. Máximo 200 palabras
-
-Redacta SOLO el cuerpo del email. Sin subject, sin saludos formales iniciales."""
-
-    try:
-        response = provider.generate_text(
-            LLMRequest(
-                system_prompt="Redactas emails profesionales en español para clientes.",
-                user_prompt=prompt,
-                temperature=0.0,
-                thinking=False,
-            )
+Escribe solo el cuerpo del correo, en español.""")
+    response = provider.generate_text(
+        LLMRequest(
+            system_prompt=skill("ejecutor", "contrato", "plantillas"),
+            user_prompt=prompt,
+            temperature=0.0,
+            max_tokens=EMAIL_TOKENS,
+            thinking=False,
         )
-
-        body = response.text.strip()
-
-        if email_tool:
-            draft_result = email_tool.execute(
-                recipient=recipient,
-                body=body,
-            )
-            executed = ExecutedAction(
-                actionId=action_id,
-                type="email_draft",
-                result=body,
-                parameters=parameters,
-            )
-        else:
-            executed = ExecutedAction(
-                actionId=action_id,
-                type="email_draft",
-                result=body,
-                parameters=parameters,
-            )
-
-        logger.info(f"Ejecutor: email draft created for {recipient}")
-        return {
-            "executed_action": executed.model_dump(),
-        }
-
-    except Exception as e:
-        logger.error(f"Ejecutor: email draft failed: {e}")
-        raise
+    )
+    body = response.text.strip()
+    if email_tool:
+        email_tool.execute(recipient=recipient, body=body)
+    executed = ExecutedAction(actionId=action_id, type="email_draft", result=body, parameters=parameters)
+    logger.info(f"Ejecutor: email draft created for {recipient}")
+    return {"executed_action": executed.model_dump()}
 
 
 def _execute_task(

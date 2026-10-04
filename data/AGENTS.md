@@ -122,9 +122,8 @@ at a time, the simulated day replaces `fecha_corte()`, and every query filters
 `fecha <= <simulated day>`. [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md) owns the clock: it
 keeps the day in its table `api.simulacion` and seeds it, on the first read, from `fecha_corte()`
 (`apps/api/src/centinela_api/simulacion.py:dia_actual(conn)`), so the first advance already passes
-the dataset's last day. The day it advances reaches no view and no KPI, because the reader the
-API hands the orchestrator returns fixed demo rows whatever the day
-(`apps/api/src/centinela_api/agentes.py:_demo_reader(metric, day)`).
+the dataset's last day. The day it advances reaches every KPI as the `dia` of the kernel's
+`kpi_consultar`, the reader the API hands detection and the agents.
 
 **The three paragraphs below describe the views**, and bind every reader of one: an agent through
 the SQL tool, and anyone who reads a view to check a figure. The paragraph after them is the

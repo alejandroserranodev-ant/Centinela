@@ -118,7 +118,14 @@ async def decidir(
                     )
 
         except Exception as e:
-            logger.warning(f"Orchestrator resume skipped for {id}: {e}")
+            logger.error(f"Orchestrator resume failed for {id}: {e}", exc_info=True)
+            with conn.transaction():
+                bitacora.registrar(
+                    conn, nueva.id, "result",
+                    ActorAgent(agent="ejecutor"),
+                    f"La acción aprobada no se ejecutó: {e}",
+                    dia,
+                )
 
     elif isinstance(decision, DecisionReject):
         try:
@@ -130,6 +137,6 @@ async def decidir(
                 "simulated_day": dia.isoformat(),
             })
         except Exception as e:
-            logger.warning(f"Orchestrator reject skipped for {id}: {e}")
+            logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
     return nueva

@@ -1,94 +1,64 @@
 """
-Vigía: Redact alert title.
+Vigía: write the title of a detected alert.
 
-Vigía detects which rules are broken (código determinista en walk.py).
-This node redacts the title: one sentence in Spanish stating what happened.
-
-Input: the alert state, whose `detection` holds the metric and the entity
-Output: Sentence with title and figures
-Tools: none (detection is code)
-Model: LLM thinking OFF (simple redaction)
+Detection is code (walk.py). This leaf reads the alert's KPI row through the kernel, hands the
+model the compared column and `pesos_en_riesgo` as figures, and keeps the model's sentence only
+when every placeholder points to one of them.
 """
 
 import logging
-from typing import Any
+import re
+from typing import Any, Mapping
 
+from centinela_agents.evidence import Sources, merged_queries, stray_digits
+from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import LLMProvider, LLMRequest
+from centinela_agents.skills import skill
 from centinela_agents.state import subject
 
 logger = logging.getLogger(__name__)
 
-
-class VigiaError(Exception):
-    """Vigía step error."""
-    pass
+PLACEHOLDER = re.compile(r"\{(\d+)\}")
+TITLE_TOKENS = 80
 
 
-def redact_title(
-    provider: LLMProvider,
-    state: dict[str, Any],
-) -> dict[str, Any]:
-    """
-    Redact the alert's title from the detection the state holds under `detection`.
+def placeholders_problem(text: str, figures: int) -> str | None:
+    cited = {int(index) for index in PLACEHOLDER.findall(text)}
+    stray = sorted(index for index in cited if index >= figures)
+    return f"cites {stray} with {figures} figures" if stray else None
 
-    Returns:
-        {title: Sentence with text and figures}
-    """
-    metric, entity_id, _ = subject(state)
 
-    logger.info(
-        f"Vigía: redact title for {metric}:{entity_id}",
-        extra={"metric": metric, "entity": entity_id}
-    )
+def redact_title(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) -> dict[str, Any]:
+    metric, entity, day = subject(state)
+    detection = state["detection"]
+    ledger = sources.ledger()
+    qid, row = ledger.alert_row(metric, detection["entity"], day)
+    columns = (*sources.compared(detection), "pesos_en_riesgo")
+    facts = ledger.add(metric, row or detection["row"], qid, columns)
+    figures = [fact.figure() for fact in facts]
+    listed = "\n".join(f"{{{index}}}: {fact.column} = {fact.value} ({fact.figure()['unit']})" for index, fact in enumerate(facts))
+    prompt = f"""detection.metric: {metric}
+detection.entity: {entity}
+simulated_day: {day}
+regla: {sources.metrics.descriptions.get(metric, metric)}
+figures:
+{listed}
 
-    prompt = f"""Eres Vigía de Centinela. Tu tarea: redactar una frase en español que describa qué pasó.
-
-REGLAS:
-1. Una frase en español que indique qué ocurrió y a qué entidad
-2. Escribe cada cifra como placeholder {{0}}, {{1}}, etc., en orden
-3. No inventes figuras; copia solo las que recibiste
-4. Nombra la entidad por su identificador: {entity_id}
-5. Estado del hecho, no causa
-6. Palabras de negocio: margen, cartera vencida, cobertura, descuento, concentración, etc.
-
-ALERTA DETECTADA:
-- Métrica: {metric}
-- Entidad: {entity_id}
-
-Redacta UNA SOLA FRASE en español describiendo qué pasó.
-No incluyas causas, explicaciones, ni recomendaciones.
-Solo el hecho."""
-
-    try:
-        response = provider.generate_text(
-            LLMRequest(
-                system_prompt="Eres Vigía redactando títulos de alertas.",
-                user_prompt=prompt,
-                temperature=0.0,
-                thinking=False,
-            )
+Escribe solo la frase del título, en español, con los placeholders de figures."""
+    response = provider.generate_text(
+        LLMRequest(
+            system_prompt=skill("vigia", "contrato"),
+            user_prompt=prompt,
+            temperature=0.0,
+            max_tokens=TITLE_TOKENS,
+            thinking=False,
         )
-
-        title_text = response.text.strip()
-
-        result = {
-            "title": {
-                "text": title_text,
-                "figures": [],
-            },
-        }
-
-        logger.info(f"Vigía: title redacted: {title_text[:100]}")
-        return result
-
-    except Exception as e:
-        logger.error(f"Vigía: title redaction failed: {e}")
-        fallback_text = f"{metric} en {entity_id}"
-        return {
-            "title": {
-                "text": fallback_text,
-                "figures": [],
-            },
-        }
-
-
+    )
+    text = " ".join(response.text.strip().strip('"').split())
+    problem = placeholders_problem(text, len(figures))
+    if stray_digits(text, (*map(str, detection["entity"]), day)):
+        problem = "writes a figure outside a placeholder"
+    if not text or problem:
+        raise SchemaRefused(f"Vigía's title {problem or 'is empty'}")
+    logger.info("Vigía: %s", text[:100])
+    return {"title": {"text": text, "figures": figures}, "queries": merged_queries(state, ledger)}

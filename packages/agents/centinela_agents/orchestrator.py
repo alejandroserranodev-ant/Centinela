@@ -38,10 +38,13 @@ from .agents.ejecutor import execute_action
 from .agents.estratega import propose_actions
 from .agents.orquestador import classify_rejection
 from .agents.vigia import redact_title
-from .graph import Compiler, awaiting_decision, resume, start_alert, thread
+from .catalog import KernelCall
+from .evidence import Sources, call_from_reader
+from .graph import Compiler, awaiting_decision, manual_owners, manual_review, resume, start_alert, thread
 from .llm_provider import LLMProvider
 from .metrics import Metrics
-from .schema import Tree
+from .schema import Tree, index
+from .skills import skill
 from .tools import ToolRegistry
 from .walk import Context, Detection
 
@@ -74,6 +77,8 @@ class CentinelaOrchestrator:
         reader: Any,
         checkpointer: Any,
         owners: Mapping[str, str] | None = None,
+        kernel: KernelCall | None = None,
+        reasoning_provider: LLMProvider | None = None,
     ):
         """
         Initialize orchestrator.
@@ -86,22 +91,27 @@ class CentinelaOrchestrator:
             catalog: KPI catalog
             reader: KPI reader
             checkpointer: LangGraph checkpointer (for state persistence)
-            owners: Manual review owners by metric
+            owners: Manual review owners by metric, read from acciones.md when absent
+            kernel: the kernel's call; the leaves consult kpi_consultar through it
+            reasoning_provider: the provider of Analista and Estratega, when it differs
         """
         self.provider = provider
         self.tools = tools
         self.tree = tree
         self.metrics = metrics
 
+        owners = dict(owners) if owners is not None else manual_owners(skill("estratega", "acciones"))
+        sources = Sources(kernel or call_from_reader(reader), catalog, metrics, index(tree))
+        reasoning = reasoning_provider or provider
+
         self.leaves = {
-            ("vigia", "titular"): lambda state: redact_title(provider, state),
-            ("analista", "explicar"): lambda state: explain_cause(provider, state, tools),
-            ("estratega", "proponer"): lambda state: propose_actions(
-                provider, state, state.get("cause"), tools
-            ),
-            ("estratega", "revision_manual"): lambda state: propose_actions(
-                provider, state, state.get("cause"), tools
-            ),
+            ("vigia", "titular"): lambda state: redact_title(provider, state, sources),
+            ("analista", "explicar"): lambda state: explain_cause(reasoning, state, sources),
+            ("estratega", "proponer"): lambda state: propose_actions(reasoning, state, state.get("cause"), sources),
+            ("estratega", "revision_manual"): lambda state: {
+                "actions": [manual_review(state["detection"]["metric"], owners)],
+                "insufficient_cause": None,
+            },
             ("ejecutor", "ejecutar"): lambda state: execute_action(
                 provider, state.get("action"), state.get("decision"), tools
             ),

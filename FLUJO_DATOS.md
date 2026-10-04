@@ -16,11 +16,14 @@ steps.
 2. Detection runs in the API's process.
    `apps/api/src/centinela_api/agentes.py:get_context()` builds the walk's context once per
    process: the tree from `packages/agents/arbol/base.yaml`, the thresholds of
-   [`data/metricas.yaml`](./data/metricas.yaml), the catalogue `VIEW_CATALOG`, and the reader
-   `apps/api/src/centinela_api/agentes.py:_demo_reader(metric, day)`.
+   [`data/metricas.yaml`](./data/metricas.yaml), and the kernel's catalogue and reader, which
+   `apps/api/src/centinela_api/agentes.py:get_kernel()` reaches through
+   `packages/agents/centinela_agents/catalog.py:connect_kernel(env)` with the DSNs of the root `.env`.
    `packages/agents/centinela_agents/walk.py:detect(ctx, day)` walks the detection nodes over the
-   reader's rows. The router keeps only the detections whose metric is in `API_METRICS`, because
-   the API's `Alert` model accepts no other.
+   rows `kpi_consultar` returns for the simulated day.
+   `apps/api/src/centinela_api/agentes.py:prioritized(detections, known)` keeps the detections
+   whose metric is in `API_METRICS`, because the API's `Alert` model accepts no other, drops those
+   whose alert already exists, and keeps the `ALERTS_PER_DAY` with the most `pesos_en_riesgo`.
 3. For each detection the stream sends a `step` event, an `AgentStep` of `vigia`. Then
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)`
    runs the graph in a worker thread, through `asyncio.to_thread`, so the event loop keeps

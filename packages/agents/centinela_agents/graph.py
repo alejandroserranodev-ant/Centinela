@@ -98,8 +98,8 @@ def manual_owners(acciones: str) -> dict[str, str]:
     return dict(re.findall(r"^\| `([a-z0-9_]+)` \| `([^`]+)` \|", rows, re.MULTILINE))
 
 
-def manual_review(metric: str, ctx: Context) -> dict[str, Any]:
-    owner = ctx.owners.get(metric)
+def manual_review(metric: str, owners: Mapping[str, str]) -> dict[str, Any]:
+    owner = owners.get(metric)
     return {
         "id": "act-revision-manual",
         "title": "Revisión manual de la alerta",
@@ -117,11 +117,12 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
         return {"title": {"text": " ".join(words), "figures": []}}
     if key == ("analista", "explicar"):
         reason = REASONS[failure_kind(error)]
-        return {"cause": {"kind": "no_evidence", "reason": reason, "queriesReviewed": list(state.get("queries") or [])}, "same_cause_as": None}
+        reviewed = [query["queryId"] if isinstance(query, Mapping) else str(query) for query in state.get("queries") or []]
+        return {"cause": {"kind": "no_evidence", "reason": reason, "queriesReviewed": reviewed}, "same_cause_as": None}
     if key == ("estratega", "proponer"):
         return {"actions": None, "insufficient_cause": None}
     if key == ("estratega", "revision_manual"):
-        return {"actions": [manual_review(state["detection"]["metric"], ctx)], "insufficient_cause": None}
+        return {"actions": [manual_review(state["detection"]["metric"], ctx.owners)], "insufficient_cause": None}
     if leaf.agente == "ejecutor":
         return {"executed_action": None}
     raise error

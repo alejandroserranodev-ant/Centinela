@@ -4,6 +4,7 @@ Tests for agent implementations.
 Tests basic agent functionality without requiring full orchestrator.
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,162 +15,175 @@ from centinela_agents.agents.estratega import propose_actions
 from centinela_agents.agents.orquestador import classify_rejection
 from centinela_agents.agents.vigia import redact_title
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse, ModelConfig
+from centinela_agents.evidence import Sources, query_id
+from centinela_agents.failures import SchemaRefused
+from centinela_agents.metrics import load_metrics
+from centinela_agents.schema import index
 from centinela_agents.tools import ToolRegistry
+from support import KERNEL_CATALOG, METRICAS, base_tree
+
+
+DAY = "2026-10-03"
+ROWS = {
+    "saldo_vencido": [{"cliente_id": "C1", "saldo_vencido": 800000.0, "saldo_abierto": 1200000.0, "max_dias_vencido": 45, "cupo_credito": 5000000, "pesos_en_riesgo": 800000.0}],
+    "dias_pago_prom": [{"cliente_id": "C1", "dias_pago_prom": 52.0, "dias_pago_prom_base": 30.0, "aumento_pct": 73.3, "pesos_en_riesgo": 0.0}],
+    "concentracion_vencida_pct": [{"cliente_id": "C2", "saldo_vencido": 1.0, "concentracion_vencida_pct": 9.0, "pesos_en_riesgo": 1.0}],
+}
+DETECTION = {
+    "metric": "saldo_vencido",
+    "entity": ["C1"],
+    "path": [["detectar.cartera.saldo_vencido.dias", "si"]],
+    "row": ROWS["saldo_vencido"][0],
+}
+STATE = {"alert_id": "A1", "detection": DETECTION, "simulated_day": DAY}
+
+
+def kernel(name, arguments):
+    kpi = arguments["kpi"]
+    return {"kpi": kpi, "dia": arguments["dia"], "consulta": f"SELECT * FROM k_{kpi}(%(dia)s)", "filas": ROWS.get(kpi, [])}
+
+
+def sources():
+    return Sources(kernel, KERNEL_CATALOG, load_metrics(METRICAS), index(base_tree()))
+
+
+def structured(parsed):
+    return LLMStructuredResponse(text=json.dumps(parsed), parsed=parsed, stop_reason="stop", usage={}, model="m")
+
+
+def saldo_query():
+    return query_id("SELECT * FROM k_saldo_vencido(%(dia)s)", DAY)
 
 
 class TestVigia:
     """Tests for Vigía agent."""
 
-    def test_redact_title_success(self):
-        """Vigía redacts title from detection."""
+    def test_the_title_cites_the_kernel_figures_with_their_query(self):
         provider = MagicMock()
-        provider.generate_text.return_value = LLMResponse(
-            text="Cliente cliente_123 tiene 45 días de retraso.",
-            stop_reason="stop",
-            usage={"prompt_tokens": 50, "completion_tokens": 10},
-            model="qwen3:8b"
-        )
+        provider.generate_text.return_value = LLMResponse(text="El cliente C1 tiene {0} días de mora y {1} en riesgo.", stop_reason="stop", usage={}, model="m")
 
-        state = {"detection": {"metric": "saldo_vencido", "entity": ["cliente_123"]}, "simulated_day": "2026-10-03"}
+        result = redact_title(provider, STATE, sources())
 
-        result = redact_title(provider, state)
-
-        assert "cliente_123" in result["title"]["text"]
+        figures = result["title"]["figures"]
+        assert [figure["value"] for figure in figures] == [45, 800000.0]
+        assert {figure["queryId"] for figure in figures} == {saldo_query()}
+        assert result["queries"][0]["consulta"] == "SELECT * FROM k_saldo_vencido(%(dia)s)"
         prompt = provider.generate_text.call_args.args[0].user_prompt
-        assert "saldo_vencido" in prompt and "cliente_123" in prompt
+        assert "saldo_vencido" in prompt and "C1" in prompt
 
-    def test_redact_title_fallback(self):
-        """Vigía falls back on LLM failure."""
+    def test_a_placeholder_with_no_figure_is_refused(self):
         provider = MagicMock()
-        provider.generate_text.side_effect = Exception("LLM error")
+        provider.generate_text.return_value = LLMResponse(text="Mora de {7} días.", stop_reason="stop", usage={}, model="m")
 
-        state = {"detection": {"metric": "margen_pct", "entity": ["2026-W09", "linea_456"]}, "simulated_day": "2026-10-03"}
-
-        result = redact_title(provider, state)
-
-        assert "margen_pct" in result["title"]["text"]
+        with pytest.raises(SchemaRefused):
+            redact_title(provider, STATE, sources())
 
 
 class TestAnalista:
     """Tests for Analista agent."""
 
-    def test_explain_cause_identified(self):
-        """Analista returns identified cause."""
+    def test_the_cause_cites_facts_the_kernel_returned(self):
         provider = MagicMock()
-        provider.generate_structured.return_value = LLMStructuredResponse(
-            text='{"kind": "identified", "sentence": "Cliente acumula retraso", "evidence": []}',
-            parsed={
+        provider.generate_structured.return_value = structured(
+            {
                 "kind": "identified",
-                "sentence": "Cliente acumula retraso",
-                "evidence": []
-            },
-            stop_reason="stop",
-            usage={"prompt_tokens": 100, "completion_tokens": 20},
-            model="qwen3:8b"
+                "sentence": "La mora coincide con pagos más lentos: {0} días.",
+                "sentence_figures": ["f6"],
+                "evidence": [{"claim": "El promedio de pago subió a {0} días.", "figures": ["f6"]}],
+                "confidence": "medium",
+                "assumptions": [],
+            }
         )
 
-        alert = {"detection": {"metric": "saldo_vencido", "entity": ["cliente_123"]}, "simulated_day": "2026-10-03"}
+        result = explain_cause(provider, STATE, sources())
 
-        tools = ToolRegistry()
+        cause = result["cause"]
+        assert cause["kind"] == "identified"
+        assert cause["sentence"]["figures"][0]["value"] == 52.0
+        assert cause["evidence"][0]["figures"][0]["queryId"] == query_id("SELECT * FROM k_dias_pago_prom(%(dia)s)", DAY)
+        prompt = provider.generate_structured.call_args.args[0].user_prompt
+        assert "dias_pago_prom.dias_pago_prom de C1 = 52.0" in prompt
+        assert "C2" not in prompt
+        assert {query["kpi"] for query in result["queries"]} >= {"saldo_vencido", "dias_pago_prom"}
 
-        result = explain_cause(provider, alert, tools)
-
-        assert result["cause"]["kind"] == "identified"
-
-    def test_explain_cause_no_evidence(self):
-        """Analista returns no_evidence."""
+    def test_a_cited_fact_no_query_returned_is_refused(self):
         provider = MagicMock()
-        provider.generate_structured.return_value = LLMStructuredResponse(
-            text='{"kind": "no_evidence", "reason": "No data", "queriesReviewed": []}',
-            parsed={
-                "kind": "no_evidence",
-                "reason": "No data",
-                "queriesReviewed": []
-            },
-            stop_reason="stop",
-            usage={"prompt_tokens": 100, "completion_tokens": 15},
-            model="qwen3:8b"
+        provider.generate_structured.return_value = structured(
+            {"kind": "identified", "sentence": "x {0}", "sentence_figures": ["f99"], "evidence": [{"claim": "x {0}", "figures": ["f99"]}], "confidence": "low"}
         )
 
-        alert = {"detection": {"metric": "dias_pago_prom", "entity": ["cliente_456", "2026-09"]}, "simulated_day": "2026-10-03"}
+        with pytest.raises(SchemaRefused):
+            explain_cause(provider, STATE, sources())
 
-        tools = ToolRegistry()
-
-        result = explain_cause(provider, alert, tools)
-
-        assert result["cause"]["kind"] == "no_evidence"
-
-    def test_explain_cause_fallback(self):
-        """Analista falls back on LLM failure."""
+    def test_a_figure_written_outside_a_placeholder_is_refused(self):
         provider = MagicMock()
-        provider.generate_structured.side_effect = Exception("LLM error")
+        provider.generate_structured.return_value = structured(
+            {"kind": "identified", "sentence": "Paga en 52 días.", "sentence_figures": ["f6"], "evidence": [], "confidence": "low"}
+        )
 
-        alert = {"detection": {"metric": "cobertura_dias", "entity": ["sku_789", "BOD-01"]}, "simulated_day": "2026-10-03"}
+        with pytest.raises(SchemaRefused):
+            explain_cause(provider, STATE, sources())
 
-        tools = ToolRegistry()
+    def test_a_claim_with_a_written_figure_is_dropped_and_the_sentence_stands_in(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured(
+            {
+                "kind": "identified",
+                "sentence": "La mora de C1 coincide con pagos a {0} días.",
+                "sentence_figures": ["f6"],
+                "evidence": [{"claim": "Subió 73 por ciento.", "figures": ["f8"]}],
+                "confidence": "low",
+            }
+        )
 
-        result = explain_cause(provider, alert, tools)
+        cause = explain_cause(provider, STATE, sources())["cause"]
+
+        assert [item["claim"] for item in cause["evidence"]] == ["La mora de C1 coincide con pagos a {0} días."]
+
+    def test_no_evidence_lists_every_query_reviewed(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured({"kind": "no_evidence", "reason": "Nada coincide.", "confidence": "low"})
+
+        result = explain_cause(provider, STATE, sources())
 
         assert result["cause"]["kind"] == "no_evidence"
+        assert saldo_query() in result["cause"]["queriesReviewed"]
 
 
 class TestEstrategA:
     """Tests for Estratega agent."""
 
-    def test_propose_actions_success(self):
-        """Estratega proposes actions."""
+    def test_the_action_takes_its_parameters_and_impact_from_the_kpi(self):
         provider = MagicMock()
-        provider.generate_structured.return_value = LLMStructuredResponse(
-            text='{"actions": [{"id": "a1", "title": "Email", "description": "Send email", "type": "email_draft", "parameters": {"recipient": "c123"}, "confidence": {"level": "high"}}]}',
-            parsed={
-                "actions": [
-                    {
-                        "id": "a1",
-                        "title": "Enviar recordatorio",
-                        "description": "Email según FIN-POL-004 §4",
-                        "type": "email_draft",
-                        "parameters": {"recipient": "cliente_123"},
-                        "impact": None,
-                        "confidence": {"level": "high", "assumptions": []}
-                    }
-                ]
-            },
-            stop_reason="stop",
-            usage={"prompt_tokens": 150, "completion_tokens": 30},
-            model="qwen3:8b"
+        provider.generate_structured.return_value = structured(
+            {"actions": [{"row": "r1", "title": "Recordatorio de pago", "description": "Enviar un recordatorio cortés."}], "insufficient_cause": False}
         )
 
-        alert = {"detection": {"metric": "saldo_vencido", "entity": ["cliente_123"]}, "simulated_day": "2026-10-03"}
+        result = propose_actions(provider, STATE, {"kind": "identified", "sentence": "Paga tarde", "confidence": {"level": "high"}}, sources())
 
-        cause = {
-            "kind": "identified",
-            "sentence": "Cliente acumula retraso"
-        }
+        (action,) = result["actions"]
+        assert action["id"] == "act-saldo_vencido-r1"
+        assert action["type"] == "email_draft"
+        assert action["parameters"] == {"recipient": "C1"}
+        assert action["impact"] == {"value": 800000.0, "unit": "COP", "queryId": saldo_query()}
+        assert result["insufficient_cause"] is None
 
-        tools = ToolRegistry()
+    def test_a_row_the_list_does_not_hold_is_insufficient(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured({"actions": [{"row": "r99", "title": "x", "description": "y"}], "insufficient_cause": False})
 
-        result = propose_actions(provider, alert, cause, tools)
+        result = propose_actions(provider, STATE, {"kind": "identified", "sentence": "Paga tarde"}, sources())
 
-        assert result["insufficient_cause"] is False
-        assert len(result["actions"]) > 0
+        assert result["actions"] is None
+        assert result["insufficient_cause"] is True
 
     def test_propose_actions_no_evidence(self):
-        """Estratega returns insufficient_cause if no evidence."""
         provider = MagicMock()
 
-        alert = {"detection": {"metric": "margen_pct", "entity": ["2026-W09", "linea_456"]}, "simulated_day": "2026-10-03"}
-
-        cause = {
-            "kind": "no_evidence",
-            "reason": "No data"
-        }
-
-        tools = ToolRegistry()
-
-        result = propose_actions(provider, alert, cause, tools)
+        result = propose_actions(provider, STATE, {"kind": "no_evidence", "reason": "Sin datos"}, sources())
 
         assert result["insufficient_cause"] is True
-        assert result["actions"] is None
+        provider.generate_structured.assert_not_called()
 
 
 class TestEjecutor:

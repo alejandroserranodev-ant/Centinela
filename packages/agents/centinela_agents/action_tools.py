@@ -6,8 +6,8 @@ Stub implementation. Real implementation requires:
 - Integration with backend (API endpoints)
 """
 
+import hashlib
 import logging
-import uuid
 from typing import Any
 
 from .tools import (
@@ -22,6 +22,10 @@ from .tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def stable_id(prefix: str, *parts: Any) -> str:
+    return f"{prefix}_{hashlib.sha256(repr(parts).encode()).hexdigest()[:8]}"
 
 
 class EmailDraftStub(EmailDraftTool):
@@ -51,7 +55,7 @@ class EmailDraftStub(EmailDraftTool):
             EmailDraftResult with draft ID
         """
         self.draft_counter += 1
-        draft_id = f"email_draft_{uuid.uuid4().hex[:8]}"
+        draft_id = stable_id("email_draft", recipient, body, subject)
 
         logger.info(
             f"Email draft created: {draft_id} to {recipient}",
@@ -94,7 +98,7 @@ class TaskStub(TaskTool):
             TaskResult with task ID
         """
         self.task_counter += 1
-        task_id = f"task_{uuid.uuid4().hex[:8]}"
+        task_id = stable_id("task", owner, title, description)
 
         logger.info(
             f"Task created: {task_id} for {owner}",
@@ -136,7 +140,7 @@ class PurchaseOrderDraftStub(PurchaseOrderDraftTool):
             PurchaseOrderDraftResult with order draft
         """
         self.order_counter += 1
-        order_id = f"po_draft_{uuid.uuid4().hex[:8]}"
+        order_id = stable_id("po_draft", proveedor_id, sku, quantity, warehouse)
 
         logger.info(
             f"Purchase order draft created: {order_id}",
@@ -181,7 +185,7 @@ class PriceChangeDraftStub(PriceChangeDraftTool):
             raise ValueError("price_increase_pct is required")
 
         self.change_counter += 1
-        change_id = f"price_draft_{uuid.uuid4().hex[:8]}"
+        change_id = stable_id("price_draft", sku, linea, price_increase_pct)
 
         logger.info(
             f"Price change draft created: {change_id}",

@@ -38,7 +38,7 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start` and `resume` ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
 | `centinela_agents/security.py` | masking, secret detection and a prompt builder by trust level, which no leaf calls ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
 | `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
-| `centinela_agents/output_validator.py`, `centinela_agents/orchestrator_v2.py` | checks of a leaf's output, and an orchestrator that adds them and the counters ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
+| `centinela_agents/output_validator.py` | checks of a leaf's output that only the tests run ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
 | `skills/` | what each agent is told ([`skills/AGENTS.md`](./skills/AGENTS.md)) |
 | `tests/` | the validator's planted violations, the walk of `detectar`, the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model, and the unit tests of each module above, `tests/test_evals.py` among them ([`PHASE_8_SETUP.md`](./PHASE_8_SETUP.md)) |
 | `PHASE_1_SETUP.md` … `PHASE_9_SETUP.md` | one page per subsystem above, the detail this page links |
@@ -341,8 +341,8 @@ has not reached.
 > and the only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.
 > `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
-> and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; only
-> `centinela_agents/orchestrator_v2.py` uses them, and nothing imports `centinela_agents/orchestrator_v2.py`.
+> and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; no running path
+> uses them.
 
 - **After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
   call to the alert's `cost`, under the agent that made it.** A chat answer carries its own cost.

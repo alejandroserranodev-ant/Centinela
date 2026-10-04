@@ -126,7 +126,7 @@ class CalcularImpactoStub(CalcularImpactoProvider):
 
         return ImpactResult(
             value=0,
-            unit="COP" if "impacto" in formula["output"] else "%",
+            unit="COP" if "impact" in formula["output"] else "%",
             queryId=query_id,
             formula=formula_name,
             assumptions=["Stub implementation returns 0; use real SQL for actual impact"],

@@ -353,7 +353,7 @@ class TestDecision:
         )
 
         assert decision.kind == "reject"
-        assert "No son confiables" in decision.reason
+        assert "no son confiables" in decision.reason
 
     def test_decision_request_changes(self):
         """Decision to request changes to proposal."""

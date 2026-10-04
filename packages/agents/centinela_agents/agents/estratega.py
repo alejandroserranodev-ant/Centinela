@@ -1,193 +1,135 @@
 """
-Estratega: Propose 1-3 actions for an alert.
+Estratega: propose one to three actions from the closed list of acciones.md.
 
-Receives alert + cause and generates action proposals.
-Returns list of Action (or insufficient_cause for fallback).
-
-Input: detected alert, cause, rejection reasons
-Output: list[Action] or insufficient_cause (as fallback)
-Tools: sql_vistas, buscar_politica, calcular_impacto
-Model: LLM thinking ON (reasoning required)
+Code reads the rows acciones.md lists for the alert's metric and hands them to the model by ref.
+The model chooses rows whose condition the alert and its cause meet and words each action; code
+fills every parameter from the alert's KPI row and entity, and sets the impact to the KPI's
+`pesos_en_riesgo`, computed in SQL, whenever the row names a formula.
 """
 
 import logging
-from typing import Any
+from typing import Any, Mapping
 
-from centinela_agents.llm_provider import (
-    LLMProvider,
-    LLMStructuredRequest,
-)
-from centinela_agents.schema import Action, Confidence
+from centinela_agents.evidence import Sources, merged_queries, stray_digits
+from centinela_agents.failures import SchemaRefused
+from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
+from centinela_agents.schema import Action
+from centinela_agents.skills import ActionRow, action_rows, skill
 from centinela_agents.state import subject
-from centinela_agents.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-
-class EstrategaError(Exception):
-    """Estratega step error."""
-    pass
-
-
-def propose_actions(
-    provider: LLMProvider,
-    state: dict[str, Any],
-    cause: dict[str, Any],
-    tools: ToolRegistry,
-) -> dict[str, Any]:
-    """
-    Propose 1-3 actions for an alert.
-
-    Args:
-        provider: LLM provider (thinking ON)
-        state: the alert state; its `detection` holds the metric and the entity
-        cause: Cause schema (identified or no_evidence)
-        tools: ToolRegistry with sql_vistas, buscar_politica, calcular_impacto
-
-    Returns:
-        {
-            actions: list[Action] | None,
-            insufficient_cause: bool,
-        }
-
-    Rules:
-        1. If cause.kind is "no_evidence", return insufficient_cause=True
-        2. Read acciones.md rows for this metric
-        3. Keep rows that match alert + cause
-        4. Keep at most 3, in acciones.md order
-        5. For each row: call calcular_impacto with formula
-        6. Fill parameters only from alert, cause, queries
-        7. Cite policy section in description
-        8. If no row passes or insufficient_cause again, fallback to manual review
-    """
-    metric, entity, day = subject(state)
-    cause_kind = cause.get("kind")
-
-    logger.info(
-        f"Estratega: propose for {metric}:{entity}, cause={cause_kind}",
-        extra={"metric": metric, "cause": cause_kind}
-    )
-
-    if cause_kind == "no_evidence":
-        logger.info(f"Estratega: no evidence, returning insufficient_cause")
-        return {
-            "actions": None,
-            "insufficient_cause": True,
-        }
-
-    sql_tool = tools.sql_vistas if hasattr(tools, 'sql_vistas') else None
-    policy_tool = tools.buscar_politica if hasattr(tools, 'buscar_politica') else None
-    impact_tool = tools.calcular_impacto if hasattr(tools, 'calcular_impacto') else None
-
-    actions_schema = {
-        "type": "object",
-        "properties": {
-            "actions": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 3,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "string"},
-                        "title": {"type": "string"},
-                        "description": {"type": "string"},
-                        "type": {
-                            "type": "string",
-                            "enum": ["email_draft", "task", "purchase_order_draft", "price_change_draft"]
-                        },
-                        "parameters": {"type": "object"},
-                        "impact": {
-                            "type": ["object", "null"],
-                            "properties": {
-                                "value": {"type": ["number", "string"]},
-                                "unit": {"type": ["string", "null"]},
-                                "queryId": {"type": "string"}
-                            }
-                        },
-                        "confidence": {
-                            "type": "object",
-                            "properties": {
-                                "level": {
-                                    "type": "string",
-                                    "enum": ["high", "medium", "low"]
-                                },
-                                "assumptions": {"type": "array"}
-                            },
-                            "required": ["level"]
-                        }
-                    },
-                    "required": ["id", "title", "description", "type", "parameters", "confidence"]
-                }
-            }
+PROPOSAL_TOKENS = 350
+MAX_ACTIONS = 3
+IMPACT_ASSUMPTION = "El impacto es la columna pesos_en_riesgo del KPI de la alerta, calculada en SQL por el kernel."
+NO_FORMULA = "Sin fórmula de impacto para esta acción."
+PROPOSAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "actions": {
+            "type": "array",
+            "maxItems": MAX_ACTIONS,
+            "items": {
+                "type": "object",
+                "properties": {"row": {"type": "string"}, "title": {"type": "string"}, "description": {"type": "string"}},
+                "required": ["row", "title", "description"],
+            },
         },
-        "required": ["actions"]
-    }
+        "insufficient_cause": {"type": "boolean"},
+    },
+    "required": ["actions", "insufficient_cause"],
+}
 
-    cause_sentence = cause.get("sentence", "Causa no identificada")
-    evidence_summary = f"Causa identificada: {cause_sentence}"
 
-    prompt = f"""Eres Estratega de Centinela. Propón acciones para esta alerta.
+def parameters_of(row: ActionRow, values: Mapping[str, Any]) -> dict[str, Any]:
+    filled: dict[str, Any] = {}
+    for token in row.parameters:
+        name, _, source = (part.strip() for part in token.partition(":"))
+        if source:
+            value = values.get(source, source)
+        elif name in values:
+            value = values[name]
+        else:
+            continue
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            filled[name] = value
+    return filled
 
-ALERTA:
-- Métrica: {metric}
-- Entidad: {entity}
-- Día: {day}
 
-{evidence_summary}
+def cause_text(cause: Mapping[str, Any]) -> str:
+    if cause.get("kind") != "identified":
+        return str(cause.get("reason") or "")
+    sentence = cause.get("sentence")
+    return sentence.get("text", "") if isinstance(sentence, Mapping) else str(sentence or "")
 
-REGLAS:
-1. Propón entre 1 y 3 acciones del catálogo cerrado
-2. Solo acciones que la causa permite
-3. Tipos permitidos: email_draft, task, purchase_order_draft, price_change_draft
-4. Parámetros solo de alert, causa, o queries (nunca inventes)
-5. Impact = nulo si la métrica no tiene fórmula
-6. Confidence: high (dos vistas), medium (una vista), low (incompleto o sin fórmula)
-7. Cita sección de política en description
-8. Responde SOLO con JSON válido
 
-Devuelve JSON puro. Nada de markdown ni explicación."""
+def propose_actions(provider: LLMProvider, state: Mapping[str, Any], cause: Mapping[str, Any] | None, sources: Sources) -> dict[str, Any]:
+    metric, entity, day = subject(state)
+    cause = cause or {}
+    if cause.get("kind") != "identified":
+        return {"actions": None, "insufficient_cause": True}
+    detection = state["detection"]
+    rows = {row.ref: row for row in action_rows(metric)}
+    ledger = sources.ledger()
+    qid, row = ledger.alert_row(metric, detection["entity"], day)
+    kpi_row = dict(row or detection["row"])
+    values = {**dict(zip(sources.catalog.kpis[metric].entity, detection["entity"])), **kpi_row}
+    listed = "\n".join(f"{ref}: [{action.type}] {action.condition} ({action.policy})" for ref, action in rows.items())
+    rejections = "\n".join(f"- {reason}" for reason in state.get("proposal_rejections") or []) or "- ninguno"
+    prompt = f"""detection.metric: {metric}
+detection.entity: {entity}
+simulated_day: {day}
+fila del KPI: {kpi_row}
+causa: {cause_text(cause)}
+rechazos de propuestas anteriores:
+{rejections}
 
-    try:
-        response = provider.generate_structured(
-            LLMStructuredRequest(
-                system_prompt="Eres Estratega. Responde con JSON válido.",
-                user_prompt=prompt,
-                schema=actions_schema,
-                temperature=0.3,
-                thinking=True,
-            )
+filas de acciones.md para {metric}:
+{listed}
+
+Elige de una a tres filas cuya condición se cumple, por su ref, en el orden de la lista. Escribe
+title (máximo 8 palabras) y description (una frase) en español, sin cifras: el impacto lo agrega el
+código. Si ninguna fila se
+sostiene con esta causa, devuelve actions vacío e insufficient_cause true."""
+    response = provider.generate_structured(
+        LLMStructuredRequest(
+            system_prompt=skill("estratega", "contrato"),
+            user_prompt=prompt,
+            schema=PROPOSAL_SCHEMA,
+            temperature=0.0,
+            max_tokens=PROPOSAL_TOKENS,
+            thinking=True,
         )
-
-        actions_data = response.parsed.get("actions", [])
-
-        actions = []
-        for idx, action_data in enumerate(actions_data):
-            try:
-                action = Action.model_validate(action_data)
-                actions.append(action.model_dump())
-            except Exception as validation_error:
-                logger.warning(f"Estratega: action {idx} validation failed: {validation_error}")
-                continue
-
-        if not actions:
-            logger.info(f"Estratega: no valid actions, returning insufficient_cause")
-            return {
-                "actions": None,
-                "insufficient_cause": True,
-            }
-
-        result = {
-            "actions": actions,
-            "insufficient_cause": False,
-        }
-
-        logger.info(f"Estratega: proposed {len(actions)} actions")
-        return result
-
-    except Exception as e:
-        logger.error(f"Estratega: proposal failed: {e}")
-        return {
-            "actions": None,
-            "insufficient_cause": True,
-        }
+    )
+    allowed = (*map(str, detection["entity"]), day)
+    chosen = [
+        item
+        for item in response.parsed.get("actions") or []
+        if item.get("row") in rows and not stray_digits(f"{item.get('title', '')} {item.get('description', '')}", allowed)
+    ]
+    unique = list({item["row"]: item for item in chosen}.values())[:MAX_ACTIONS]
+    if not unique:
+        return {"actions": None, "insufficient_cause": True, "queries": merged_queries(state, ledger)}
+    level = ((cause.get("confidence") or {}).get("level")) or "medium"
+    impact = {"value": kpi_row.get("pesos_en_riesgo"), "unit": "COP", "queryId": qid} if kpi_row.get("pesos_en_riesgo") is not None else None
+    actions = []
+    for item in unique:
+        action_row = rows[item["row"]]
+        has_impact = action_row.formula is not None and impact is not None
+        try:
+            action = Action.model_validate(
+                {
+                    "id": f"act-{metric}-{action_row.ref}",
+                    "title": item["title"],
+                    "description": f"{item['description']} ({action_row.policy})",
+                    "type": action_row.type,
+                    "parameters": parameters_of(action_row, values),
+                    "impact": impact if has_impact else None,
+                    "confidence": {"level": level if has_impact else "low", "assumptions": [IMPACT_ASSUMPTION if has_impact else NO_FORMULA]},
+                }
+            )
+        except ValueError as error:
+            raise SchemaRefused(f"Estratega's action {action_row.ref} is refused: {error}") from error
+        actions.append(action.model_dump())
+    logger.info("Estratega: %d actions for %s:%s", len(actions), metric, entity)
+    return {"actions": actions, "insufficient_cause": None, "queries": merged_queries(state, ledger)}

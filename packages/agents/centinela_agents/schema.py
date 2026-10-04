@@ -163,8 +163,9 @@ class CauseIdentified(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["identified"]
-    sentence: str
+    sentence: Sentence | str
     evidence: list[Evidence] = Field(min_length=1)
+    confidence: Confidence | None = None
     same_cause_as: str | None = None
 
 

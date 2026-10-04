@@ -8,6 +8,7 @@ and that the graph routes alerts through the correct nodes.
 from unittest.mock import MagicMock
 
 import pytest
+from langgraph.checkpoint.memory import InMemorySaver
 
 from centinela_agents.graph import (
     GATE,
@@ -39,15 +40,6 @@ class TestGraphCompilation:
                     hoja=Leaf(agente="vigia", decision="titular", skill="vigia/contrato.md"),
                     sigue="fin.sin_alerta",
                 ),
-                Node(
-                    id="fin.sin_alerta",
-                    fundamento=None,
-                    predicado=None,
-                    si=None,
-                    no=None,
-                    hoja=None,
-                    sigue=None,
-                ),
             )
         )
 
@@ -58,7 +50,7 @@ class TestGraphCompilation:
         catalog.columns = {}
         reader = MagicMock()
         classify = lambda x: "ninguno"
-        checkpointer = MagicMock()
+        checkpointer = InMemorySaver()
 
         compiler = Compiler(
             leaves=leaves,
@@ -97,7 +89,7 @@ class TestGraphCompilation:
         catalog.columns = {}
         reader = MagicMock()
         classify = lambda x: "ninguno"
-        checkpointer = MagicMock()
+        checkpointer = InMemorySaver()
 
         compiler = Compiler(
             leaves=leaves,
@@ -143,7 +135,7 @@ class TestGraphRouting:
         catalog.columns = {}
         reader = MagicMock()
         classify = lambda x: "ninguno"
-        checkpointer = MagicMock()
+        checkpointer = InMemorySaver()
 
         compiler = Compiler(
             leaves=leaves,
@@ -160,7 +152,6 @@ class TestGraphRouting:
             entry="detectar.raiz",
             metric="test_metric",
             entity=("entity_id",),
-            severity="high",
             path=[],
             row={},
         )
@@ -303,7 +294,7 @@ class TestGraphState:
         catalog.columns = {}
         reader = MagicMock()
         classify = lambda x: "ninguno"
-        checkpointer = MagicMock()
+        checkpointer = InMemorySaver()
 
         compiler = Compiler(
             leaves=leaves,
@@ -320,7 +311,6 @@ class TestGraphState:
             entry="detectar.raiz",
             metric="test",
             entity=("e1",),
-            severity="high",
             path=[],
             row={},
         )

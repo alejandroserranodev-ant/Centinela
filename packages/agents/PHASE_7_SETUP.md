@@ -4,8 +4,7 @@ This page covers `centinela_agents/observability.py`. The file keeps its histori
 beside [`AGENTS.md`](./AGENTS.md) because the team keeps the file structure; `AGENTS.md` is the
 level page, owns what an alert's cost and trace are decided to be, and links here.
 
-Only `centinela_agents/orchestrator_v2.py` uses this module, and nothing uses that one
-([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)). No running path records cost or latency.
+No running path imports this module, so no alert records cost or latency.
 
 ## What it holds
 

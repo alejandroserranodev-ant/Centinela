@@ -63,3 +63,13 @@ def get_provider(
             f"Unknown LLM provider: {provider}. "
             f"Choose one of: ollama, openai, anthropic"
         )
+
+
+def get_reasoning_provider() -> LLMProvider | None:
+    """
+    The provider of the steps that reason (Analista, Estratega), when LLM_MODEL_RAZONA names a model.
+
+    Returns None when it is unset or empty, and those steps use the provider of every other step.
+    """
+    model = os.getenv("LLM_MODEL_RAZONA", "").strip()
+    return get_provider(model_name=model, thinking=True) if model else None

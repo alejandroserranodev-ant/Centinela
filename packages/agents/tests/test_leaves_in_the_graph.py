@@ -8,7 +8,9 @@ from centinela_agents.agents.analista import explain_cause
 from centinela_agents.agents.ejecutor import execute_action
 from centinela_agents.agents.estratega import propose_actions
 from centinela_agents.agents.vigia import redact_title
-from centinela_agents.llm_provider import LLMResponse
+from centinela_agents.evidence import Sources, call_from_reader
+from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse
+from centinela_agents.schema import index
 from centinela_agents.metrics import load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.state import AlertState
@@ -64,16 +66,24 @@ def test_the_leaves_write_only_keys_the_state_declares():
 def test_each_leaf_returns_only_keys_the_state_declares(fails):
     provider = MagicMock()
     provider.generate_text.return_value = LLMResponse(text="Borrador.", stop_reason="stop", usage={}, model="m")
+    provider.generate_structured.return_value = LLMStructuredResponse(
+        text="{}", parsed={"kind": "no_evidence", "reason": "Nada.", "actions": [], "insufficient_cause": True}, stop_reason="stop", usage={}, model="m"
+    )
     if fails:
         provider.generate_text.side_effect = RuntimeError("sin modelo")
         provider.generate_structured.side_effect = RuntimeError("sin modelo")
     _, state = started()
-    tools = ToolRegistry()
-    outputs = [
-        redact_title(provider, state),
-        explain_cause(provider, state, tools),
-        propose_actions(provider, state, IDENTIFIED, tools),
-        execute_action(provider, EMAIL, approve(), tools),
+    sources = Sources(call_from_reader(reader_from({DAY: {"saldo_vencido": [SALDO_ROW]}})), KERNEL_CATALOG, load_metrics(METRICAS), index(base_tree()))
+    leaves = [
+        lambda: redact_title(provider, state, sources),
+        lambda: explain_cause(provider, state, sources),
+        lambda: propose_actions(provider, state, IDENTIFIED, sources),
+        lambda: execute_action(provider, EMAIL, approve(), ToolRegistry()),
     ]
-    for output in outputs:
+    for leaf in leaves:
+        try:
+            output = leaf()
+        except Exception:
+            assert fails
+            continue
         assert set(output) <= set(AlertState.__annotations__)

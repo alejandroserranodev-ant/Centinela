@@ -1,178 +1,114 @@
 """
-Analista: Explain why alert happened.
+Analista: explain why an alert happened, from the kernel's figures.
 
-Analyzes alert using data from sql_vistas and buscar_politica.
-Returns Cause (identified with evidence OR no_evidence).
-
-Input: detected alert, earlier alerts state, rejection reasons
-Output: Cause schema (CauseIdentified | CauseNoEvidence)
-Tools: sql_vistas, buscar_politica
-Model: LLM thinking ON (reasoning required)
+Code reads the alert's KPI row and the rows other KPIs hold for the same entity on the simulated
+day, through kpi_consultar, and numbers every figure as a fact. The model chooses which facts
+support a cause and writes the Spanish around them; it cites a fact by its ref and never writes a
+number, so every figure of the cause carries the queryId of the query that returned it.
 """
 
-import json
 import logging
-from typing import Any
+from typing import Any, Mapping
 
-from centinela_agents.llm_provider import (
-    LLMProvider,
-    LLMStructuredRequest,
-)
-from centinela_agents.schema import Cause, CauseIdentified, CauseNoEvidence
+from centinela_agents.evidence import Sources, UnknownFigure, cited, merged_queries, stray_digits
+from centinela_agents.failures import SchemaRefused
+from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
+from centinela_agents.schema import CauseIdentified, CauseNoEvidence
+from centinela_agents.skills import skill
 from centinela_agents.state import subject
-from centinela_agents.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-
-class AnalistaError(Exception):
-    """Analista step error."""
-    pass
-
-
-def explain_cause(
-    provider: LLMProvider,
-    state: dict[str, Any],
-    tools: ToolRegistry,
-) -> dict[str, Any]:
-    """
-    Explain why alert happened.
-
-    Args:
-        provider: LLM provider (thinking ON)
-        state: the alert state; its `detection` holds the metric and the entity
-        tools: ToolRegistry with sql_vistas, buscar_politica
-
-    Returns:
-        {
-            cause: CauseIdentified | CauseNoEvidence,
-        }
-
-    Rules:
-        1. Test hypotheses from skill file for this metric
-        2. Run queries filtering by simulated day
-        3. Test hypothesis: entity, time, direction (three tests)
-        4. Report at most one main cause and two contributing
-        5. If no hypothesis passes, answer no_evidence
-        6. Check rejection reasons; if reason refutes, test next hypothesis
-    """
-    metric, entity, day = subject(state)
-
-    logger.info(
-        f"Analista: explain {metric}:{entity} on {day}",
-        extra={"metric": metric, "entity": entity}
-    )
-
-    sql_tool = tools.sql_vistas if hasattr(tools, 'sql_vistas') else None
-    policy_tool = tools.buscar_politica if hasattr(tools, 'buscar_politica') else None
-
-    cause_schema = {
-        "type": "object",
-        "oneOf": [
-            {
+CAUSE_TOKENS = 400
+REFS = {"type": "array", "items": {"type": "string"}}
+CAUSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "enum": ["identified", "no_evidence"]},
+        "sentence": {"type": "string"},
+        "sentence_figures": REFS,
+        "evidence": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
                 "type": "object",
-                "properties": {
-                    "kind": {"type": "string", "const": "identified"},
-                    "sentence": {"type": "string"},
-                    "evidence": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "claim": {"type": "string"},
-                                "figures": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "value": {"type": ["number", "string"]},
-                                            "unit": {"type": ["string", "null"]},
-                                            "queryId": {"type": "string"}
-                                        },
-                                        "required": ["value", "queryId"]
-                                    }
-                                }
-                            },
-                            "required": ["claim"]
-                        }
-                    },
-                    "same_cause_as": {"type": ["string", "null"]}
-                },
-                "required": ["kind", "sentence", "evidence"]
+                "properties": {"claim": {"type": "string"}, "figures": REFS},
+                "required": ["claim", "figures"],
             },
-            {
-                "type": "object",
-                "properties": {
-                    "kind": {"type": "string", "const": "no_evidence"},
-                    "reason": {"type": "string"},
-                    "queriesReviewed": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": ["kind", "reason"]
-            }
-        ]
-    }
+        },
+        "reason": {"type": "string"},
+        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["kind", "sentence", "sentence_figures", "evidence", "reason", "confidence", "assumptions"],
+}
 
-    prompt = f"""Eres Analista de Centinela. Explica por qué ocurrió la alerta.
 
-ALERTA:
-- Métrica: {metric}
-- Entidad: {entity}
-- Día: {day}
-
-REGLAS:
-1. Responde SOLO con JSON válido (no texto adicional)
-2. Si encontraste causa con evidencia, usa kind: "identified"
-3. Si no hay evidencia suficiente, usa kind: "no_evidence"
-4. Una frase que explique qué pasó (causa)
-5. Evidencias: claim (texto) + figures (datos con queryId)
-6. Máximo una causa principal + dos contribuyentes
-7. Sin forecasting; solo datos históricos y políticas
-8. Nunca digas "provocó", "probablemente", "seguramente"; usa "coincide con"
-
-Devuelve JSON puro. Nada de markdown, backticks ni explicación."""
-
+def build_cause(answer: Mapping[str, Any], ledger, queries: list[str], allowed: tuple[str, ...]) -> dict[str, Any]:
+    if answer.get("kind") != "identified":
+        reason = str(answer.get("reason") or "").strip()
+        if not reason or stray_digits(reason, allowed):
+            reason = "Ningún KPI del día muestra una causa para esta alerta."
+        return CauseNoEvidence(kind="no_evidence", reason=reason, queriesReviewed=queries).model_dump()
+    sentence = str(answer.get("sentence") or "")
+    sentence_refs = cited(sentence, list(answer.get("sentence_figures") or []))
+    if stray_digits(sentence, allowed):
+        raise SchemaRefused("Analista wrote a figure outside a placeholder in its sentence")
+    claims = [
+        item
+        for item in answer.get("evidence") or []
+        if item.get("figures") and item.get("claim") and not stray_digits(str(item["claim"]), allowed)
+    ] or ([{"claim": sentence, "figures": sentence_refs}] if sentence_refs else [])
     try:
-        response = provider.generate_structured(
-            LLMStructuredRequest(
-                system_prompt="Eres Analista. Responde con JSON válido.",
-                user_prompt=prompt,
-                schema=cause_schema,
-                temperature=0.3,
-                thinking=True,
-            )
+        cause = CauseIdentified.model_validate(
+            {
+                "kind": "identified",
+                "sentence": {"text": sentence, "figures": ledger.figures(sentence_refs)},
+                "evidence": [{"claim": item["claim"], "figures": ledger.figures(list(item["figures"]))} for item in claims],
+                "confidence": {
+                    "level": answer.get("confidence") or "low",
+                    "assumptions": [text for text in answer.get("assumptions") or [] if not stray_digits(str(text), allowed)],
+                },
+            }
         )
+    except (UnknownFigure, ValueError) as error:
+        raise SchemaRefused(f"Analista's cause is refused: {error}") from error
+    return cause.model_dump()
 
-        cause_data = response.parsed
 
-        try:
-            if cause_data.get("kind") == "identified":
-                cause = CauseIdentified.model_validate(cause_data)
-            else:
-                cause = CauseNoEvidence.model_validate(cause_data)
-        except Exception as validation_error:
-            logger.warning(f"Analista: validation failed, returning no_evidence: {validation_error}")
-            cause = CauseNoEvidence(
-                kind="no_evidence",
-                reason="El análisis no terminó: el modelo no devolvió una respuesta válida.",
-                queriesReviewed=[]
-            )
+def explain_cause(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) -> dict[str, Any]:
+    metric, entity, day = subject(state)
+    detection = state["detection"]
+    ledger = sources.ledger()
+    qid, row = ledger.alert_row(metric, detection["entity"], day)
+    ledger.add(metric, row or detection["row"], qid)
+    ledger.related(metric, detection["entity"], day)
+    rejections = "\n".join(f"- {reason}" for reason in state.get("cause_rejections") or []) or "- ninguno"
+    insufficient = "sí: la causa anterior no sostuvo ninguna acción" if state.get("insufficient_cause") else "no"
+    prompt = f"""detection.metric: {metric}
+detection.entity: {entity}
+simulated_day: {day}
+cause_rejections:
+{rejections}
+insufficient_cause: {insufficient}
 
-        result = {
-            "cause": cause.model_dump(),
-        }
+evidencia (cada hecho es una cifra que el kernel devolvió para el día simulado):
+{ledger.lines()}
 
-        logger.info(f"Analista: cause found: {cause.kind}")
-        return result
-
-    except Exception as e:
-        logger.error(f"Analista: explanation failed: {e}")
-        return {
-            "cause": CauseNoEvidence(
-                kind="no_evidence",
-                reason=f"El análisis no terminó: falló una herramienta o la conexión.",
-                queriesReviewed=[]
-            ).model_dump(),
-        }
+Devuelve el JSON del esquema. sentence es una sola frase de máximo 30 palabras; cada claim, una
+frase corta. Cita cada cifra por su ref (f1, f2...) en sentence_figures o en evidence[].figures, y
+escribe en el texto el placeholder {{0}}, {{1}} en ese orden. Nunca escribas una cifra en el texto."""
+    response = provider.generate_structured(
+        LLMStructuredRequest(
+            system_prompt=skill("analista", "contrato"),
+            user_prompt=prompt,
+            schema=CAUSE_SCHEMA,
+            temperature=0.0,
+            max_tokens=CAUSE_TOKENS,
+            thinking=True,
+        )
+    )
+    allowed = (*map(str, detection["entity"]), day)
+    cause = build_cause(response.parsed, ledger, list(ledger.queries), allowed)
+    logger.info("Analista: %s for %s:%s", cause["kind"], metric, entity)
+    return {"cause": cause, "same_cause_as": None, "queries": merged_queries(state, ledger)}

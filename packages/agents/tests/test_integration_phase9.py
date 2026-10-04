@@ -127,7 +127,7 @@ class TestOutputValidator:
 
         with pytest.raises(OutputValidationError) as exc_info:
             validator.validate_action(output)
-        assert exc_info.value.category == "domain"
+        assert exc_info.value.category == "schema"
 
     def test_validate_executed_action_valid(self):
         """Validate valid executed action."""
@@ -162,7 +162,7 @@ class TestOutputValidator:
 
         with pytest.raises(OutputValidationError) as exc_info:
             validator.validate_decision(output)
-        assert exc_info.value.category == "domain"
+        assert exc_info.value.category == "schema"
 
     def test_validate_rejection_classifier_valid(self):
         """Validate valid rejection classifier."""

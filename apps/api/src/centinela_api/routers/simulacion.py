@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import logging
-import uuid
 
 import psycopg
 from fastapi import APIRouter, Depends, Query
@@ -9,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
 from .. import bitacora, ciclo_vida, simulacion
-from ..agentes import API_METRICS, get_context, get_orchestrator, state_to_alert, status_path
+from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path
 from ..db import obtener_conexion
 from ..modelos import ActorAgent, AgentStep, SimulatedDay
 from ..sse import flujo
@@ -43,11 +42,11 @@ async def avanzar(
 
         try:
             ctx = get_context()
-            detections = [d for d in detect(ctx, day_str) if d.metric in API_METRICS]
+            detections = prioritized(detect(ctx, day_str), alertas_repo.ids(conn))
             orq = get_orchestrator()
 
             for detection in detections:
-                alert_id = f"alerta_{uuid.uuid4().hex[:16]}"
+                alert_id = alert_id_of(detection)
 
                 inicio = datetime.datetime.now(datetime.UTC).isoformat()
                 yield "step", AgentStep(
@@ -75,7 +74,16 @@ async def avanzar(
                             ActorAgent(agent="vigia"),
                             f"Alerta detectada: {alerta.title.text}",
                             nuevo_dia,
+                            alerta.pesos_at_risk.query_id,
                         )
+                        for query in state.get("queries") or []:
+                            bitacora.registrar(
+                                conn, alert_id, "evidence",
+                                ActorAgent(agent="analista"),
+                                f"{query['kpi']} el {query['dia']}: {query['consulta']}",
+                                nuevo_dia,
+                                query["queryId"],
+                            )
 
                     new_alert_ids.append(alert_id)
 

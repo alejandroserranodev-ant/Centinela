@@ -1,12 +1,12 @@
-# Output validation and the second orchestrator
+# Output validation
 
-This page covers `centinela_agents/output_validator.py` and `centinela_agents/orchestrator_v2.py`.
-The file keeps its historical name and sits beside [`AGENTS.md`](./AGENTS.md) because the team
-keeps the file structure; `AGENTS.md` is the level page and links here.
+This page covers `centinela_agents/output_validator.py`. The file keeps its historical name and sits
+beside [`AGENTS.md`](./AGENTS.md) because the team keeps the file structure; `AGENTS.md` is the
+level page and links here.
 
-**Nothing outside the tests imports `centinela_agents/orchestrator_v2.py`.** `apps/api` builds the orchestrator of
-[`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md), so neither the validator nor the counters of
-[`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md) run on a real alert.
+**Nothing outside the tests runs the validator.** Each leaf builds its own output with the models
+of [`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md) and refuses what does not build, as
+[`AGENTS.md`](./AGENTS.md#models) says.
 
 ## The validator
 
@@ -23,14 +23,6 @@ categories, carried by `OutputValidationError(category, message, output)`:
 
 With `strict` true a failure raises; with it false the validator logs a warning and returns
 `None`. The decision and classifier checks raise in either mode.
-
-## The second orchestrator
-
-`centinela_agents/orchestrator_v2.py:CentinelaOrchestratorV2` subclasses
-`CentinelaOrchestrator` with a `strict_validation` flag, and adds `start_with_metrics(...)` and
-`resume_with_metrics(alert_id, decision, collector)`, which validate the outputs in the state and
-record each agent's call. It estimates tokens from latency instead of reading the provider's
-`usage`, so the cost it records is not measured.
 
 ## Tests
 

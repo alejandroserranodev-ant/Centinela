@@ -18,19 +18,19 @@ logger = logging.getLogger(__name__)
 
 SENSITIVE_PATTERNS = {
     "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-    "phone": r"\b(?:\+\d{1,3}[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})\b",
+    "phone": r"\+\d{1,3}(?:[-.\s]?\d{2,4}){2,4}\b|\b\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
     "name": r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b",
     "id_passport": r"\b\d{8,10}[A-Z]?\b",
     "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
-    "api_key": r"sk-[a-zA-Z0-9]{20,}",
-    "token": r"ghp_[a-zA-Z0-9]{36,}",
+    "api_key": r"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}",
+    "token": r"ghp_[A-Za-z0-9]{30,}",
     "password": r"password['\"]?\s*[:=]\s*['\"]?[^\s'\"]+",
 }
 
 SECRET_PATTERNS = {
-    "openai_key": r"sk-[a-zA-Z0-9]{20,}",
-    "anthropic_key": r"sk-ant-[a-zA-Z0-9]{20,}",
-    "github_token": r"ghp_[a-zA-Z0-9]{36,}",
+    "openai_key": r"sk-(?!ant-)(?:proj-)?[A-Za-z0-9_-]{20,}",
+    "anthropic_key": r"sk-ant-[A-Za-z0-9_-]{20,}",
+    "github_token": r"ghp_[A-Za-z0-9]{30,}",
     "aws_access": r"AKIA[0-9A-Z]{16}",
 }
 
