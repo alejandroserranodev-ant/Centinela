@@ -8,6 +8,7 @@ from typing import Annotated, Literal, Mapping, Sequence
 from pydantic import Field, TypeAdapter
 
 from .schema import AGENT_STAGE, ROOT, Node, Strict, Tree, branches, index, level
+from .skills import actions_table
 from .validator import Grounds, capped_return, problems, resolved
 from .yaml_loader import load_yaml
 
@@ -260,7 +261,7 @@ def fingerprint(grounds: Grounds, growth: Growth) -> str:
             for name, kpi in grounds.catalog.kpis.items()
         },
         "growth": {"repetitions": dict(growth.repetitions), "caps": asdict(growth.caps)},
-        "skills": {name: (skills / name).read_text(encoding="utf-8") for name in files},
+        "skills": {name: actions_table(skills) if name == "estratega/acciones.md" else (skills / name).read_text(encoding="utf-8") for name in files},
     }
     return hashlib.sha256(json.dumps(read, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
 

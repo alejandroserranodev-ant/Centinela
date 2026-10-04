@@ -312,9 +312,11 @@ that breaks any row below, and a refused move never becomes a version a run walk
 | the evidence reached its count | `centinela_agents/growth.py:grow(tree, grounds, growth, rejections, consumed)` |
 
 `centinela_agents/expansion.py:fingerprint(grounds, growth)` digests everything the validator and
-the replay read: the base, the registry, the metrics, the KPI catalogue, the caps and repetitions, `skills/estratega/acciones.md`, the
-skills the base leaves load and `skills/analista/*.md`. A digest that differs from the one a
-version was built under says its criteria may have moved.
+the replay read: the base, the registry, the metrics, the KPI catalogue, the caps and repetitions,
+`skills/estratega/acciones.md`, the skills the base leaves load and `skills/analista/*.md`. A
+digest that differs from the one a version was built under says its criteria may have moved. It
+hashes the action table the validator holds, `centinela_agents/skills.py:actions_table(root)`,
+read once per process, so an edit to that table reaches both on the next start.
 
 A refused draft is not retried with the criterion named, because a drafter handed the same
 evidence drafts the same move; how `apps/api` records it is

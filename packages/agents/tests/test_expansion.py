@@ -10,6 +10,7 @@ from centinela_agents.catalog import Catalog, Kpi
 from centinela_agents.expansion import Branch, Caps, MOVE, Retire, Split, apply_move, cap_problems, entry_of, expansion_problems, fingerprint, layer_hash, load_growth, replay
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import Tree, Leaf, Node, Predicate, index, level
+from centinela_agents.skills import actions_table
 from centinela_agents.validator import load_grounds
 from centinela_agents.walk import Context, detect
 from support import ARBOL, DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, SKILLS, base_data, base_tree, grounds, node_of, reader_from, split_tree
@@ -206,11 +207,19 @@ def test_the_fingerprint_moves_when_the_catalog_changes():
 
 @pytest.mark.parametrize("name", ["estratega/acciones.md", "vigia/contrato.md", "analista/saldo_vencido.md", "analista/politicas.md"])
 def test_the_fingerprint_moves_when_a_skill_it_reads_changes(tmp_path, name):
+    unchanged, edited = skills_copy(tmp_path / "unchanged"), skills_copy(tmp_path / "edited")
+    (edited / name).write_text("changed\n" + (edited / name).read_text(encoding="utf-8"), encoding="utf-8")
+    assert digest(skills=unchanged) == digest() != digest(skills=edited)
+
+
+def test_the_fingerprint_hashes_the_action_table_the_validator_holds(tmp_path):
     skills = skills_copy(tmp_path)
-    assert digest(skills=skills) == digest()
-    with (skills / name).open("a", encoding="utf-8") as file:
-        file.write("\nchanged\n")
-    assert digest(skills=skills) != digest()
+    before = digest(skills=skills)
+    table = skills / "estratega" / "acciones.md"
+    table.write_text("changed\n" + table.read_text(encoding="utf-8"), encoding="utf-8")
+    assert digest(skills=skills) == before
+    actions_table.cache_clear()
+    assert digest(skills=skills) != before
 
 
 def test_the_fingerprint_moves_when_an_analyst_skill_is_added_or_removed(tmp_path):

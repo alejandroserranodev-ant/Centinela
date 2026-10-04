@@ -11,7 +11,7 @@ from .predicate import KPI_PATH, STATE_PATH
 from .graph import BOUND_NODES
 from .severity import severity_problems
 from .schema import AGENT_DECISIONS, AGENT_STAGE, CHAT_ROOT, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, live, reachable, resolve, stage_of
-from .skills import action_rows
+from .skills import action_rows, actions_table
 from .state import STATE_FIELDS
 from .yaml_loader import load_yaml
 
@@ -400,7 +400,7 @@ def coverage_problems(tree: Tree, grounds: Grounds) -> list[str]:
         and node.id in alive
         and node.retirado is None
     }
-    listed = (grounds.skills / "estratega" / "acciones.md").read_text(encoding="utf-8").split("\n## ")[0]
+    listed = actions_table(grounds.skills)
     found: list[str] = []
     for metric in grounds.metrics.names:
         if metric not in read:
