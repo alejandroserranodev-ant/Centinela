@@ -32,7 +32,8 @@ def registrar(conn: psycopg.Connection, consultas: Iterable[Any]) -> None:
             continue
         conn.execute(
             "INSERT INTO api.consultas (query_id, kpi, dia, consulta, fuente, filas) VALUES (%s, %s, %s, %s, %s, %s) "
-            "ON CONFLICT (query_id) DO NOTHING",
+            "ON CONFLICT (query_id) DO UPDATE SET filas = EXCLUDED.filas "
+            "WHERE jsonb_array_length(api.consultas.filas) = 0 AND jsonb_array_length(EXCLUDED.filas) > 0",
             (
                 consulta["queryId"], consulta["kpi"], consulta["dia"], consulta["consulta"], consulta.get("fuente", "kernel"),
                 Jsonb(list(consulta.get("filas") or []), dumps=lambda filas: json.dumps(filas, default=_plano)),
