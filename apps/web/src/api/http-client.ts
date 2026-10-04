@@ -20,6 +20,7 @@ import type {
   Session,
   Settings,
   SimulatedDay,
+  TreeExpansion,
 } from './types';
 
 export const STATUS_ESTADO: Record<AlertStatus, string> = {
@@ -162,6 +163,17 @@ export async function getSettings(): Promise<Settings> {
 
 export async function saveSettings(next: Settings): Promise<Settings> {
   return fetchJson<Settings>(`${API_BASE_URL}/configuracion`, { method: 'PUT', body: JSON.stringify(next) });
+}
+
+export async function listExpansions(): Promise<TreeExpansion[]> {
+  return fetchJson<TreeExpansion[]>(`${API_BASE_URL}/arbol/expansiones`);
+}
+
+export async function retireExpansion(id: string, reason: string): Promise<TreeExpansion> {
+  return fetchJson<TreeExpansion>(`${API_BASE_URL}/arbol/expansiones/${encodeURIComponent(id)}/retiro`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function listBitacora(filter: LogFilter = {}): Promise<LogEvent[]> {

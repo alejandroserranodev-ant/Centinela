@@ -21,6 +21,7 @@ import type { ActionType, AutonomyLevel, Settings as SettingsData, WatchedMetric
 import { canConfigure } from '../roles';
 import { useSession } from '../state/Session';
 import { useSimulation } from '../state/Simulation';
+import { Expansions } from './Expansions';
 
 const ACTION_TYPES: { type: ActionType; name: string }[] = [
   { type: 'email_draft', name: 'Borrador de correo' },
@@ -240,6 +241,9 @@ export function Settings() {
               ))}
             </div>
           </div>
+        </ArenaTab>
+        <ArenaTab value="tree" label="Árbol de decisión">
+          <Expansions allowed={allowed} />
         </ArenaTab>
       </ArenaTabs>
       {allowed ? (
