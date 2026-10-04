@@ -14,9 +14,7 @@ is a generator `apps/api` drives in its own process. `uv run pytest` holds the t
 with stub leaves, and the leaves with a mocked provider and kernel; `uv run pytest -m modelo` runs
 the five agents against OpenAI and the kernel. What is decided, not built: log events beyond
 `same_cause_dropped`, a policy search in the chat, and the drafts of self-expansion other than
-`Estratega`'s. Before each day run, the drafter of self-expansion grows the tree in code, and
-`apps/api` persists each version. Each section that states one opens with the marker. How the
-tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
+`Estratega`'s. Each section that states one opens with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
 instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
 each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md); how a provider
 is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).

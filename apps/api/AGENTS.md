@@ -207,7 +207,7 @@ under decisions and roles, and an action type at `inform` cannot be approved.
 **`api.arbol_versiones` holds every version of the client's tree as the move that made it**, keyed
 by the client, `src/centinela_api/arboles.py:CLIENTE`, each with its `origen`, its parent, the agent
 or the person, the alerts that drafted it, the base's `version` and hash, the hash of L0 and L1 and
-the tree it yields. A version's id is the `Tree.version` the run walks and each alert stores. What
+the tree it yields, with the simulated day and the real time it was written. A version's id is the `Tree.version` the run walks and each alert stores. What
 a move is, what refuses it and what the drafter returns is
 [`../../packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md#how-the-tree-grows).
 
@@ -216,7 +216,7 @@ a move is, what refuses it and what the drafter returns is
 | `base` | a merged base replaced the one the newest version was built on |
 | `expansion` | a move the drafter returned passed its criteria |
 | `retiro` | a person retired an expansion |
-| `descartada` | a draft the criteria refused, or a move a merged base refuses; it carries its move and its evidence, and no run walks it |
+| `descartada` | a draft the criteria refused, which carries its move and its evidence; or a move a merged base refuses, which carries its move and names, in `retira`, the row it drops, whose evidence stays on that row. No run walks it |
 
 - **A merged base replays the client's moves.** `src/centinela_api/arboles.py:vigente(conn, grounds, growth, dia)`
   returns the newest version while the base it was built on is the base in the tree; otherwise it

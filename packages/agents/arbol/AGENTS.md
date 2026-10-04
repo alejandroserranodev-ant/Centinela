@@ -39,8 +39,8 @@ free text, and no ISO clause the registry holds names the controls against promp
 text is public at genai.owasp.org, so the reviewer checks the strategy's number there. Like an ISO
 clause, it founds structure, never a threshold.
 
-**A client's version of the tree is not a file**: `apps/api` keeps it as the moves of its
-expansions replayed over this base and hands it to each run, because no agent writes anywhere
+**A client's version of the tree is not a file**: `apps/api` keeps it, built from the moves of its
+expansions over this base, and hands it to each run, because no agent writes anywhere
 ([`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions)).
 `centinela_agents/graph.py:Compiler` caches a graph per version and content.
 
@@ -309,7 +309,7 @@ that breaks any row below, and a refused move never becomes a version a run walk
 | the version's longest path and the nodes of each stage stay under the caps of `crecimiento.yaml`; a retirement is not held to them, because it only removes live nodes and a cap must never keep a person from retiring | `centinela_agents/expansion.py:cap_problems(tree, caps)` |
 | the evidence reached its count | `centinela_agents/growth.py:grow(tree, grounds, growth, rejections, consumed)` |
 
-A refused draft is never drafted again with the criterion named, because a drafter handed the same
+A refused draft is not retried with the criterion named, because a drafter handed the same
 evidence drafts the same move; how `apps/api` records it is
 [`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions).
 
@@ -355,9 +355,8 @@ small model reads whole. From `packages/agents`, this prints the base's figures:
 uv run python -c "from collections import Counter; from pathlib import Path; from centinela_agents.expansion import depth; from centinela_agents.schema import Tree, index; from centinela_agents.yaml_loader import load_yaml; t = Tree.model_validate(load_yaml(Path('arbol/base.yaml'))); print(depth(index(t)), Counter(n.id.split('.')[0] for n in t.nodos if n.hoja is None))"
 ```
 
-**Each version records** its parent, the client, the move, the agent or the person, the alerts
-that drafted it, the hash of L0 and L1, `centinela_agents/expansion.py:layer_hash(tree)`, and the
-simulated and real dates; `apps/api` keeps it ([`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions)).
+`apps/api` records each version with the hash of its L0 and L1,
+`centinela_agents/expansion.py:layer_hash(tree)` ([`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions)).
 
 ## Adding to the tree
 
