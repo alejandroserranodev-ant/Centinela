@@ -1,7 +1,7 @@
 # The orchestrator's cases of evals/AGENTS.md that need no apps/api and no model: the tree is
-# compiled with stub leaves and a stub KPI reader, and each test names its case. The cases that
-# need apps/api's record (a second avanzar, the order of a day, a reason handed to the next run)
-# are not here.
+# compiled with stub leaves and a stub KPI reader, and each test names its case. The order of a
+# day, the coverage by earlier alerts and the verdicts are in tests/test_day.py; a second
+# avanzar and a reason handed to the next run need apps/api's record and are not here.
 import pytest
 
 from centinela_agents.catalog import Catalog, Kpi

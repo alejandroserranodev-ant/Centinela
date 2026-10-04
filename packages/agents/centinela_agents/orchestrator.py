@@ -42,6 +42,7 @@ from .agents.estratega import propose_actions
 from .agents.orquestador import classify_rejection
 from .agents.vigia import redact_title
 from .catalog import KernelCall
+from .day import run_day
 from .evidence import Sources, call_from_reader
 from .graph import Compiler, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
 from .llm_provider import LLMProvider
@@ -331,3 +332,6 @@ class CentinelaOrchestrator:
             "failures": state.get("failures") or [],
             "costs": state.get("costs") or [],
         }
+
+    def run_day(self, ctx: Context, day: str, *, earlier=(), watched=None, limit: int = 3, cause_rejections=None, proposal_rejections=None):
+        return run_day(self.graph, ctx, day, earlier=earlier, watched=watched, limit=limit, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=self.tracer)
