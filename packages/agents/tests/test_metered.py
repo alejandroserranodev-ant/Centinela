@@ -1,6 +1,11 @@
 # The metered provider: one retry on a timeout, a connection error or a refused output, the cost
-# of each call under its agent, the token cap of an alert, and a cached answer charged nothing.
+# of each call under its agent, the token cap of an alert, a cached answer charged nothing, and no
+# call at all outside a masking scope.
 import pytest
+
+from centinela_tools.masking import Masking
+
+from centinela_agents import privacy
 
 from centinela_agents.failures import TokenCapReached
 from centinela_agents.graph import REASONS, awaiting_decision, start_alert
@@ -38,7 +43,7 @@ def reply(prompt=100, completion=20, cached=False):
 @pytest.mark.parametrize("error", [TimeoutError("lento"), ConnectionError("caído"), ValueError("no es JSON")])
 def test_a_call_is_retried_once_then_answers(error):
     inner = Scripted(error, reply())
-    with metering("analista", 0, None) as meter:
+    with privacy.scope(Masking()), metering("analista", 0, None) as meter:
         MeteredProvider(inner).generate_text(ASK)
     assert inner.calls == 2 and meter.attempts == 2
     assert meter.cost() == {"analista": {"prompt_tokens": 100, "completion_tokens": 20, "calls": 1, "cached": 0}}
@@ -46,14 +51,14 @@ def test_a_call_is_retried_once_then_answers(error):
 
 def test_a_second_failure_raises():
     inner = Scripted(TimeoutError("uno"), TimeoutError("dos"))
-    with metering("analista", 0, None) as meter, pytest.raises(TimeoutError):
+    with privacy.scope(Masking()), metering("analista", 0, None) as meter, pytest.raises(TimeoutError):
         MeteredProvider(inner).generate_text(ASK)
     assert meter.attempts == 2
 
 
 def test_a_cached_answer_is_charged_nothing_and_never_reaches_the_cap():
     inner = Scripted(reply(cached=True), reply(cached=True))
-    with metering("vigia", 499, 500) as meter:
+    with privacy.scope(Masking()), metering("vigia", 499, 500) as meter:
         provider = MeteredProvider(inner)
         provider.generate_text(ASK)
         provider.generate_text(ASK)
@@ -62,7 +67,7 @@ def test_a_cached_answer_is_charged_nothing_and_never_reaches_the_cap():
 
 def test_a_call_past_the_cap_raises_before_reaching_the_model():
     inner = Scripted(reply(prompt=400, completion=200), reply())
-    with metering("vigia", 0, 500) as meter:
+    with privacy.scope(Masking()), metering("vigia", 0, 500) as meter:
         provider = MeteredProvider(inner)
         provider.generate_text(ASK)
         with pytest.raises(TokenCapReached):
@@ -72,7 +77,15 @@ def test_a_call_past_the_cap_raises_before_reaching_the_model():
 
 def test_with_no_meter_the_provider_calls_once_and_counts_nothing():
     inner = Scripted(reply())
-    assert MeteredProvider(inner).generate_text(ASK).text == "ok"
+    with privacy.scope(Masking()):
+        assert MeteredProvider(inner).generate_text(ASK).text == "ok"
+
+
+def test_a_call_outside_a_masking_scope_never_reaches_the_model():
+    inner = Scripted(reply())
+    with metering("vigia", 0, None), pytest.raises(privacy.Unmasked):
+        MeteredProvider(inner).generate_text(ASK)
+    assert inner.calls == 0
 
 
 def test_costs_add_by_agent():

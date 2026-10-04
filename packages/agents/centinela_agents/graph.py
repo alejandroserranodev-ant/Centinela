@@ -3,10 +3,13 @@ import logging
 import re
 from typing import Any, Callable, Iterator, Mapping
 
-from langgraph.config import get_stream_writer
+from langgraph.config import get_config, get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
+from centinela_tools.masking import Masking
+
+from . import privacy
 from .catalog import Catalog, KpiReader
 from .failures import SchemaRefused, StepTimeout, TokenCapReached
 from .metered import metering, spent
@@ -22,7 +25,7 @@ Classifier = Callable[[Mapping[str, Any]], str]
 DECISION_KINDS = ("approve", "edit", "reject", "request_changes")
 REJECTION_TARGETS = ("causa", "propuesta", "ambos", "ninguno")
 DECIDED_STATUS = {"approve": "aprobada", "edit": "aprobada", "reject": "rechazada"}
-ACCUMULATED = ("camino", "transitions", "failures", "events")
+ACCUMULATED = ("camino", "transitions", "failures", "events", "prompts")
 REASONS = {
     "timeout": "El análisis no terminó a tiempo.",
     "token_cap": "El análisis no terminó: la alerta agotó el trabajo que tiene asignado.",
@@ -169,7 +172,9 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
         write({**step, "status": "running"})
         given = leaf_input(leaf, state)
         cleared = {key: None for key in LEAF_OUTPUTS.get((leaf.agente, leaf.decision), ())}
-        with metering(leaf.agente, spent(state.get("cost")), token_cap) as meter:
+        masking = privacy.of_config(get_config())
+        privacy.register_state(masking, ctx.catalog, state)
+        with privacy.scope(masking), metering(leaf.agente, spent(state.get("cost")), token_cap) as meter:
             try:
                 update, failures = {**cleared, **function(given)}, []
             except Exception as error:
@@ -177,7 +182,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
                 update = {**cleared, **fallback(leaf, state, error, ctx)}
                 failures = [{"step": node.id, "kind": failure_kind(error), "attempts": meter.attempts}]
         write({**step, "status": "done", "failed": bool(failures)})
-        return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures, "cost": meter.cost()})
+        return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures, "cost": meter.cost(), "prompts": meter.prompts})
 
     return run
 
@@ -216,7 +221,9 @@ def end_node(end_id: str, classify: Classifier):
         if end_id == "fin.ejecutada":
             return {"fin": end_id, "status": "ejecutada", "transitions": [[alert, "ejecutada"]]}
         if end_id == "fin.rechazada":
-            return {"fin": end_id, "rejection_target": classified(classify, state)}
+            with metering("orquestador", 0, None) as meter:
+                target = classified(classify, state)
+            return {"fin": end_id, "rejection_target": target, "prompts": meter.prompts}
         return {"fin": end_id}
 
     return run
@@ -292,8 +299,9 @@ def thread(alert_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": alert_id}}
 
 
-def run_config(alert_id: str, tracer=None) -> dict[str, Any]:
-    return {**(dict(tracer.config(alert_id)) if tracer is not None else {}), **thread(alert_id)}
+def run_config(alert_id: str, tracer=None, masking: Masking | None = None) -> dict[str, Any]:
+    traced = dict(tracer.config(alert_id)) if tracer is not None else {}
+    return {**traced, "configurable": {**(traced.get("configurable") or {}), **privacy.configured(masking).get("configurable", {}), **thread(alert_id)["configurable"]}}
 
 
 def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, arbol_version=None) -> dict[str, Any]:
@@ -317,14 +325,14 @@ def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts,
     }
 
 
-def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None) -> Iterator[dict[str, Any]]:
+def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None, masking: Masking | None = None) -> Iterator[dict[str, Any]]:
     initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, arbol_version)
     fresh(graph, alert_id)
-    yield from graph.stream(initial, run_config(alert_id, tracer), stream_mode="custom")
+    yield from graph.stream(initial, run_config(alert_id, tracer, masking or Masking()), stream_mode="custom")
 
 
-def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None) -> dict[str, Any]:
-    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer, arbol_version=arbol_version):
+def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None, masking: Masking | None = None) -> dict[str, Any]:
+    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer, arbol_version=arbol_version, masking=masking):
         pass
     return graph.get_state(thread(alert_id)).values
 
@@ -368,5 +376,5 @@ def resume(graph, alert_id: str, decision: Mapping[str, Any], tracer=None) -> di
     problem = decision_problem(decision, snapshot.values)
     if problem is not None:
         raise ResumeRefused(f"{alert_id}: {problem}")
-    graph.invoke(Command(resume=dict(decision)), run_config(alert_id, tracer))
+    graph.invoke(Command(resume=dict(decision)), run_config(alert_id, tracer, Masking()))
     return graph.get_state(thread(alert_id)).values

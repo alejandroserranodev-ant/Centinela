@@ -39,7 +39,8 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/day.py` | the alert id, the coverage by earlier alerts, the order of a day and the day run |
 | `centinela_agents/expansion.py` | the three moves of self-expansion, their criteria, the caps and the replay of a client's moves over the base |
 | `centinela_agents/growth.py` | the drafter of self-expansion: `Estratega`'s split from repeated rejections of one action row |
-| `centinela_agents/metered.py` | the retry, the cost and the token cap of a model call |
+| `centinela_agents/metered.py` | the retry, the cost and the token cap of a model call, and its masking |
+| `centinela_agents/privacy.py` | the masking scope a run opens and what it registers from a state ([masking every prompt](#masking-every-prompt)) |
 | `centinela_agents/tracing.py` | the tracer the host injects |
 | `centinela_agents/graph.py` | the compilers of the alert graph and of the chat graph, the interrupt, the resume, the fallbacks |
 | `centinela_agents/failures.py` | the exceptions that name a leaf's failure |
@@ -134,11 +135,37 @@ product's path.
   evidence, and one to three actions with an eight-word title, each call with its `max_tokens`,
   because each token is paid and waited for.
 
-> **Limit.** Every prompt, with the alert's figures and entity identifiers, reaches OpenAI's
-> servers; only the prompt of an email draft is masked. The kernel's columns carry identifiers and
-> figures and no person's name, which bounds what leaves. The key lives in the ignored
+> **Limit.** Every prompt, with the alert's figures, reaches OpenAI's servers; its personal values
+> leave as placeholders ([masking every prompt](#masking-every-prompt)). The key lives in the ignored
 > `.env.local`, never in the versioned `.env`, because the repository is public and a key pushed to
 > it is revoked.
+
+### Masking every prompt
+
+**Every model call is masked at the provider**, because it is the one place every prompt builder
+passes, so no builder can forget a value. `centinela_agents/metered.py:MeteredProvider(inner)`
+refuses a call made outside a masking scope with `centinela_agents/privacy.py:Unmasked`, replaces
+in the system and the user prompt every value the scope's mapping holds
+([`packages/tools`](../tools/AGENTS.md#masking)), records the masked prompt, and fills the
+placeholders of the answer back before the leaf reads it, so every check of a leaf reads what it
+read before masking. A placeholder the mapping lacks stays as written.
+
+- **A run opens one mapping**: `centinela_agents/day.py:run_day(graph, ctx, day)` registers the
+  entity of every earlier alert and every detection of the day, and hands the mapping to the graph
+  through `centinela_agents/graph.py:run_config(alert_id, tracer, masking)`, whose `configurable`
+  LangGraph never checkpoints for an object. A resume and a chat question open their own, and the
+  rejection classifier its own in
+  `centinela_agents/orchestrator.py:rejection_target(provider, state, catalog)`.
+- **Each step teaches the mapping what it may write**: `leaf_node` registers the state through
+  `centinela_agents/privacy.py:register_state(masking, catalog, state)`, and
+  `centinela_agents/evidence.py:Ledger.consult(kpi, day)` every row it reads.
+- **A typed id is resolved before the model reads it**: when the question holds a token with a
+  digit, `centinela_agents/agents/chat.py:typed_entities(question, sources, day)` reads the rows
+  of each KPI keyed by a personal column, so `clasificar` sends the id's placeholder and gets the id
+  back. A placeholder no row holds is spelled by no question, so it selects no row.
+- **The prompts travel in the state**, as `prompts`, and
+  `centinela_agents/orchestrator.py:CentinelaOrchestrator.resume(alert_id, decision)` returns the
+  ones its resume added as `resumed_prompts`, which `apps/api` logs.
 
 **A local model, on a machine that can run one**, is admitted only when `ollama show <model>` lists
 `tools` among its capabilities, from the Qwen3 family, one loaded at a time, because Ollama pays a
@@ -263,10 +290,11 @@ and the only context is the alert it is anchored to.
   reaches the gate, an orchestrator write or another agent's leaf
   ([`arbol/AGENTS.md`](./arbol/AGENTS.md#the-chat)).
 
-> **Limit.** `centinela_agents/security.py:mask_data(text, placeholder_prefix)` masks any two
-> capitalized words as a name, so the answer is masked with its email, key, token, password and card patterns alone,
-> `centinela_agents/agents/chat.py:masked(text)`; a person's name written in a question reaches the
-> model and the answer.
+> **Limit.** A name a person types reaches the model unless a row of the run carries it, because
+> the mapping masks only what rows hold. `centinela_agents/agents/chat.py:masked(text)` masks
+> email, key, token, password and card patterns in the question and the answer, never a name,
+> since `centinela_agents/security.py:mask_data(text, placeholder_prefix)` masks any two
+> capitalized words as one.
 
 > **Decided, not built.** The intent `politica` ends without evidence until a leaf can call
 > `buscar_politica`.
@@ -306,7 +334,7 @@ and the only context is the alert it is anchored to.
 - **Ceiling: no discretion.** It passes the approved `parameters` unchanged. The stubs of
   `centinela_agents/action_tools.py` name each draft by its inputs,
   `centinela_agents/action_tools.py:stable_id(prefix, parts)`, so a second run names the same
-  draft. The prompt of an email draft is masked by `centinela_agents/security.py:mask_data(text, placeholder_prefix)`.
+  draft. The prompt of an email draft passes `centinela_agents/security.py:mask_data(text, placeholder_prefix)`, then the provider's mapping, which masks the recipient's id.
 - **Result:** a Spanish sentence code composes from the parameters, plus an email's body.
 - **Never:** chooses between actions, recomputes, adds a recipient, runs without a recorded decision.
 
@@ -397,6 +425,7 @@ declare is dropped without a trace, so the leaves return none.
 | `camino`, `next_node`, `failures`, `events` | the orchestrator | `apps/api`; `next_node` the edges |
 | `queries`: the detection's reading, then each `kpi_consultar` a leaf ran, with its `queryId`, KPI, day and SQL | `start_alert`, then the leaves of `Vigía`, `Analista` and `Estratega` | the fallback of `explicar`, for `queriesReviewed`; `apps/api`, which logs each as `evidence` |
 | `cost`: by agent, the prompt tokens, completion tokens, calls and cached answers | each leaf node | `apps/api`, which persists it |
+| `prompts`: each masked prompt, its agent, system and user text | each leaf node and the rejection's end | `apps/api`, which logs each as `prompt` |
 
 ### How a step runs
 
@@ -529,9 +558,8 @@ checks that a decision's role may make it and that an edit keeps the action's ke
 resume, keeps the rejection reasons, validates and persists each transition the orchestrator
 proposes, stores the checkpoint, persists cost, persists the tree's versions and the rejections,
 streams the steps and owns the `bitácora`: its
-page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action and
-masking personal data are decided to be `packages/tools`'; `centinela_agents/action_tools.py` and
-`centinela_agents/security.py` hold them in this package instead.
+page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action is decided to be
+`packages/tools`'; `centinela_agents/action_tools.py` holds it in this package instead.
 
 ## Coverage: every metric has one owner per step
 
@@ -547,7 +575,7 @@ does not load with a gap ([`arbol/AGENTS.md`](./arbol/AGENTS.md#the-validator)).
 agents, closed:** a person's question belongs to `Chat`; pesos at risk belong to `Vigía` and what an action
 recovers to `Estratega`; two alerts with one cause are marked by `Analista` and merged by the
 orchestrator; a policy passage that gives orders is reported, never obeyed, by `Analista` and
-`Estratega`; personal data is masked in `packages/tools` before any agent sees it.
+`Estratega`; personal data is masked by the mapping of `packages/tools` before any model reads it.
 
 ## Rules of this level
 

@@ -33,9 +33,8 @@ implement.
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/arboles.py` | the tree's versions: the store, the replay when what the validator reads changes, the growth of a day and the retirement of an expansion |
 | `src/centinela_api/rechazos.py` | records each rejection the classifier targeted, with its metric and the actions it rejected, and lists them as evidence |
-| `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
 | `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `bandeja`, `configuracion`, `arbol`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py`, `tests/test_permisos.py`, `tests/test_configuracion.py`, `tests/test_arboles.py` and `tests/test_arbol.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py`, `tests/test_bitacora.py`, `tests/test_permisos.py`, `tests/test_configuracion.py`, `tests/test_arboles.py` and `tests/test_arbol.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -410,12 +409,6 @@ left off the gate leaves only the rejection, which the row says.
 - **An edit keeps the keys of the action's `parameters`, adding none and dropping none**, because
   `Ejecutor` passes them unchanged. `aplicar` merges the edit into them, so a new key passes.
 
-**Personal data reaches the models unmasked.** `src/centinela_api/masking.py:mask_dict_for_model(data)`
-replaces client and vendor ids and names with a hash-suffixed placeholder, the same for the same
-input, but no route calls it, and `mask_text_evidence` replaces only the pairs it is handed. It
-costs the challenge's Ley 1581 requirement on every model call, and is paid when the data a model
-reads goes through it, in this level or in `packages/tools`, whose page owns masking.
-
 ## The inbox totals
 
 **The API computes the inbox totals**: `src/centinela_api/resumen.py:calcular(conn)` runs three
@@ -448,6 +441,7 @@ figures its detail's placeholders point to.
 | `evidence`, from the chat | `/chat`, one row per query the chat ran |
 | `answer` | `/chat`, the text of an answer with its figures and its first figure's `queryId` |
 | `costo` | `/chat`, one per model step, through `src/centinela_api/bitacora.py:registrar_costo(conn, alerta_id, actor, detalle, dia_simulado)`; `GET /bitacora` never serves it |
+| `prompt` | `avanzar`, a resume and `/chat`, one per model call, the masked prompt the model received, through `src/centinela_api/bitacora.py:registrar_prompts(conn, alerta_id, prompts, dia_simulado)`, so an audit reads what left, in a savepoint of its own, so a failed write is logged and never undoes the alert or the decision; `GET /bitacora` never serves it |
 | `refusal` | `/chat`, a question the screen flagged, one outside the chat's use, or one asking to act |
 | `configuracion` | `PUT /configuracion`, the person who saved and each change, with no alert |
 | `arbol` | the growth of a day, under the agent whose move it is, a move refused by the criteria or dropped by a replay, and a retirement, under the person, each with no alert |

@@ -138,6 +138,7 @@ def _registrar(conn, corrida: AlertRun, dia: datetime.date, day_str: str, nota: 
             alerta, unidas = _absorber(conn, alerta, corrida.absorbed, day_str, dia)
         alertas_repo.fijar_entidad(conn, alert_id, detection.entity)
         alertas_repo.fijar_costo(conn, alert_id, state.get("cost") or {})
+        bitacora.registrar_prompts(conn, alert_id, state.get("prompts") or [], dia)
         alertas_repo.fijar_version(conn, alert_id, state.get("arbol_version"))
         consultas.registrar(conn, state.get("queries") or [])
         for query in state.get("queries") or []:

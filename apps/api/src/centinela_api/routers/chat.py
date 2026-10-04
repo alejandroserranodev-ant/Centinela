@@ -115,6 +115,7 @@ async def chat(
             bitacora.registrar(conn, pregunta.alert_id, tipo, agente, detalle, dia, figuras[0].query_id if figuras else None, figuras)
             for costo in respuesta.get("costs") or []:
                 bitacora.registrar_costo(conn, pregunta.alert_id, agente, costo_de(costo), dia)
+            bitacora.registrar_prompts(conn, pregunta.alert_id, respuesta.get("prompts") or [], dia)
 
         yield "end", ChatMessage(
             id=f"msg_{uuid.uuid4().hex[:8]}",

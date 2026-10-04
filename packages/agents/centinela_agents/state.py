@@ -57,6 +57,7 @@ class AlertState(TypedDict, total=False):
     transitions: Annotated[list, operator.add]
     failures: Annotated[list, operator.add]
     events: Annotated[list, operator.add]
+    prompts: Annotated[list, operator.add]
     cost: Annotated[dict, add_costs]
 
 
@@ -74,6 +75,7 @@ class ChatState(TypedDict, total=False):
     camino: Annotated[list, operator.add]
     failures: Annotated[list, operator.add]
     costs: Annotated[list, operator.add]
+    prompts: Annotated[list, operator.add]
     cost: Annotated[dict, add_costs]
 
 

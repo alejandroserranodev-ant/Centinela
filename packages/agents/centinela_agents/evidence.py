@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from . import privacy
 from .catalog import Catalog, KernelCall, KpiReader
 from .metrics import Metrics
 from .predicate import is_kpi, kpi_column
@@ -98,6 +99,10 @@ class Ledger:
             raise RuntimeError(f"the kernel refused {kpi} on {day}: {answer['rechazado']['guarda']}: {answer['rechazado']['detalle']}")
         qid = query_id(answer["consulta"], day)
         rows = list(answer["filas"])
+        masking = privacy.current.get()
+        if masking is not None:
+            for row in rows:
+                masking.register_row(row)
         self.queries[qid] = {"queryId": qid, "kpi": kpi, "dia": day, "consulta": answer["consulta"], "filas": [dict(row) for row in rows[:SHOWN_ROWS]]}
         return qid, rows
 

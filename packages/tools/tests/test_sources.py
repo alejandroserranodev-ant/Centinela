@@ -85,6 +85,7 @@ def test_an_unchanged_copy_of_fuentes_loads(tmp_path):
         pytest.param(lambda d: d["fuentes"]["pedidos"]["dimensiones"].append("pedidos.estado"), id="a-fuga-dimension"),
         pytest.param(lambda d: d["fuentes"]["facturas"]["cierres"]["pagada"].update(fecha="valor"), id="a-closing-without-event"),
         pytest.param(lambda d: d["tablas"]["facturas"]["columnas"].update(dia="text"), id="a-column-named-dia"),
+        pytest.param(lambda d: d["tablas"]["vendedores"]["personales"].append("nombre"), id="a-personal-column-not-readable"),
     ],
 )
 def test_an_inconsistent_fuentes_fails_the_load(change, tmp_path):

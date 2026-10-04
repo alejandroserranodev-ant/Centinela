@@ -5,6 +5,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Generator, Iterable, Mapping, Sequence
 
+from centinela_tools.masking import Masking
+
+from . import privacy
 from .catalog import Catalog
 from .metrics import Metrics
 from .graph import STEP_LABELS, stream_alert, thread
@@ -132,6 +135,9 @@ def run_day(graph, ctx: Context, day: str, *, earlier: Iterable[Earlier] = (), w
     found = [detection for detection in detect(ctx, day) if (watched is None or detection.metric in watched) and not covered(detection, earlier)]
     queue = {alert_id(detection.metric, detection.entity, day): detection for detection in ordered(found, day, limit)}
     candidates = {alert.alert_id: dict(alert.brief) for alert in earlier if alert.status == MERGEABLE}
+    masking = Masking()
+    for held in [*earlier, *found]:
+        privacy.register_entity(masking, ctx.catalog, held.metric, held.entity)
     while queue:
         current, detection = next(iter(queue.items()))
         del queue[current]
@@ -148,6 +154,7 @@ def run_day(graph, ctx: Context, day: str, *, earlier: Iterable[Earlier] = (), w
                     cause_rejections=(cause_rejections or {}).get(detection.metric, ()),
                     proposal_rejections=(proposal_rejections or {}).get(detection.metric, ()),
                     tracer=tracer,
+                    masking=masking,
                     arbol_version=ctx.version,
                 ):
                     yield step_of(written, detection)

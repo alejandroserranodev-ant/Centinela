@@ -5,9 +5,10 @@ exactly what a tool here exposes and nothing else, which is what makes an acting
 buy.
 
 **What runs is the KPI kernel**: the compiler, its guards, the four kernel tools behind
-`centinela_tools/kernel.py:CONTRACT`, and the generator of `data/sql/05_kpis.generated.sql`.
+`centinela_tools/kernel.py:CONTRACT`, and the generator of `data/sql/05_kpis.generated.sql`; and
+the masking of personal data before a model reads it.
 **What is decided and not built** is every other tool and what surrounds them: the MCP servers
-over stdio, policy search with `bge-m3`, personal-data masking in the SQL tool, the impact
+over stdio, policy search with `bge-m3`, the impact
 calculator `calcular_impacto` and its formulas, the actions and their idempotency, and the writer
 of the approved-KPI file `CENTINELA_KPIS_APROBADOS`. Each section about them opens with the marker
 the guide uses for design with no code.
@@ -22,11 +23,13 @@ the guide uses for design with no code.
 | `centinela_tools/tools.py` | the catalogue and the kernel's four tools |
 | `centinela_tools/kernel.py` | the kernel's contract: the JSON Schema of each of its four tools, the one call that checks arguments against it and dispatches, and the kernel built from the environment |
 | `centinela_tools/generate.py` | writes `data/sql/05_kpis.generated.sql` |
+| `centinela_tools/masking.py` | the catalogue of personal columns and a run's mapping of their values to placeholders ([masking](#masking)) |
 | `centinela_tools/refusal.py`, `centinela_tools/settings.py`, `centinela_tools/paths.py` | the closed list of guards, the settings read from the environment, and where the files of `data/` are |
 | `tests/support.py` | what the tests share: a parser of `data/sql/01_esquema.sql` and the fixture KPIs of `tests/fixtures/metricas.yaml` |
 | `tests/conftest.py` | skips the tests marked `db` unless `CENTINELA_TEST_DSN` is set, and applies the generator's roles, grants and functions to the scratch database once per session |
 | `tests/test_language.py`, `tests/test_sources.py`, `tests/test_compiler.py`, `tests/test_primitives.py` | one planted violation per bound of the language, per rule of `data/kernel/fuentes.yaml` and per refusal of the compiler, with no database |
 | `tests/test_kernel.py`, `tests/test_tools.py`, `tests/test_tools_db.py` | the contract, the catalogue, and each tool and guard, without and with the scratch database |
+| `tests/test_masking.py` | the mapping: one placeholder per value in a run and another across runs, no digit, whole tokens, an unknown placeholder left as written |
 | `tests/test_generate.py` | **a gate**: it fails when `data/sql/05_kpis.generated.sql` differs from what the generator writes from the tree |
 | `tests/test_roles.py` | **a gate**: the law that no agent changes a database, held against the scratch database ([roles and grants](../../data/AGENTS.md#rules-of-this-level)) |
 | `tests/test_parity.py` | **a gate**: [base-KPI parity](#base-kpi-parity), against the scratch database |
@@ -107,14 +110,29 @@ itself. `docker stop centinela-kernel-test` removes the container.
 
 ### Masking
 
-> **Decided, not built.**
+**No personal value reaches a model.** `centinela_tools/masking.py:Masking(columns, salt)` stands
+a placeholder such as `CLIENTE_QKZTBW` for each value of the columns `data/kernel/fuentes.yaml`
+lists under `personales` ([the data page](../../data/AGENTS.md)), wherever a prompt carries one.
+An id is masked with the name because it resolves to the name on screen. Where a run opens its mapping and where it masks is
+[`../agents/AGENTS.md`](../agents/AGENTS.md#masking-every-prompt).
 
-**Personal data is masked in the SQL tool**, before a result reaches any agent: a seller is
-`vendedor_id`, never a name, because sellers are people and customers and suppliers are
-companies. `apps/web` resolves an id to a name for the person who reads it. What holds in the tree
-already: `data/kernel/fuentes.yaml` excludes `vendedores.nombre`, so no KPI reads it, and no view
-of `data/sql/03_capa_semantica.sql` or `data/sql/04_vistas_causa.sql` joins `vendedores`. The
-masking step is what keeps a later view from breaking that.
+- **One run, one mapping.** `Masking.register_row(row)` and `Masking.register_tree(value)` learn
+  the values of the listed columns, by column name. A value reads the same placeholder for the
+  whole run, so a model can tell that two alerts share a client, and an HMAC under a salt drawn per
+  instance gives it another in the next run, so a leaked prompt is no pseudonym to join across
+  days. The mapping lives in memory for the run; it is never persisted, logged or sent.
+- **Text is masked by the mapping, never by a pattern**: `Masking.text(text)` replaces every value
+  it learned, whole tokens only, ignoring case, because a pattern for names masks any two
+  capitalized words.
+- **A placeholder holds letters only**, so the figure checks of `packages/agents` never read one
+  as a number.
+- **Unmasking fills only what the mapping holds**: `Masking.unmask(text)` and
+  `Masking.unmask_tree(value)` restore a placeholder the run learned and leave, and log, one it
+  did not.
+- **What passes:** every column outside `personales`, such as `sku` or `bodega_id`, and a name a
+  person types that no row of the run carries. `nombre` is masked by name of column, so a KPI that
+  read `productos.nombre` would mask it too. `vendedores.nombre` stays excluded from the kernel, so
+  no row carries a seller's name at all.
 
 ## The impact calculator
 

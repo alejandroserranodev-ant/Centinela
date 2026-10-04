@@ -1,8 +1,11 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterator, Mapping
 
+from centinela_tools.masking import Masking
+
+from . import privacy
 from .failures import StepTimeout, TokenCapReached
 from .llm_provider import LLMProvider, LLMRequest, LLMResponse, LLMStructuredRequest, LLMStructuredResponse
 
@@ -18,6 +21,7 @@ class Meter:
     cap: int | None
     usage: dict[str, int] = field(default_factory=lambda: dict.fromkeys(COUNTED, 0))
     attempts: int = 0
+    prompts: list[dict[str, str]] = field(default_factory=list)
 
     def tokens(self) -> int:
         return self.spent + self.usage["prompt_tokens"] + self.usage["completion_tokens"]
@@ -71,11 +75,25 @@ class MeteredProvider(LLMProvider):
         meter = current.get()
         return ask() if meter is None else meter.call(ask)
 
+    def _masked(self, request: Any) -> tuple[Masking, Any]:
+        masking = privacy.current.get()
+        if masking is None:
+            raise privacy.Unmasked("a model call outside a masking scope would send personal data in the clear")
+        masked = replace(request, system_prompt=masking.text(request.system_prompt), user_prompt=masking.text(request.user_prompt))
+        meter = current.get()
+        if meter is not None:
+            meter.prompts.append({"agent": meter.agent, "system": masked.system_prompt, "user": masked.user_prompt})
+        return masking, masked
+
     def generate_text(self, request: LLMRequest) -> LLMResponse:
-        return self._call(lambda: self.inner.generate_text(request))
+        masking, masked = self._masked(request)
+        answer = self._call(lambda: self.inner.generate_text(masked))
+        return replace(answer, text=masking.unmask(answer.text))
 
     def generate_structured(self, request: LLMStructuredRequest) -> LLMStructuredResponse:
-        return self._call(lambda: self.inner.generate_structured(request))
+        masking, masked = self._masked(request)
+        answer = self._call(lambda: self.inner.generate_structured(masked))
+        return replace(answer, text=masking.unmask(answer.text), parsed=masking.unmask_tree(answer.parsed))
 
 
 def spent(cost: Mapping[str, Mapping[str, Any]] | None) -> int:

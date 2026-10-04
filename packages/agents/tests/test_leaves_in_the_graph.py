@@ -1,3 +1,4 @@
+import re
 from unittest.mock import MagicMock
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -40,20 +41,22 @@ def prompts(mock_method):
     return [call.args[0].user_prompt for call in mock_method.call_args_list]
 
 
-def test_vigia_prompts_with_the_metric_and_entity_of_the_detection():
+def test_vigia_prompts_with_the_metric_and_the_masked_entity_of_the_detection():
     provider, _ = started()
     (prompt,) = prompts(provider.generate_text)
     assert "saldo_vencido" in prompt
-    assert "CLI-001" in prompt
+    assert "CLI-001" not in prompt
+    assert re.search(r"CLIENTE_[A-Z]{6}", prompt)
     assert "None" not in prompt
 
 
-def test_analista_and_estratega_prompt_with_the_metric_entity_and_day_of_the_alert():
+def test_analista_and_estratega_prompt_with_the_metric_masked_entity_and_day_of_the_alert():
     provider, _ = started()
     analista, *estratega = prompts(provider.generate_structured)
     for prompt in (analista, *estratega):
         assert "saldo_vencido" in prompt
-        assert "CLI-001" in prompt
+        assert "CLI-001" not in prompt
+        assert re.search(r"CLIENTE_[A-Z]{6}", prompt)
         assert "None" not in prompt
     assert DAY in analista
 

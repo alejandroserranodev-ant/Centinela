@@ -10,7 +10,6 @@ from .. import bitacora, simulacion
 from ..ciclo_vida import transicionar
 from ..config import AGENT_SECRET_KEY
 from ..db import obtener_conexion
-from ..masking import mask_dict_for_model, mask_text_evidence
 from ..modelos import (
     ActorAgent,
     Agent,
