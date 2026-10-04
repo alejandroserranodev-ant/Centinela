@@ -30,6 +30,12 @@ structure, never a threshold: a node founded on an ISO clause compares a state, 
 compares a KPI rests on the policy section or the kit entry its threshold quotes in
 `fuente_umbral`.
 
+**An entry may also cite a numbered mitigation strategy of the OWASP Top 10 for LLM Applications
+2025**, as `owasp-llm<risk>.<strategy>`, because the chat is the first agent that reads a person's
+free text, and no ISO clause the registry holds names the controls against prompt injection. Its
+text is public at genai.owasp.org, so the reviewer checks the strategy's number there. Like an ISO
+clause, it founds structure, never a threshold.
+
 > **Decided, not built.** A client's version of the tree is not a file: `apps/api` keeps it and
 > hands it to each run, because no agent writes anywhere.
 > `centinela_agents/graph.py:Compiler` caches a graph per version and content, so two

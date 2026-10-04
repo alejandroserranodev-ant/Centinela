@@ -1,4 +1,7 @@
 fundamentos:
+  - id: iso31000.6.2
+    cita: "ISO 31000:2018 §6.2"
+    funda: "stage conversar: communication and consultation, so a person understands a risk, the basis of a decision and why an action is proposed"
   - id: iso31000.6.4.2
     cita: "ISO 31000:2018 §6.4.2"
     funda: "stage detectar: risk identification"
@@ -59,9 +62,27 @@ fundamentos:
   - id: iso42001.anexo-a.supervision-humana
     cita: "ISO/IEC 42001:2023 Annex A, control A.9.3, with its guidance B.9.3 on human oversight"
     funda: "stage aprobar; the law that no action runs without a recorded human approval"
+  - id: iso42001.anexo-a.uso-previsto
+    cita: "ISO/IEC 42001:2023 Annex A, control A.9.4, intended use of the AI system"
+    funda: "stage conversar: the chat answers only on the operation's data, its alerts and the tree, and a question outside that use ends the conversation's walk"
   - id: iso42001.anexo-a.registro-eventos
     cita: "ISO/IEC 42001:2023 Annex A, control A.6.2.8, AI system recording of event logs"
     funda: "the law that every step lands in the bitácora"
+  - id: owasp-llm01.3
+    cita: "OWASP Top 10 for LLM Applications 2025, LLM01:2025 Prompt Injection, Prevention and Mitigation Strategy 3, implement input and output filtering"
+    funda: "stage conversar: a question is screened in code before any model reads it, and a question the screen flags ends the walk"
+  - id: owasp-llm01.6
+    cita: "OWASP Top 10 for LLM Applications 2025, LLM01:2025 Prompt Injection, Prevention and Mitigation Strategy 6, segregate and identify external content"
+    funda: "stage conversar: a person's question reaches a model only as content marked untrusted, apart from the skill's orders"
+  - id: owasp-llm05.1
+    cita: "OWASP Top 10 for LLM Applications 2025, LLM05:2025 Improper Output Handling, Prevention and Mitigation Strategy 1, treat the model as any other user"
+    funda: "stage conversar: a model's answer is validated in code before a person reads it, and a sentence citing no logged query is dropped"
+  - id: owasp-llm06.7
+    cita: "OWASP Top 10 for LLM Applications 2025, LLM06:2025 Excessive Agency, Prevention and Mitigation Strategy 7, complete mediation"
+    funda: "stage conversar: a question that asks for an action is refused, because authorization lives in apps/api's decision endpoint, never in a model"
+  - id: owasp-llm07.4
+    cita: "OWASP Top 10 for LLM Applications 2025, LLM07:2025 System Prompt Leakage, Prevention and Mitigation Strategy 4, ensure that security controls are enforced independently from the LLM"
+    funda: "the rule that no path from conversar.raiz reaches the gate aprobar, a leaf of Estratega or Ejecutor, or an orchestrator write, held by the validator and not by a prompt"
   - id: iso22400-2.descripcion-kpi
     cita: "ISO 22400-2:2014+A1:2017 §4, Table 1"
     funda: "the fields of a KPI in the kernel: name, id, description, scope, formula, unit, range, trend, timing, audience; the kernel leaves out production methodology, effect model diagram and notes, which describe manufacturing"
