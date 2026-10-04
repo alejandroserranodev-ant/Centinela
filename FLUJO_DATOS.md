@@ -7,6 +7,18 @@ the path one simulated day, one decision and one chat question take through the 
 [How the parts connect](./AGENTS.md#how-the-parts-connect). Each level page owns the rules of its own
 steps.
 
+## Signing in
+
+1. `POST /auth/login` reaches `apps/api/src/centinela_api/routers/auth.py:login(credenciales)`, which
+   checks the email and password against the hashed profiles of `CENTINELA_USUARIOS` through
+   `apps/api/src/centinela_api/auth.py:verificar(correo, clave)` and answers a token that
+   `apps/api/src/centinela_api/auth.py:emitir(persona, ahora)` signs, with the person.
+2. Every other route depends on
+   `apps/api/src/centinela_api/auth.py:persona_actual(authorization)`, which reads the bearer token
+   through `apps/api/src/centinela_api/auth.py:leer(token, ahora)` and answers 401 when it is
+   missing, forged or expired. `GET /auth/sesion` answers the person a token names, which is how
+   the web restores a session on load.
+
 ## One simulated day
 
 1. `POST /simulacion/avanzar` reaches
@@ -14,6 +26,13 @@ steps.
    transaction, through `apps/api/src/centinela_api/simulacion.py:avanzar(conn, dias)`, before
    anything detects.
 2. Detection runs in the API's process.
+   The router reads the settings first, with
+   `apps/api/src/centinela_api/configuracion.py:leer(conn)`, together with the ids of the stored
+   alerts and the open ones. `apps/api/src/centinela_api/configuracion.py:umbrales(ajustes)` turns
+   them into the thresholds the day uses, which
+   `apps/api/src/centinela_api/agentes.py:with_thresholds(ctx, umbrales)` lays over the context and
+   `CentinelaOrchestrator.use_thresholds` hands to the orchestrator, so a change saved by
+   `PUT /configuracion` reaches the next day and no earlier one.
    `apps/api/src/centinela_api/agentes.py:get_context()` builds the walk's context once per
    process: the tree from `packages/agents/arbol/base.yaml`, the thresholds of
    [`data/metricas.yaml`](./data/metricas.yaml), and the kernel's catalogue and reader, which
@@ -21,9 +40,10 @@ steps.
    `packages/agents/centinela_agents/catalog.py:connect_kernel(env)` with the DSNs of the root `.env`.
    `packages/agents/centinela_agents/walk.py:detect(ctx, day)` walks the detection nodes over the
    rows `kpi_consultar` returns for the simulated day.
-   `apps/api/src/centinela_api/agentes.py:prioritized(detections, known)` keeps the detections
-   whose metric is in `API_METRICS`, because the API's `Alert` model accepts no other, drops those
-   whose alert already exists, and keeps the `CENTINELA_ALERTAS_POR_DIA` with the most `pesos_en_riesgo`.
+   `apps/api/src/centinela_api/agentes.py:prioritized(detections, known, vigiladas)` keeps the
+   detections whose metric is in `API_METRICS`, because the API's `Alert` model accepts no other, and
+   in `apps/api/src/centinela_api/configuracion.py:vigiladas(ajustes)`, the metrics the settings
+   leave watched, drops those whose alert already exists, and keeps the `CENTINELA_ALERTAS_POR_DIA` with the most `pesos_en_riesgo`.
 3. For each detection the stream sends a `step` event, an `AgentStep` of `vigia`. Then
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)`
    runs the graph in a worker thread, through `asyncio.to_thread`, so the event loop keeps
@@ -45,11 +65,14 @@ steps.
    An alert the graph ends `unida` is stored `merged` into the alert that remains, and a detection
    it absorbed is stored `merged` without running, as the lifecycle in
    [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle) states.
-5. Another `step`, of `estratega`, reports the proposal, and the stream closes with `end`, which carries the
+5. Each stored alert goes out as an `alert` event carrying the `Alert`, the one that remains after a
+   merge and each alert merged into it included, so a screen shows the alert before the day ends.
+   Another `step`, of `estratega`, reports the proposal, and the stream closes with `end`, which carries the
    simulated day and the ids of the new alerts. `apps/api/src/centinela_api/sse.py:flujo(eventos)`
    writes each event's name on its `event:` line.
 
-An error in one detection is logged and skips that alert. An error before the loop, such as a
+A second `POST /simulacion/avanzar` while a day runs is answered 409 and starts nothing, because
+the router holds one lock for the whole stream. An error in one detection is logged and skips that alert. An error before the loop, such as a
 provider with no `LLM_MODEL`, is logged too, and the stream still ends with no new alerts.
 
 ## One decision
@@ -58,9 +81,9 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    `apps/api/src/centinela_api/routers/alertas.py:decidir(id, decision, persona, conn)`, whose
    person `apps/api/src/centinela_api/auth.py:persona_actual(authorization)` reads from the
    bearer token. The alert is read, the person is checked by
-   `apps/api/src/centinela_api/permisos.py:puede_decidir(persona, alerta)`, and
-   `apps/api/src/centinela_api/decisiones.py:aplicar(alerta, decision)` checks the decision and
-   returns the alert as `approved` or `rejected`, together with its log event.
+   `apps/api/src/centinela_api/permisos.py:puede_decidir(conn, persona, alerta)`, which reads the owner from the settings,, and
+   `apps/api/src/centinela_api/decisiones.py:aplicar(alerta, decision, autonomia)` checks the
+   decision against the autonomy the settings give each action type and returns the alert as `approved` or `rejected`, together with its log event.
 2. One transaction stores the alert and writes the `decision` row, whose actor is the signed-in
    person's name and role.
 3. The graph resumes with
@@ -68,7 +91,11 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    in a worker thread. On an approval or an edit, a state that carries an `executed_action` turns
    the alert `executed` through
    `apps/api/src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)`, and a `result` row with actor `ejecutor` is written. A rejection resumes
-   the graph and writes nothing more.
+   the graph and writes nothing more. A request for changes resumes it through
+   `apps/api/src/centinela_api/routers/alertas.py:_reproponer(conn, alerta, motivo, ajustes, dia)`:
+   the orchestrator receives the reason as `request_changes`, `Estratega` proposes again, and the
+   alert keeps its status with the new actions, a `proposal` row and the queries the proposal added;
+   a resume that fails or returns no actions writes a `proposal` row saying the earlier actions stay.
 4. A failed approval resume writes a `result` row of `ejecutor` saying the action did not run. That
    includes the state the in-memory checkpointer loses when the process restarts, so the alert
    stays `approved`. A failed rejection resume is logged.
@@ -92,6 +119,13 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    `answer` or `refusal` row, then one `evidence` row per model step's cost. No alert changes.
 4. A figure of the answer opens its source through `GET /consultas/{queryId}`,
    `apps/api/src/centinela_api/routers/consultas.py:obtener(query_id, conn)`.
+
+## The inbox totals
+
+`GET /bandeja/resumen` reaches `apps/api/src/centinela_api/routers/bandeja.py:totales(conn)`, which
+answers `apps/api/src/centinela_api/resumen.py:calcular(conn)`: the totals over the proposed alerts
+as `Figure`s, each with a query over the alerts table that `GET /consultas/{queryId}` answers like
+any other.
 
 ## Where this departs from the design
 

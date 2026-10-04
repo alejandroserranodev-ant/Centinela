@@ -27,7 +27,6 @@ and what each shows is
 | `src/api/types.ts` | the contract the client and the screens share: aliases over `src/api/schema.generated.ts`, plus the types the API has no model for |
 | `src/api/openapi.json` | the API's OpenAPI document, written by `python -m centinela_api.contrato` |
 | `src/api/schema.generated.ts` | the TypeScript types of that document, written by `npm run contract`; never edited |
-| `src/api/fixtures/` | the illustrative data the screens ran on before the fetch client; no module imports it |
 | `.env` | the `VITE_API_URL` Vite reads, versioned with the local API's address |
 | `src/format.ts` | every number and date as a person reads it: pesos, percentages, points, days and units in `es-CO`, dates in the time zone of Bogotá |
 | `src/actionParameters.ts` | the Spanish name of each key of an action's `parameters`, for the proposal, the edit dialog and the `bitácora` |
@@ -101,8 +100,7 @@ and what each shows is
   ([`../api/AGENTS.md`](../api/AGENTS.md)).
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
-  including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
-  fixtures. The words the data names keep their Spanish in code too: the agents (`vigia`,
+  including `aria-label`s, hints and notices, is Spanish. The words the data names keep their Spanish in code too: the agents (`vigia`,
   `analista`, `estratega`, `ejecutor`, `chat`), the metrics (`margen_pct`…), the `v_*` views and the
   `alertas` table, because a translation would make a second name for one thing.
 - **The contract is English except its routes.** Field names and values in
@@ -116,14 +114,6 @@ and what each shows is
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
-- **Fixture files and ids are English** (`src/api/fixtures/alerts.json`, `alert-hogar-margin`,
-  `q-hogar-drop`); the line name stays as the data spells it. An id never reaches a manager's
-  screen.
-- **The fixtures in `src/api/fixtures/` are illustrative**, and no module imports them. They are
-  built from the brief's public example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
-  examples, never from the dataset, because figures read from `data/csv/` would name the seeded
-  scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
-  figure cites an example query against a real `v_*` view; the queries are not run.
 - **The screen computes no figure.** The inbox totals are `Figure`s the API computes
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
   table, which is why `src/api/types.ts:QuerySource` is `kernel` or `alertas`, and a view's name

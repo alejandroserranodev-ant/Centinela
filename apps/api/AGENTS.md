@@ -344,8 +344,8 @@ time, and the alert it belongs to, which a chat question asked from no alert lea
 | Type | Written by |
 |---|---|
 | `alert` | `avanzar`, for each alert the orchestrator returns, and for each merge, under `analista`, naming the alert that remains; `POST /interno/alertas` |
-| `evidence` | `avanzar`, one row per `kpi_consultar` a leaf ran, its SQL as the detail and its `queryId`; `PUT /interno/alertas/{id}/causa` |
-| `proposal` | `PUT /interno/alertas/{id}/propuesta` |
+| `evidence` | `avanzar`, one row per `kpi_consultar` a leaf ran, its SQL as the detail and its `queryId`, and `_reproponer` for each query a new proposal added; `PUT /interno/alertas/{id}/causa` |
+| `proposal` | `_reproponer`, for a new proposal after a request for changes or its failure; `PUT /interno/alertas/{id}/propuesta` |
 | `decision` | a person's decision |
 | `action` | `POST /interno/alertas/{id}/ejecutar` |
 | `result` | the resume after an approval, when `Ejecutor` returns an executed action |
@@ -357,8 +357,8 @@ time, and the alert it belongs to, which a chat question asked from no alert lea
 
 On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
 and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL
-that returned it; an approval adds its `decision` and `result`. The graph's proposal leaves no row
-of its own.
+that returned it; an approval adds its `decision` and `result`. The graph's first proposal leaves
+no row of its own.
 
 ## Rules of this level
 

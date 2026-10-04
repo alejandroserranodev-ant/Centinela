@@ -26,8 +26,8 @@ Each arrow is a call, and nothing calls back up the chain. The rule and what hol
 
 ## One alert, from the clock to the log
 
-> **Decided, not built.** The earlier alerts and rejection reasons handed to each run,
-> `calcular_impacto`, and action tools that keep their drafts. Of this diagram, `apps/api`
+> **Decided, not built.** The severity of earlier alerts and the rejection reasons kept for a
+> metric handed to each run, `calcular_impacto`, and action tools that keep their drafts. Of this diagram, `apps/api`
 > advances the day, walks `detectar` over the kernel's KPIs, runs the model leaves, which read the
 > kernel, to the pause at `aprobar.decision`, records the decision and resumes.
 
@@ -43,9 +43,13 @@ sequenceDiagram
   participant E as Estratega
   participant X as Ejecutor
   participant T as packages/tools
+  P->>W: sign in
+  W->>A: POST /auth/login
+  A-->>W: a signed token and the person's role
   P->>W: advance the simulated day
-  W->>A: POST /simulacion/avanzar
-  A->>O: day run: the simulated day, earlier alerts, kept rejection reasons
+  W->>A: POST /simulacion/avanzar, with the token
+  A->>A: reads the saved settings: watched metrics, thresholds, owners, autonomy
+  A->>O: day run: the simulated day, the thresholds, the open alerts as earlier alerts
   O->>V: detect
   V->>T: read each measure on the simulated day
   T-->>V: figures, each with its query
@@ -60,10 +64,10 @@ sequenceDiagram
   E-->>O: one to three Actions with impact
   O-->>A: proposes propuesta, then pauses before Ejecutor
   A-->>W: SSE: the alert reaches the inbox
-  P->>W: approve, edit or reject with a reason
+  P->>W: approve, edit, reject or request changes
   W->>A: POST /alertas/{id}/decision
   A->>A: checks the role, records aprobada or rechazada
-  A->>O: resumes the alert with the recorded decision
+  A->>O: resumes the alert with the recorded decision; a request for changes returns a new proposal
   O->>X: an approved email_draft only: write its body
   X-->>O: the body
   O->>T: the action tool, in code, with the approved parameters unchanged
@@ -72,10 +76,12 @@ sequenceDiagram
   Note over A: every step lands in the bitácora
 ```
 
-*Draws: `AGENTS.md` § How the parts connect; `packages/agents/AGENTS.md` § The day run; `packages/agents/AGENTS.md` § The alert graph*
+*Draws: `AGENTS.md` § How the parts connect; `packages/agents/AGENTS.md` § The day run; `packages/agents/AGENTS.md` § The alert graph; `apps/api/AGENTS.md` § Decisions and roles*
 
 Each step, and the section of the page that owns it:
 
+- **Signing in and settings**: [apps/api](../../../apps/api/AGENTS.md), *Decisions and roles* and
+  *The settings*.
 - **The clock**: [apps/api](../../../apps/api/AGENTS.md), *The clock*; which views ignore the
   simulated day, [data](../../../data/AGENTS.md), *The simulated clock*.
 - **Detection**: what `Vigía` fires on, how often it raises an alert again and where its pesos at

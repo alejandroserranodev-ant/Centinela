@@ -26,7 +26,7 @@ the database's SQL and the generator, and `evals` holds no code. Each page opens
 |---|---|
 | the chat answered, refused or stayed silent when it should not have | [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#chat-answers-a-question), then [`packages/agents/arbol/AGENTS.md`](./packages/agents/arbol/AGENTS.md#the-chat) |
 | an alert is missing, wrong, duplicated or fires on the wrong day | [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md), then [`packages/agents/arbol/AGENTS.md`](./packages/agents/arbol/AGENTS.md), then the clock in [`data/AGENTS.md`](./data/AGENTS.md#the-simulated-clock) |
-| a number on screen disagrees with SQL | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md), whose screens read fixtures, then the totals in [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-inbox-totals) |
+| a number on screen disagrees with SQL | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md), whose screens read the API, then the totals in [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-inbox-totals) |
 | a number in an agent's answer or an alert disagrees with SQL | [`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md#the-kpi-kernel), then the base KPIs in [`data/AGENTS.md`](./data/AGENTS.md#the-base-kpis) |
 | something happened without approval, or the log is missing a step | [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#decisions-and-roles) |
 | a screen renders or behaves wrong | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md) |
@@ -38,6 +38,7 @@ the database's SQL and the generator, and `evals` holds no code. Each page opens
 | an agent, the orchestrator, which model a step uses | [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md) |
 | the instructions a model step loads, its skill | [`packages/agents/skills/AGENTS.md`](./packages/agents/skills/AGENTS.md) |
 | a tool an agent calls: SQL, policy search, impact, an action | [`packages/tools/AGENTS.md`](./packages/tools/AGENTS.md) |
+| sign-in, a role, a 401 or a 403 | [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#decisions-and-roles) |
 | an endpoint, the clock, the alert lifecycle, roles, the `bitácora` | [`apps/api/AGENTS.md`](./apps/api/AGENTS.md) |
 | a screen, a component, the Arena skin | [`apps/web/AGENTS.md`](./apps/web/AGENTS.md) |
 | an evaluation case, or proving nothing regressed | [`evals/AGENTS.md`](./evals/AGENTS.md) |
