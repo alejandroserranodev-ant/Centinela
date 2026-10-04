@@ -365,6 +365,7 @@ class TestChat:
         request = provider.generate_structured.call_args.args[0]
         assert "UNTRUSTED DATA" in request.user_prompt and "¿Cuánto saldo vencido tiene C1?" in request.user_prompt
         assert request.temperature == 0.0
+        assert result["costs"] == [{"agent": "chat", "step": "clasificar", "modelo": "m", "tokens_entrada": 0, "tokens_salida": 0, "latencia_ms": result["costs"][0]["latencia_ms"]}]
 
     def test_classify_drops_a_kpi_outside_the_catalogue_and_an_entity_the_question_does_not_name(self):
         provider = MagicMock()
@@ -416,6 +417,7 @@ class TestChat:
         prompt = provider.generate_structured.call_args.args[0].user_prompt
         assert "detectar.cartera.saldo_vencido.dias" in prompt and "fin-pol-004.s4" in prompt
         assert result["queries"][0]["queryId"] == saldo_query()
+        assert [cost["step"] for cost in result["costs"]] == ["responder"]
 
     def test_a_sentence_with_a_written_figure_or_an_unknown_ref_is_dropped(self):
         provider = MagicMock()

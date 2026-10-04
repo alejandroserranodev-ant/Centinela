@@ -66,6 +66,7 @@ class ChatState(TypedDict, total=False):
     fin: str
     camino: Annotated[list, operator.add]
     failures: Annotated[list, operator.add]
+    costs: Annotated[list, operator.add]
 
 
 def subject(state: Mapping[str, Any]) -> tuple[str, str, str]:

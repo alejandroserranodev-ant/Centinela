@@ -9,6 +9,7 @@ the walk of the tree. A sentence that cites no fact, or writes a number, is drop
 
 import logging
 import re
+import time
 from functools import cache
 from pathlib import Path
 from typing import Any, Mapping
@@ -53,6 +54,21 @@ ANSWER_SCHEMA = {
     },
     "required": ["sentences", "assumptions"],
 }
+
+
+def costed(provider: LLMProvider, request: LLMStructuredRequest, step: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    started = time.monotonic()
+    response = provider.generate_structured(request)
+    usage = response.usage or {}
+    cost = {
+        "agent": "chat",
+        "step": step,
+        "modelo": response.model,
+        "tokens_entrada": int(usage.get("prompt_tokens", 0)),
+        "tokens_salida": int(usage.get("completion_tokens", 0)),
+        "latencia_ms": int((time.monotonic() - started) * 1000),
+    }
+    return response.parsed, cost
 
 
 @cache
@@ -101,10 +117,14 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
         .add_untrusted_content(masked(question))
         .build()
     )
+    costs: list[dict[str, Any]] = []
     try:
-        parsed = provider.generate_structured(
-            LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=schema, temperature=0.0, max_tokens=CLASSIFY_TOKENS)
-        ).parsed
+        parsed, cost = costed(
+            provider,
+            LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=schema, temperature=0.0, max_tokens=CLASSIFY_TOKENS),
+            "clasificar",
+        )
+        costs.append(cost)
     except Exception as error:
         logger.warning("Chat: the classifier failed, the question is out of scope: %s", error)
         parsed = {}
@@ -117,7 +137,7 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
     if metric and kpi is None and chosen is None:
         kpi, chosen = metric, entity
     logger.info("Chat: intent %s, kpi %s, entity %s", intent, kpi, chosen)
-    return {"chat": {**chat, "intent": intent, "kpi": kpi, "entity": chosen}}
+    return {"chat": {**chat, "intent": intent, "kpi": kpi, "entity": chosen}, "costs": costs}
 
 
 def figure_of(raw: Any) -> dict[str, Any] | None:
@@ -242,16 +262,18 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
         .add_untrusted_content(masked(state["question"]))
         .build()
     )
-    parsed = provider.generate_structured(
-        LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=ANSWER_SCHEMA, temperature=0.0, max_tokens=ANSWER_TOKENS)
-    ).parsed
+    parsed, cost = costed(
+        provider,
+        LLMStructuredRequest(system_prompt=system, user_prompt=user, schema=ANSWER_SCHEMA, temperature=0.0, max_tokens=ANSWER_TOKENS),
+        "responder",
+    )
     allowed = tuple(part for part in (chat.get("entity") or "", entity or "", state["day"], *facts.names) if part)
     texts, figures = written(parsed, facts, allowed)
     if not texts:
-        return {**no_answer(chat), "queries": queries}
+        return {**no_answer(chat), "queries": queries, "costs": [cost]}
     assumptions = [masked(str(text)) for text in parsed.get("assumptions") or [] if not stray_digits(str(text), allowed)]
     reply = ChatAnswer(text=masked(" ".join(texts)), figures=figures, enough_evidence=True, assumptions=assumptions).model_dump()
-    return {"chat": {**chat, "figuras": reply["figures"]}, "answer": reply, "queries": queries}
+    return {"chat": {**chat, "figuras": reply["figures"]}, "answer": reply, "queries": queries, "costs": [cost]}
 
 
 def closing(state: Mapping[str, Any]) -> dict[str, Any]:

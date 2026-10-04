@@ -309,4 +309,5 @@ class CentinelaOrchestrator:
             "queries": state.get("queries") or [],
             "screen": screened,
             "failures": state.get("failures") or [],
+            "costs": state.get("costs") or [],
         }

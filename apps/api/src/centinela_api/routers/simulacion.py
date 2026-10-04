@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, simulacion
+from .. import bitacora, ciclo_vida, consultas, simulacion
 from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path
 from ..db import obtener_conexion
 from ..modelos import ActorAgent, AgentStep, SimulatedDay
@@ -78,6 +78,7 @@ async def avanzar(
                             nuevo_dia,
                             alerta.pesos_at_risk.query_id,
                         )
+                        consultas.registrar(conn, state.get("queries") or [])
                         for query in state.get("queries") or []:
                             bitacora.registrar(
                                 conn, alert_id, "evidence",

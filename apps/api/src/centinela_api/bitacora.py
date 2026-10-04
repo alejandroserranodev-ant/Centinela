@@ -8,7 +8,7 @@ from .modelos import Actor, LogEvent, LogEventType
 
 def registrar(
     conn: psycopg.Connection,
-    alerta_id: str,
+    alerta_id: str | None,
     tipo: LogEventType,
     actor: Actor,
     detalle: str,

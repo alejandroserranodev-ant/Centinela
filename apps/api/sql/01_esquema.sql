@@ -18,8 +18,8 @@ CREATE INDEX IF NOT EXISTS idx_alertas_status ON api.alertas (status);
 
 CREATE TABLE IF NOT EXISTS api.bitacora (
   id bigserial PRIMARY KEY,
-  alerta_id text NOT NULL REFERENCES api.alertas (id),
-  tipo text NOT NULL CHECK (tipo IN ('alert', 'evidence', 'proposal', 'decision', 'action', 'result')),
+  alerta_id text REFERENCES api.alertas (id),
+  tipo text NOT NULL,
   actor jsonb NOT NULL,
   detalle text NOT NULL,
   query_id text,
@@ -27,4 +27,17 @@ CREATE TABLE IF NOT EXISTS api.bitacora (
   creado_en timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE api.bitacora ALTER COLUMN alerta_id DROP NOT NULL;
+ALTER TABLE api.bitacora DROP CONSTRAINT IF EXISTS bitacora_tipo_check;
+ALTER TABLE api.bitacora ADD CONSTRAINT bitacora_tipo_check
+  CHECK (tipo IN ('alert', 'evidence', 'proposal', 'decision', 'action', 'result', 'question', 'answer', 'refusal'));
+
 CREATE INDEX IF NOT EXISTS idx_bitacora_alerta ON api.bitacora (alerta_id);
+
+CREATE TABLE IF NOT EXISTS api.consultas (
+  query_id text PRIMARY KEY,
+  kpi text NOT NULL,
+  dia date NOT NULL,
+  consulta text NOT NULL,
+  creado_en timestamptz NOT NULL DEFAULT now()
+);

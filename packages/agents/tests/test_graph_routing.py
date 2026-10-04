@@ -475,3 +475,4 @@ class TestChatInjections:
         assert reply["answer"]["figures"][0]["value"] == 45
         assert reply["queries"][0]["consulta"] == "SELECT * FROM k_saldo_vencido(%(dia)s)"
         assert [step["node"] for step in reply["steps"]][-1] == "conversar.con_evidencia"
+        assert [cost["step"] for cost in reply["costs"]] == ["clasificar", "responder"]

@@ -1,6 +1,7 @@
 from typing import Annotated, Literal, Union
 from enum import Enum
 
+from centinela_agents.agents.chat import MAX_QUESTION
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -17,8 +18,9 @@ Metric = Literal[
 ]
 FigureUnit = Literal["COP", "points", "percent", "days", "units"]
 ActionType = Literal["email_draft", "task", "purchase_order_draft", "price_change_draft"]
-Agent = Literal["vigia", "analista", "estratega", "ejecutor"]
-LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result"]
+Agent = Literal["vigia", "analista", "estratega", "ejecutor", "chat"]
+LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result", "question", "answer", "refusal"]
+ChatOutcome = Literal["answered", "no_evidence", "out_of_scope", "refused"]
 
 
 class AlertEstadoEnum(str, Enum):
@@ -127,6 +129,7 @@ class AgentStep(Esquema):
     """Progress event during agent processing (for SSE streams)."""
     alert_id: str | None = Field(None, description="Alert ID being processed")
     agent: Agent = Field(..., description="Agent name")
+    node: str | None = Field(None, description="Node of the decision tree the step walked, if any")
     status: Literal["running", "done"] = Field(..., description="Step status")
     description: str = Field(..., description="Human-readable step description")
     start: str = Field(..., description="UTC start time (ISO 8601)")
@@ -136,7 +139,7 @@ class AgentStep(Esquema):
 class ActorAgent(Esquema):
     """Alert action performed by an agent."""
     kind: Literal["agent"] = Field("agent", description="Discriminator: action by agent")
-    agent: Agent = Field(..., description="Agent name (vigia, analista, estratega, ejecutor)")
+    agent: Agent = Field(..., description="Agent name (vigia, analista, estratega, ejecutor, chat)")
 
 
 class ActorPerson(Esquema):
@@ -154,15 +157,15 @@ class LogEvent(Esquema):
     id: str = Field(..., description="Log entry ID")
     date: str = Field(..., description="UTC timestamp of event (ISO 8601)")
     simulated_day: str = Field(..., description="Simulated date when event occurred")
-    alert_id: str = Field(..., description="Alert ID")
-    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result")
+    alert_id: str | None = Field(None, description="Alert ID, null for a chat question asked from no alert")
+    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal")
     actor: Actor = Field(..., description="Who/what performed the action (agent or person)")
     detail: str = Field(..., description="Human-readable description or JSON cost data")
     query_id: str | None = Field(None, description="SQL query ID if relevant to this event")
 
 
 class ChatMessage(Esquema):
-    """Chat response from Centinela (Analista)."""
+    """Chat response from Centinela (the agent chat)."""
     id: str = Field(..., description="Message ID")
     role: Literal["user", "centinela"] = Field(..., description="Message source: user question or centinela answer")
     text: str = Field(..., description="Message text")
@@ -170,13 +173,22 @@ class ChatMessage(Esquema):
     alert_id: str | None = Field(None, description="Related alert ID if any")
     series: list[SeriesPoint] | None = Field(None, description="Historical series if relevant")
     enough_evidence: bool = Field(..., description="Whether answer is based on sufficient evidence")
+    outcome: ChatOutcome = Field("answered", description="How the walk of conversar ended: answered, no_evidence, out_of_scope or refused")
     date: str = Field(..., description="Message timestamp (ISO 8601)")
 
 
 class ChatQuestion(Esquema):
-    """User question for Centinela (Analista)."""
-    question: str = Field(..., description="Natural language question about alert or metric")
+    """User question for Centinela (the agent chat)."""
+    question: str = Field(..., min_length=1, max_length=MAX_QUESTION, description="Natural language question about alert or metric")
     alert_id: str | None = Field(None, description="Alert the question is asked from, if any")
+
+
+class Query(Esquema):
+    """A query of the kernel that produced a figure, recorded when an agent ran it."""
+    id: str = Field(..., description="The figure's queryId")
+    source: Literal["kernel"] = Field("kernel", description="Where the query runs: the KPI kernel of packages/tools")
+    sql: str = Field(..., description="The call the kernel ran")
+    description: str = Field(..., description="The KPI and the simulated day it was read on")
 
 
 class SimulatedDay(Esquema):

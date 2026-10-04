@@ -1,7 +1,7 @@
 """
 Orchestrator singleton for Centinela API.
 
-Initialized lazily on first use. The orchestrator runs Vigía, Analista, Estratega and Ejecutor
+Initialized lazily on first use. The orchestrator runs Vigía, Analista, Estratega and Ejecutor, and answers the chat,
 over the kernel's KPIs, which centinela_agents.catalog.connect_kernel reaches with the DSNs of the
 root .env, using LangGraph with InMemorySaver (state is per-process).
 """

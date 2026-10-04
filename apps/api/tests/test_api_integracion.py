@@ -198,3 +198,44 @@ def test_un_dia_real_cita_el_kernel_y_aprobar_ejecuta_y_rechazar_clasifica(monke
                 conn.execute("DELETE FROM api.bitacora WHERE alerta_id = %s", (id_alerta,))
                 conn.execute("DELETE FROM api.alertas WHERE id = %s", (id_alerta,))
             conn.commit()
+
+
+CONSULTA_CHAT = {"queryId": "q_prueba_chat", "kpi": "saldo_vencido", "dia": "2026-03-02", "consulta": "kpi_consultar('saldo_vencido', '2026-03-02')"}
+
+
+class _OrquestadorDelChat:
+    def ask(self, question, day, alert=None):
+        figura = {"value": 45, "unit": "days", "queryId": CONSULTA_CHAT["queryId"]}
+        return {
+            "fin": "fin.chat_respondida",
+            "steps": [{"node": "conversar.raiz", "branch": "no", "agent": None}],
+            "answer": {"text": "CLI-001 tiene {0} de mora.", "figures": [figura], "enough_evidence": True, "assumptions": []},
+            "queries": [CONSULTA_CHAT],
+            "costs": [],
+        }
+
+
+def test_una_pregunta_sin_alerta_queda_en_la_bitacora_y_su_consulta_se_abre(monkeypatch):
+    from centinela_api.routers import chat as chat_router
+
+    monkeypatch.setattr(chat_router, "get_orchestrator", lambda: _OrquestadorDelChat())
+    marca = "¿Cuánta mora tiene CLI-001? prueba de integración"
+    try:
+        respuesta = TestClient(app).post("/chat", json={"question": marca}, headers=CABECERAS_GERENTE)
+        assert respuesta.status_code == 200
+
+        eventos = TestClient(app).get("/bitacora").json()
+        pregunta = next(e for e in eventos if e["type"] == "question" and e["detail"] == marca)
+        assert pregunta["alertId"] is None
+        assert pregunta["actor"] == {"kind": "person", "name": NOMBRE_GERENTE, "role": "gerente"}
+        assert any(e["type"] == "answer" and e["alertId"] is None and e["queryId"] == "q_prueba_chat" for e in eventos)
+
+        consulta = TestClient(app).get("/consultas/q_prueba_chat")
+        assert consulta.status_code == 200
+        assert consulta.json() == {"id": "q_prueba_chat", "source": "kernel", "sql": CONSULTA_CHAT["consulta"], "description": "KPI saldo_vencido del 2026-03-02"}
+        assert TestClient(app).get("/consultas/q_no_existe").status_code == 404
+    finally:
+        with conectar() as conn:
+            conn.execute("DELETE FROM api.bitacora WHERE alerta_id IS NULL AND (detalle = %s OR detalle LIKE %s OR query_id = %s)", (marca, "fin.chat_respondida: CLI-001 tiene {0} de mora.", "q_prueba_chat"))
+            conn.execute("DELETE FROM api.consultas WHERE query_id = %s", ("q_prueba_chat",))
+            conn.commit()
