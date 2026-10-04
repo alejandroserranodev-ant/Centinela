@@ -11,7 +11,7 @@ comes from the dataset. The sections marked below hold decisions the code does n
 
 | File | Why it exists |
 |---|---|
-| `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
+| `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
 | `.env.example` | `DSN_ADMIN` and `AGENT_SECRET_KEY`, which `src/centinela_api/config.py` reads |
 | `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
@@ -27,24 +27,25 @@ comes from the dataset. The sections marked below hold decisions the code does n
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
 | `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_chat.py` are pure; `tests/test_flujo_agentes.py` and `tests/test_avanzar.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py`, `tests/test_chat.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py` and `tests/test_avanzar.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
 From this directory, with Python 3.12 or later, because `packages/agents` asks for it:
 
 ```bash
-pip install -e ../../packages/agents
-pip install -e ".[dev]"
+pip install -e ../../packages/agents -e ".[dev]"
 psql "$DSN_ADMIN" -f sql/01_esquema.sql
 uvicorn centinela_api.main:app --reload
 pytest
 pytest -m integracion
 ```
 
-- **`centinela-agents` is installed by hand**, because the manifest does not declare it: a plain
-  `pip install -e .` installs an API whose routers fail to import. It costs every fresh setup one
-  step that nothing names but this page.
+- **`centinela-agents` is a declared dependency that no index serves**, so pip installs it only
+  from the path the same command names, and a plain `pip install -e .` stops with no matching
+  distribution. `uv pip install -e ".[dev]"` reads the path from `[tool.uv.sources]` and needs
+  none. `tests/test_manifest.py` fails when a module imports a distribution the manifest does not
+  declare.
 - **`sql/01_esquema.sql` runs after the dataset's SQL files**, because the clock seeds
   itself from `centinela.fecha_corte()`. The database setup is
   [`../../data/AGENTS.md`](../../data/AGENTS.md#setting-up-the-database).

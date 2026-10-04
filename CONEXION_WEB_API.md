@@ -19,11 +19,11 @@ psql "postgresql://centinela:centinela@localhost:5432/centinela" -f sql/01_esque
 ```
 
 **2. The API**, from `apps/api/`, in a Python 3.12 environment, because `packages/agents` asks for
-it. `apps/api/pyproject.toml` does not declare `centinela-agents`, so it is installed first:
+it. `apps/api/pyproject.toml` declares `centinela-agents`, and pip finds it only at the path the
+command names:
 
 ```bash
-pip install -e ../../packages/agents
-pip install -e ".[dev]"
+pip install -e ../../packages/agents -e ".[dev]"
 cp .env.example .env
 uvicorn centinela_api.main:app --reload
 ```
