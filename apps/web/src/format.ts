@@ -112,3 +112,10 @@ export function formatFigureInText(figure: Figure): string {
       return formatNumber(figure.value);
   }
 }
+
+export function fillSentence(text: string, figures: Figure[]): string {
+  return text.replace(/\{(\d+)\}/g, (placeholder, index: string) => {
+    const figure = figures[Number(index)];
+    return figure ? formatFigureInText(figure) : placeholder;
+  });
+}

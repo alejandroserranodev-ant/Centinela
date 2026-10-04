@@ -109,6 +109,15 @@ ol {
   padding-bottom: calc(var(--layout-bar) + var(--pad-safe-bottom));
 }
 
+.shell--mobile .arena-toast-host__root {
+  inset-inline: var(--sp-4);
+  bottom: calc(var(--layout-bar) + var(--pad-safe-bottom) + var(--sp-3));
+}
+
+.shell--mobile .arena-toast__root {
+  width: auto;
+}
+
 .shell__rail {
   position: sticky;
   top: var(--layout-bar);
@@ -455,4 +464,5 @@ ol {
   min-height: 100vh;
   display: grid;
   place-items: center;
+  padding-inline: var(--sp-4);
 }

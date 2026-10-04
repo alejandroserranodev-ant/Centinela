@@ -31,6 +31,7 @@ export type Query = Schemas['Query'];
 export type Persona = Schemas['Persona'];
 export type Session = Schemas['Sesion'];
 export type Settings = Schemas['Settings'];
+export type SimulatedDay = Schemas['SimulatedDay'];
 export type WatchedMetric = Schemas['WatchedMetric'];
 export type Threshold = Schemas['Threshold'];
 export type AutonomyLevel = Settings['autonomy'][string];

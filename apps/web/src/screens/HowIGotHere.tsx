@@ -22,10 +22,15 @@ export function alertQueryIds(alert: Alert): string[] {
 
 export function HowIGotHere({ alert }: { alert: Alert }) {
   const [queries, setQueries] = useState<Query[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setQueries(null);
-    Promise.all(alertQueryIds(alert).map((id) => getQuery(id))).then(setQueries, () => setQueries([]));
+    setFailed(false);
+    Promise.all(alertQueryIds(alert).map((id) => getQuery(id))).then(setQueries, () => {
+      setFailed(true);
+      setQueries([]);
+    });
   }, [alert]);
 
   return (
@@ -35,7 +40,7 @@ export function HowIGotHere({ alert }: { alert: Alert }) {
       description="Cada cifra de esta alerta sale de una de estas consultas a los datos de la operación."
     >
       <details className="collapsible">
-        <summary>{queries ? `Ver las ${queries.length} consultas` : 'Ver las consultas'}</summary>
+        <summary>{failed ? 'No se pudieron cargar las consultas' : queries === null ? 'Ver las consultas' : queries.length === 1 ? 'Ver la consulta' : `Ver las ${queries.length} consultas`}</summary>
         {queries ? (
           <ol className="arena-stack query-list">
             {queries.map((q) => (

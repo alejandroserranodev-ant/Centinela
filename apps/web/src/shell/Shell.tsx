@@ -121,7 +121,7 @@ export function Shell() {
           ]}
         </ArenaBottomNav>
       ) : null}
-      <ArenaToastHost placement={mobile ? 'top-end' : 'bottom-end'}>
+      <ArenaToastHost placement="bottom-end">
         {toasts.toasts.map((t) => (
           <ArenaToast
             key={t.id}

@@ -8,6 +8,8 @@ import {
   ArenaSegmentedControl,
   ArenaSkeleton,
   ArenaStatCard,
+  arenaReadBreakpoint,
+  useArenaContainerWidth,
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
 import { ApiError, getInboxSummary, listAlerts } from '../api/client';
@@ -74,9 +76,10 @@ function CompactTotals({ summary }: { summary: InboxSummary }) {
 
 export function Inbox() {
   const { id } = useParams();
-  const mobile = useArenaViewportBelow('lg');
+  const [band, width] = useArenaContainerWidth<HTMLDivElement>();
+  const mobile = useArenaViewportBelow('lg') || (width !== null && width < arenaReadBreakpoint('md'));
   const narrow = useArenaViewportBelow('sm');
-  const { simulatedDay, version, advance, advancing } = useSimulation();
+  const { simulatedDay, atLastDay, version, advance, advancing } = useSimulation();
   const [filter, setFilter] = useState<Filter>('pending');
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [summary, setSummary] = useState<InboxSummary | null>(null);
@@ -101,8 +104,8 @@ export function Inbox() {
 
   if (mobile && id) {
     return (
-      <div className="arena-band page">
-        <AlertDetail id={id} />
+      <div ref={band} className="arena-band page">
+        <AlertDetail id={id} alone />
       </div>
     );
   }
@@ -123,7 +126,7 @@ export function Inbox() {
   const visible = alerts?.filter((a) => passesFilter(a, filter)) ?? null;
 
   return (
-    <div className="arena-band page arena-stack arena-stack--section">
+    <div ref={band} className="arena-band page arena-stack arena-stack--section">
       <ArenaPageHead
         title="Bandeja de decisiones"
         subtitle={simulatedDay ? `Situación al ${formatDate(simulatedDay)}` : undefined}
@@ -177,10 +180,12 @@ export function Inbox() {
               message={
                 filter === 'decided'
                   ? 'Lo que apruebes o rechaces queda aquí y en la bitácora.'
-                  : 'Todos los indicadores vigilados están dentro de sus umbrales. Avanza el día para revisar el siguiente.'
+                  : atLastDay
+                    ? 'Todos los indicadores vigilados están dentro de sus umbrales, y los datos llegan hasta este día.'
+                    : 'Todos los indicadores vigilados están dentro de sus umbrales. Avanza el día para revisar el siguiente.'
               }
               action={
-                filter === 'decided' ? undefined : (
+                filter === 'decided' || atLastDay ? undefined : (
                   <ArenaButton variant="secondary" icon="ph-bold ph-fast-forward" loading={advancing} onClick={advance}>
                     Avanzar un día
                   </ArenaButton>
@@ -194,7 +199,7 @@ export function Inbox() {
         {mobile ? null : (
           <section className="inbox__column" aria-label="Detalle de la alerta">
             {id ? (
-              <AlertDetail id={id} />
+              <AlertDetail id={id} alone={false} />
             ) : (
               <ArenaEmptyState
                 icon="ph-bold ph-cursor-click"

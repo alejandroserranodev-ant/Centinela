@@ -13,6 +13,7 @@ import type { ChatMessage, ChatOutcome, Query } from '../api/types';
 import { SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
+import { fillSentence } from '../format';
 
 const FIELD_ID = 'chat-question';
 
@@ -126,7 +127,7 @@ export function Chat() {
     setAlertTitle(null);
     if (state.alertId) {
       getAlert(state.alertId).then(
-        (a) => setAlertTitle(a.title.text),
+        (a) => setAlertTitle(fillSentence(a.title.text, a.title.figures)),
         () => setAlertTitle(null),
       );
     }

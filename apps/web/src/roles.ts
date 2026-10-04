@@ -7,8 +7,12 @@ const ROLE: Record<Persona['role'], string> = {
   auditor: 'Auditoría',
 };
 
+export function roleName(role: string): string {
+  return ROLE[role as Persona['role']] ?? role;
+}
+
 export function roleLabel(persona: Pick<Persona, 'role' | 'area'>): string {
-  const label = ROLE[persona.role];
+  const label = roleName(persona.role);
   return persona.role === 'lider_proceso' && persona.area ? `${label} · ${persona.area}` : label;
 }
 

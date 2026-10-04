@@ -1,3 +1,16 @@
+export const OFFLINE = 'No hay conexión con Centinela. Revisa que el servicio esté encendido e intenta de nuevo.';
+
+export async function reach(send: () => Promise<Response>, fail: (message: string) => Error): Promise<Response> {
+  try {
+    return await send();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error;
+    }
+    throw fail(OFFLINE);
+  }
+}
+
 export function messageOfError(body: string, statusText: string): string {
   try {
     const detail = (JSON.parse(body) as { detail?: unknown }).detail;

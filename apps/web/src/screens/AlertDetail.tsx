@@ -7,10 +7,10 @@ import {
   ArenaSection,
   ArenaSkeleton,
   ArenaSpinner,
-  useArenaViewportBelow,
 } from '@dravensoft/arena-react';
-import { ApiError, getAlert, getQuery } from '../api/client';
-import type { Alert, Evidence, MergedAlert, Query } from '../api/types';
+import { ApiError, getAlert, getQuery, listBitacora } from '../api/client';
+import type { Alert, Evidence, LogEvent, MergedAlert, Query } from '../api/types';
+import { latestResult } from '../logEvent';
 import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
@@ -60,7 +60,30 @@ function Merged({ alert }: { alert: MergedAlert }) {
   );
 }
 
+function NotExecuted({ alert }: { alert: Alert }) {
+  const [result, setResult] = useState<LogEvent | null | undefined>(undefined);
+  useEffect(() => {
+    setResult(undefined);
+    listBitacora({ alertId: alert.id, type: 'result' }).then((events) => setResult(latestResult(events)), () => setResult(null));
+  }, [alert.id, alert.status]);
+  if (result) {
+    return (
+      <ArenaAlert tone="warning" title="Aprobada, sin ejecutar">
+        {result.detail}
+      </ArenaAlert>
+    );
+  }
+  return (
+    <ArenaAlert tone="success" title="Aprobada">
+      {result === undefined ? 'Revisando el resultado de la acción…' : 'La acción está en curso.'}
+    </ArenaAlert>
+  );
+}
+
 function Outcome({ alert, onOpen }: { alert: Alert; onOpen: (id: string) => void }) {
+  if (alert.status === 'approved' && !alert.executedAction) {
+    return <NotExecuted alert={alert} />;
+  }
   if (alert.status === 'merged' && alert.mergedInto) {
     const into = alert.mergedInto;
     return (
@@ -87,9 +110,8 @@ function Outcome({ alert, onOpen }: { alert: Alert; onOpen: (id: string) => void
   return null;
 }
 
-export function AlertDetail({ id }: { id: string }) {
+export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
   const navigate = useNavigate();
-  const mobile = useArenaViewportBelow('lg');
   const { version, openChat } = useSimulation();
   const [alert, setAlert] = useState<Alert | null>(null);
   const [failure, setFailure] = useState<Error | null>(null);
@@ -108,7 +130,7 @@ export function AlertDetail({ id }: { id: string }) {
     setAlert(null);
   }, [id]);
 
-  const back = mobile ? (
+  const back = alone ? (
     <div>
       <ArenaButton variant="ghost" size="sm" icon="ph-bold ph-arrow-left" onClick={() => navigate('/')}>
         Volver a la bandeja

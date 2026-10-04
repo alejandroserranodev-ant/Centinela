@@ -14,7 +14,10 @@ import {
 import { ApiError, listAlerts, listBitacora } from '../api/client';
 import type { Actor, Agent, Alert, LogEvent, LogEventType } from '../api/types';
 import { useSimulation } from '../state/Simulation';
-import { formatShortDate, formatShortDateTime } from '../format';
+import { fillSentence, formatShortDate, formatShortDateTime } from '../format';
+import { SentenceWithFigures } from '../common/SentenceWithFigures';
+import { withoutAlert } from '../logEvent';
+import { roleName } from '../roles';
 
 const PAGE_SIZE = 10;
 
@@ -50,7 +53,7 @@ const COLUMNS: ArenaTableColumn[] = [
 ];
 
 function who(actor: Actor): string {
-  return actor.kind === 'agent' ? `Centinela · ${STAGE[actor.agent]}` : `${actor.name} (${actor.role})`;
+  return actor.kind === 'agent' ? `Centinela · ${STAGE[actor.agent]}` : `${actor.name} (${roleName(actor.role)})`;
 }
 
 function SourceButton({ queryId, open }: { queryId: string; open: (id: string) => void }) {
@@ -86,7 +89,7 @@ export function Bitacora() {
     });
   }, [alertId, type, version, attempt]);
 
-  const titles = new Map(alerts.map((a) => [a.id, a.title.text]));
+  const titles = new Map(alerts.map((a) => [a.id, fillSentence(a.title.text, a.title.figures)]));
   const visible = events?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? [];
 
   return (
@@ -95,7 +98,7 @@ export function Bitacora() {
       <div className="filters">
         <ArenaSelect
           label="Alerta"
-          options={[{ value: '', label: 'Todas las alertas' }, ...alerts.map((a) => ({ value: a.id, label: a.title.text }))]}
+          options={[{ value: '', label: 'Todas las alertas' }, ...alerts.map((a) => ({ value: a.id, label: titles.get(a.id) ?? a.id }))]}
           value={alertId}
           onChange={(value) => {
             setAlertId(value);
@@ -140,14 +143,16 @@ export function Bitacora() {
                 </ArenaTableCell>
               ) : (
                 <ArenaTableCell>
-                  <span className="text-muted">Chat, sin alerta</span>
+                  <span className="text-muted">{withoutAlert(e.type)}</span>
                 </ArenaTableCell>
               )}
               <ArenaTableCell>
                 <ArenaTag>{EVENT[e.type]}</ArenaTag>
               </ArenaTableCell>
               <ArenaTableCell>{who(e.actor)}</ArenaTableCell>
-              <ArenaTableCell>{e.detail}</ArenaTableCell>
+              <ArenaTableCell>
+                <SentenceWithFigures text={e.detail} figures={e.figures ?? []} />
+              </ArenaTableCell>
               <ArenaTableCell>
                 {e.queryId ? <SourceButton queryId={e.queryId} open={openQuery} /> : <span className="text-muted">Sin cifras</span>}
               </ArenaTableCell>

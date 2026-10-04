@@ -70,7 +70,8 @@ and what each shows is
   status and `detail`, which `src/api/error-message.ts:messageOfError(body, statusText)` reads: a string
   `detail` as it comes, the first `msg` of a validation list, otherwise the body or the status
   text. The SSE calls throw the same error before their stream starts, so a screen shows the API's
-  own Spanish, such as the 409 of a second day run.
+  own Spanish, such as the 409 of a second day run. No answer at all is `ApiError` 0 with
+  `src/api/error-message.ts:OFFLINE`.
 - **`getInboxSummary` reads `GET /bandeja/resumen`**, so the three totals arrive as `Figure`s
   whose `queryId` `getQuery` answers with the query over the alerts table.
 - **A person signs in before any screen.** `/ingresar` is the one route outside the shell; every
@@ -122,7 +123,7 @@ and what each shows is
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's
   rule `arenaToastDelay`, which `src/state/Simulation.tsx:useToasts()` applies with the shorter
-  interval.
+  interval. On a phone they sit above the bottom bar, clear of the clock.
 - **Each chart sits in a box that clips sideways**, the `chart` class of `src/app.css`.
   `ArenaLineChart` hides its accessible table in a one-pixel box, but a table lays out to its
   content anyway and would widen the page at phone width. Clipping the inline axis alone keeps the
@@ -130,8 +131,9 @@ and what each shows is
 - **The chat is a non-modal `ArenaSheet`, so it handles focus itself.** The sheet takes no focus
   and traps none, and Escape reaches it only from inside. Opening moves focus to the question
   field, and closing returns it to the control that opened the chat. On a desktop the shell gives
-  up the sheet's width at its inline end while the chat is open, so the alert stays readable
-  beside the answer. The sheet covers the end of the bar while it is open, because Arena places it
+  up the sheet's width at its inline end while the chat is open, and an inbox narrower than
+  Arena's `md` shows one column, as on a phone, so
+  the alert stays readable beside the answer. The sheet covers the end of the bar while it is open, because Arena places it
   above fixed navigation.
 - **Enter sends a question and Shift + Enter breaks the line.** `ArenaTextarea` exposes no key
   events, so the form around it listens for them. The field stops at the API's 500 characters and
@@ -147,8 +149,8 @@ and what each shows is
 - **A Bitácora filter returns the reader to page 1.** `ArenaTable` returns to page 1 only when
   the page falls out of range, and it does not slice rows, so the screen keeps the page, slices
   ten rows and resets the page whenever a criterion changes. A chat row asked from no alert stays
-  in the list, its alert cell an unlinked "Chat, sin alerta", because a question is a step of the
-  log as much as a decision is.
+  in the list, its alert cell an unlinked `src/logEvent.ts:withoutAlert(type)`, because a
+  question is a step of the log as much as a decision is.
 - **The settings screen has one save action for all its tabs.** A change in any tab is a draft
   until "Guardar cambios", so no tab saves half a configuration. Only a threshold that is one
   number is an input; the others read as their rule. "Ejecuta" is disabled in every autonomy
@@ -157,7 +159,9 @@ and what each shows is
 - **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
   leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta" with the
   action that opens its `mergedInto`, and the alert that remains lists each merged one under
-  "Alertas con la misma causa", `src/screens/AlertDetail.tsx:AlertDetail({ id })`.
+  "Alertas con la misma causa", `src/screens/AlertDetail.tsx:AlertDetail({ id, alone })`.
+- **An `approved` alert with no `executedAction` shows its newest `result` row**,
+  `src/logEvent.ts:latestResult(events)`. At `ultimoDia` the clock offers no next day.
 - **An action type at `inform` shows no Aprobar or Editar**: `src/screens/ProposedActions.tsx:ProposedActions({ alert })`
   reads the settings' autonomy and says the type only informs, because the API refuses its approval.
 
@@ -200,7 +204,7 @@ a table view.
   figures `src/common/SentenceWithFigures.tsx:SentenceWithFigures()` links: "how I got here" is
   the third level of every explanation. An agent writes each figure as a placeholder, `{0}`, and
   the sentence fills it with the figure as `src/format.ts:formatFigureInText(figure)` writes it
-  before linking it. *No gate holds this.*
+  before linking it, or `src/format.ts:fillSentence(text, figures)` where no link fits. *No gate holds this.*
 - **Severity is a badge with its word**: `src/common/Badges.tsx:Severity()` pairs each tone with
   its Spanish label, so no screen tells severity by colour alone.
 - **Every amount and date goes through `src/format.ts`**: pesos as `COP` in `es-CO`, dates spelled

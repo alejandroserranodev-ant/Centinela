@@ -17,6 +17,7 @@ interface ChatState {
 
 interface Simulation {
   simulatedDay: string | null;
+  atLastDay: boolean;
   version: number;
   advancing: boolean;
   step: AgentStep | null;
@@ -77,6 +78,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const toasts = useToasts();
   const actions = useRef(new Map<number, ToastAction>());
   const [simulatedDay, setSimulatedDay] = useState<string | null>(null);
+  const [lastDay, setLastDay] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [advancing, setAdvancing] = useState(false);
   const [step, setStep] = useState<AgentStep | null>(null);
@@ -100,7 +102,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     getSimulatedDay()
-      .then(setSimulatedDay)
+      .then((day) => {
+        setSimulatedDay(day.dia);
+        setLastDay(day.ultimoDia);
+      })
       .catch((e: unknown) => {
         if (!(e instanceof ApiError && e.status === 401)) {
           notify({
@@ -164,6 +169,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Simulation>(
     () => ({
       simulatedDay,
+      atLastDay: simulatedDay !== null && lastDay !== null && simulatedDay >= lastDay,
       version,
       advancing,
       step,
@@ -180,7 +186,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       closeChat: () => setChat({ open: false }),
       clearChatContext: () => setChat((c) => ({ open: c.open })),
     }),
-    [simulatedDay, version, advancing, step, advance, changed, toasts, notify, toastAction, openQueryId, chat],
+    [simulatedDay, lastDay, version, advancing, step, advance, changed, toasts, notify, toastAction, openQueryId, chat],
   );
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>;

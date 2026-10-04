@@ -52,11 +52,11 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       } else if (decision.kind === 'request_changes') {
         notify({ tone: 'neutral', title: 'Cambios solicitados', message: 'La propuesta se revisará con tu motivo.' });
       } else {
-        notify({
-          tone: 'success',
-          title: `Aprobada: ${chosen.title}`,
-          message: result.executedAction?.result,
-        });
+        notify(
+          result.executedAction
+            ? { tone: 'success', title: `Aprobada: ${chosen.title}`, message: result.executedAction.result }
+            : { tone: 'neutral', title: `Aprobada, sin ejecutar: ${chosen.title}`, message: 'La alerta dice por qué.' },
+        );
       }
       setEditing(false);
       setRejecting(false);
