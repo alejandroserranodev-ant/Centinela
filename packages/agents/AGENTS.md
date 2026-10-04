@@ -200,9 +200,9 @@ agent its share.
 > **Limit.** Severity has no definition anywhere in the tree: `apps/web/src/api/types.ts:Severity`
 > types it, and no metric, KPI or rule computes it, while raising again and [the order](#the-day-run)
 > rest on it. The earlier alerts that
-> `centinela_agents/graph.py:start_alert(graph, detection, *, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)`
-> receives are `{id: status}` only, so no step can compare a metric, an entity or a severity with
-> them.
+> `centinela_agents/graph.py:start_alert(graph, detection, *, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)`
+> receives carry a state, a metric, an entity and a cause, and no severity, so no step can compare
+> one.
 
 ### `Analista` explains
 
@@ -215,6 +215,12 @@ agent its share.
   draws no statistical inference, forecasts nothing and claims no more than "coincides with". At
   most one main cause and two contributing ones; hypotheses come from its skill for the alert's
   metric, plus one free hypothesis held to the same tests.
+- **Same cause:** its prompt quotes, as data, each other alert in `nueva`, `en análisis` or
+  `propuesta` with its metric, entity and cause's sentence, its placeholders filled in code, and
+  its model may name one as `same_cause_as`, by the rule of its contract.
+  `centinela_agents/agents/analista.py:same_cause(answer, cause, found, alert_id)` keeps the id
+  only when it is one of those alerts, not this one, and the cause is `identified`, and logs the
+  drop otherwise. The nodes of `explicar` then merge.
 - **Never:** looks for new alerts, proposes an action, estimates an impact, answers a question.
 
 ### `Chat` answers a question
@@ -303,7 +309,7 @@ to decide: every route is a branch of the tree, and the interpreter decides only
 It is code, except the step that classifies a rejection reason.
 
 - **Input:** to start an alert, `start_alert` above: the detection, the alert id, the simulated
-  day, the earlier alerts, and the rejection reasons `apps/api` kept for the metric, already split
+  day, the earlier alerts with their briefs, and the rejection reasons `apps/api` kept for the metric, already split
   by the agent that reads them. To resume one,
   `centinela_agents/graph.py:resume(graph, alert_id, decision)` with the decision `apps/api`
   recorded. The version of the tree comes through `centinela_agents/graph.py:Compiler`.
@@ -346,7 +352,8 @@ declare is dropped without a trace, so the leaves return none.
 |---|---|---|
 | `alert_id`, `simulated_day`, `entry` (the leaf `detectar` reached) | `start_alert` | every node, `apps/api` |
 | `detection`: `metric`, `entity`, `path` (each node of `detectar` and its branch), `row` (the KPI row) | `start_alert` | the leaves, `ejecutar.vigente` through `still_breaks` |
-| `earlier_alerts`: the state of each earlier alert, by id | `start_alert` | `estado.same_cause_as.status` |
+| `earlier_alerts`: the state of each earlier alert, by id | `start_alert` | `estado.same_cause_as.status`, `Analista` |
+| `alert_briefs`: the metric, entity and cause of each earlier alert, by id | `start_alert` | `Analista` |
 | `cause_rejections`, `proposal_rejections` | `start_alert`; a `request_changes` adds to the second | `Analista`, `Estratega` |
 | `title` | `Vigía` | `apps/api` |
 | `cause`, `same_cause_as` | `Analista`, or the fallback | `Estratega`, the nodes of `explicar`, `apps/api` |

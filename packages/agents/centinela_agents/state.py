@@ -28,6 +28,7 @@ class AlertState(TypedDict, total=False):
     simulated_day: str
     entry: str
     earlier_alerts: dict[str, str]
+    alert_briefs: dict[str, dict[str, Any]]
     detection: dict[str, Any]
     title: dict[str, Any]
     cause: dict[str, Any] | None

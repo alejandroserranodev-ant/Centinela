@@ -261,12 +261,14 @@ def thread(alert_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": alert_id}}
 
 
-def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, cause_rejections=(), proposal_rejections=()) -> dict[str, Any]:
+def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=()) -> dict[str, Any]:
+    earlier = {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id}
     initial = {
         "alert_id": alert_id,
         "simulated_day": day,
         "entry": detection.entry,
-        "earlier_alerts": {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id},
+        "earlier_alerts": earlier,
+        "alert_briefs": {other: dict(brief) for other, brief in (alert_briefs or {}).items() if other in earlier},
         "detection": {
             "metric": detection.metric,
             "entity": list(detection.entity),

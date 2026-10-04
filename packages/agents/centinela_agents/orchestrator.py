@@ -150,6 +150,7 @@ class CentinelaOrchestrator:
         alert_id: str,
         day: str,
         earlier_alerts: Mapping[str, str] | None = None,
+        alert_briefs: Mapping[str, Mapping[str, Any]] | None = None,
         cause_rejections: list[dict] | None = None,
         proposal_rejections: list[dict] | None = None,
     ) -> dict[str, Any]:
@@ -161,6 +162,7 @@ class CentinelaOrchestrator:
             alert_id: Unique alert ID
             day: Simulated day (YYYY-MM-DD)
             earlier_alerts: State of earlier alerts (for merge detection)
+            alert_briefs: Metric, entity and cause of each earlier alert, by id, which Analista reads as data
             cause_rejections: Rejection reasons about causes (from API)
             proposal_rejections: Rejection reasons about proposals (from API)
 
@@ -182,6 +184,7 @@ class CentinelaOrchestrator:
                 alert_id=alert_id,
                 day=day,
                 earlier_alerts=earlier_alerts or {},
+                alert_briefs=alert_briefs or {},
                 cause_rejections=cause_rejections or [],
                 proposal_rejections=proposal_rejections or [],
             )

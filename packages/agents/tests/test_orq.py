@@ -96,6 +96,17 @@ def test_orq_a_larger_alert_absorbs_a_smaller_one_still_nueva():
     assert awaiting_decision(graph, "A1")
 
 
+def test_orq_three_alerts_of_one_cause_end_as_one_that_remains_and_two_unida():
+    named = iter(["C1", "B1"])
+    explained = {("analista", "explicar"): lambda state: {"cause": {"kind": "identified", "sentence": {"text": "x", "figures": []}, "evidence": []}, "same_cause_as": next(named)}}
+    graph = compiled(Recorder(), overrides=explained)
+    first = start_alert(graph, saldo_detection(), alert_id="B1", day=DAY, earlier_alerts={"C1": "nueva"})
+    second = start_alert(graph, saldo_detection(), alert_id="A1", day=DAY, earlier_alerts={"B1": "propuesta"})
+    assert first["merged_alerts"] == ["C1"] and ["C1", "unida"] in first["transitions"]
+    assert awaiting_decision(graph, "B1")
+    assert second["merged_into"] == "B1" and statuses(second) == ["nueva", "en análisis", "unida"]
+
+
 @pytest.mark.parametrize("named, earlier", [("R1", {"R1": "rechazada"}), ("A1", {}), ("X9", {})], ids=["rejected", "itself", "unknown"])
 def test_orq_a_same_cause_that_fails_both_checks_is_dropped_and_logged(named, earlier):
     recorder = Recorder()

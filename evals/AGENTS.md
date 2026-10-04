@@ -25,8 +25,9 @@ table below, and its name or its parameters say which.
   [`../packages/agents/tests/test_orq.py`](../packages/agents/tests/test_orq.py) compiles the tree
   with stub leaves and a stub KPI reader and is named for its case.
   [`../packages/agents/AGENTS.md`](../packages/agents/AGENTS.md) names the command. The cases that
-  need `apps/api`'s record (a second `/simulacion/avanzar`, the order of a day's alerts, three
-  alerts of one cause, a reason handed to the next run of its metric) are not in that file.
+  need `apps/api`'s record (a second `/simulacion/avanzar`, the order of a day's alerts, a reason
+  handed to the next run of its metric) are not in that file; the record of a merge is
+  `apps/api/tests/test_ciclo_orquestado.py`'s.
 - **The chat's cases**: `TestChatRouting` and `TestChatInjections` of
   [`../packages/agents/tests/test_graph_routing.py`](../packages/agents/tests/test_graph_routing.py)
   walk the chat graph with stub leaves, and the base tree with a model that obeys any order; the
