@@ -1,4 +1,6 @@
-"""Exercises the skeleton end to end: real Postgres, no agents wired in yet.
+"""Exercises the endpoints end to end against a real Postgres.
+
+A day advance runs the agents in process only when LLM_MODEL is set; without it, it ends with no alerts.
 
 Needs the Postgres from data/docker-compose.yml with data/sql/01..03 and
 apps/api/sql/01_esquema.sql already applied, and DSN_ADMIN set.

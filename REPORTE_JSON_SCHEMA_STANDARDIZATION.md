@@ -1,179 +1,47 @@
-# Reporte: JSON Schema Standardization
+# The HTTP contract's JSON schema
 
-**Fecha**: 2026-10-03  
-**Scope**: Mejorar schemas JSON sin cambiar comportamiento, rutas, ni métodos HTTP  
-**Status**: ✅ Completado
+This page holds the conventions that shape the JSON `apps/api` serves and the OpenAPI schema
+FastAPI derives from it. They belong to [`apps/api/AGENTS.md`](./apps/api/AGENTS.md); the page sits at
+the root, and not on that level, because the team keeps the tree's file structure as it is.
+What each endpoint serves and refuses is the endpoint table of that page.
 
----
+## The conventions
 
-## Cambios Implementados
+- **Every model extends `Esquema`** in
+  [`apps/api/src/centinela_api/modelos.py`](./apps/api/src/centinela_api/modelos.py), whose
+  config sets `alias_generator=to_camel`, `populate_by_name=True` and `extra="forbid"`. The
+  Python fields are snake_case and the JSON is camelCase (`pesos_at_risk` travels as
+  `pesosAtRisk`), so `apps/web/src/api/types.ts` mirrors the JSON field for field without a
+  reshape. A request with a key the model does not declare is refused with 422; the snake_case
+  name is accepted too, but the contract is the camelCase one.
+- **Unions are discriminated by `kind`**: `Cause` (`identified`, `no_evidence`), `Actor` (`agent`,
+  `person`) and `Decision` (`approve`, `edit`, `reject`), so the schema names which variant each
+  body is.
+- **Statuses are English inside and Spanish at the edge.** The `status` field speaks
+  `AlertStatus`; the query parameter `estado` of `GET /alertas` speaks `AlertEstadoEnum`, the
+  brief's Spanish names, which `apps/api/src/centinela_api/ciclo_vida.py:ESTADO_A_STATUS` maps. An
+  unknown `estado` is refused by the enum's validation with FastAPI's own 422 body.
+- **Every field carries a `Field(description=...)`**, and some carry an `example`, so the schema
+  explains itself. Pydantic warns that `example` as a keyword is deprecated in favour of
+  `json_schema_extra`.
+- **Every JSON route declares its `response_model`**, so the schema names its response. The SSE
+  routes (`/simulacion/avanzar`, `/chat`) return a `StreamingResponse` and declare none; the
+  models of their events are `AgentStep` and `ChatMessage`, except the `agent_step` and `end`
+  events of `avanzar`, which are plain dictionaries the schema does not describe.
+- **Query parameters carry a description**, and the endpoint's docstring is its description in
+  the schema.
+- **Routers are tagged** where the schema groups them: `alerts` for `/alertas` and `internal` for
+  `/interno`. The other routers carry no tag.
 
-### 1. **Response Model para `/simulacion/dia-actual`**
+## Reading the schema
 
-**Antes**:  
-```python
-async def dia_actual(...) -> dict:
-    return {"dia": dia.isoformat()}
-```
+While uvicorn runs (the commands are on [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands)),
+Swagger UI is served at `/docs` and the raw schema at `/openapi.json`.
 
-**Después**:  
-```python
-class SimulatedDay(Esquema):
-    """Current simulated day in ISO 8601 format."""
-    dia: str = Field(..., description="Current simulated day (YYYY-MM-DD)", example="2026-10-03")
+## Adding to the contract
 
-@router.get("/simulacion/dia-actual", response_model=SimulatedDay)
-async def dia_actual(...) -> SimulatedDay:
-    return SimulatedDay(dia=dia.isoformat())
-```
-
-**Impacto OpenAPI**:  
-- Antes: `{}` (dict genérico)
-- Después: `{"dia": "2026-10-03"}` (schema explícito con descripción y ejemplo)
-
----
-
-### 2. **Enum para Query Parameter `estado`**
-
-**Antes**:  
-```python
-estado: str | None = None
-# Validación manual dentro del endpoint
-if estado is not None and estado not in ESTADO_A_STATUS:
-    raise HTTPException(422, "estado desconocido")
-```
-
-**Después**:  
-```python
-class AlertEstadoEnum(str, Enum):
-    """Valid alert estado values (Spanish names for API contract)."""
-    NUEVA = "nueva"
-    EN_ANALISIS = "en_analisis"
-    PROPUESTA = "propuesta"
-    APROBADA = "aprobada"
-    RECHAZADA = "rechazada"
-    EJECUTADA = "ejecutada"
-
-@router.get("/alertas")
-async def listar(
-    estado: Annotated[AlertEstadoEnum | None, Query(...)] = None,
-    ...
-```
-
-**Impacto OpenAPI**:  
-- Schema incluye componente `AlertEstadoEnum` con 6 valores enumerados
-- Swagger UI puede mostrar dropdown con valores válidos
-- Documentación automática de qué valores acepta el parámetro
-
----
-
-### 3. **Documentación de Query Parameters**
-
-**Bitácora** (`/bitacora`):
-```python
-@router.get("/bitacora")
-async def listar(
-    alertId: str | None = Query(None, description="Filter by alert ID (UUID-like identifier)"),
-    type: LogEventType | None = Query(None, description="Filter by event type"),
-    ...
-) -> list[LogEvent]:
-    """Get audit log (bitácora)..."""
-```
-
-**Impacto**: Query parameters ahora tienen descripciones explícitas en OpenAPI.
-
----
-
-### 4. **Tags para Organización OpenAPI**
-
-```python
-router = APIRouter(tags=["alerts"])  # En alertas.py
-router = APIRouter(prefix="/interno", tags=["internal"])  # En interno.py (existía)
-```
-
-**Impacto**: Swagger agrupa endpoints por categoría.
-
----
-
-## Archivos Modificados
-
-| Archivo | Cambios |
-|---------|---------|
-| `src/centinela_api/modelos.py` | + `SimulatedDay`, + `AlertEstadoEnum(str, Enum)` |
-| `src/centinela_api/routers/simulacion.py` | Importar `SimulatedDay`, usar en `response_model` |
-| `src/centinela_api/routers/alertas.py` | Importar `AlertEstadoEnum`, tipado enum en `estado`, agregar `tags`, documentación |
-| `src/centinela_api/routers/bitacora.py` | Agregar `description` a query params, docstring al endpoint |
-
----
-
-## Esquemas Mejorados
-
-| Schema | Tipo | Cambio |
-|--------|------|--------|
-| `SimulatedDay` | Response | NUEVO — reemplaza `dict` genérico |
-| `AlertEstadoEnum` | Enum | NUEVO — 6 valores explícitos |
-| `LogEventType` | Enum | Ya existía, ahora documentado en OpenAPI |
-
----
-
-## Validación
-
-**Endpoints testeados**:
-```bash
-curl http://127.0.0.1:8000/simulacion/dia-actual
-# 200: {"dia": "2026-10-03"}
-
-curl http://127.0.0.1:8000/alertas?estado=nueva
-# 200: []
-
-curl http://127.0.0.1:8000/alertas?estado=invalid
-# 422: {"detail": "estado desconocido: invalid"}
-
-curl http://127.0.0.1:8000/openapi.json | jq '.components.schemas.AlertEstadoEnum'
-# {"type": "string", "enum": ["nueva", "en_analisis", ...], "title": "AlertEstadoEnum"}
-```
-
----
-
-## Compatibilidad
-
-✅ **Ningún cambio breaking**:
-- Rutas: sin cambios
-- Métodos HTTP: sin cambios
-- Comportamiento: idéntico
-- Request/Response: misma estructura JSON (naming camelCase preservado)
-
-El JSON que el cliente recibe es idéntico. Solo la validación y documentación mejoraron.
-
----
-
-## Observación: OpenAPI y `| None`
-
-FastAPI genera `anyOf` para parámetros con uniones (`AlertEstadoEnum | None`).  
-Este es comportamiento estándar de JSON Schema + FastAPI, no incorrecto, pero menos explícito que un enum puro.
-
-El endpoint funciona correctamente:
-- Acepta `estado=nueva` ✅
-- Rechaza `estado=invalid` con 422 ✅
-- Permite omitir `estado` (None por defecto) ✅
-
-La representación en OpenAPI es `anyOf: [{"enum": [...]}, {"type": "null"}]`.  
-Swagger UI aún permite usuarios seleccionar valores válidos.
-
----
-
-## Próximos Pasos (No Alcanzados)
-
-- Enums explícitos sin `anyOf` (requeriría refactor de parámetros opcionales)
-- Documentación de headers (`X-Agent`, `X-Agent-Key`, `X-User-Role`, etc.)
-- Estandarización de status codes por tipo de error
-- Descripción detallada de cada endpoint (docstrings expandidos)
-
----
-
-## Tokens Gastados
-
-- Audit (agent): ~30k
-- Implementación: ~35k
-- Testing: ~10k
-- **Total**: ~75k / 150k (50% del presupuesto)
+1. Write the model in `apps/api/src/centinela_api/modelos.py`, extending `Esquema`, with a
+   description on every field.
+2. Use a `Literal` or an `Enum` for a closed set of values, so the schema lists them.
+3. Set `response_model` on the route, and a description on each query parameter.
+4. Mirror the camelCase JSON in `apps/web/src/api/types.ts`.
