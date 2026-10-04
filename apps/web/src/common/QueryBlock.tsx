@@ -23,9 +23,11 @@ function heading(column: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+const HIDDEN_COLUMNS = new Set(['id', 'alerta_id']);
+
 export function QueryBlock({ query }: { query: Query }) {
   const rows = query.rows ?? [];
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const columns = rows.length > 0 ? Object.keys(rows[0]).filter((c) => !HIDDEN_COLUMNS.has(c)) : [];
   return (
     <div className="arena-stack arena-stack--group query">
       <p className="query__description">{query.description}</p>
