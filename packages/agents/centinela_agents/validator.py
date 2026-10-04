@@ -94,6 +94,12 @@ def load_base(arbol: Path, metricas: Path, skills: Path, catalog: Catalog) -> Tr
     )
 
 
+def load_grounds(arbol: Path, metricas: Path, skills: Path, catalog: Catalog) -> Grounds:
+    registry = load_registry(arbol / "fundamentos.yaml")
+    metrics = load_metrics(metricas)
+    return Grounds(checked_base(load_yaml(arbol / "base.yaml"), registry, metrics, catalog, skills), registry, metrics, catalog, skills)
+
+
 def shape_problems(tree: Tree) -> list[str]:
     found: list[str] = []
     seen: set[str] = set()
