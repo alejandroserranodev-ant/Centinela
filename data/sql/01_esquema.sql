@@ -43,3 +43,10 @@ CREATE TABLE ref_margen_minimo_linea (linea text PRIMARY KEY, margen_minimo_pct 
 
 CREATE INDEX ON pedidos (fecha); CREATE INDEX ON pedidos (cliente_id); CREATE INDEX ON pedidos_detalle (sku);
 CREATE INDEX ON facturas (cliente_id); CREATE INDEX ON pagos (factura_id); CREATE INDEX ON inventario_diario (sku, bodega_id);
+
+-- Read-only user for packages/tools (MCP SQL server)
+-- Vigía and other agents query metrics through this user; no write access
+CREATE ROLE tools_reader WITH LOGIN PASSWORD 'tools_reader_password';
+GRANT USAGE ON SCHEMA centinela TO tools_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA centinela TO tools_reader;
+ALTER DEFAULT PRIVILEGES IN SCHEMA centinela GRANT SELECT ON TABLES TO tools_reader;

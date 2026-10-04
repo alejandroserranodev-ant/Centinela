@@ -12,6 +12,7 @@ interface Props {
 function proposalLine(alert: Alert): string | null {
   if (alert.status === 'proposed') {
     const [first, ...others] = alert.actions;
+    if (!first) return null;
     return others.length === 0 ? `Propuesta: ${first.title}` : `Propuesta: ${first.title} y ${others.length} más`;
   }
   const executed = alert.actions.find((a) => a.id === alert.executedAction?.actionId);
