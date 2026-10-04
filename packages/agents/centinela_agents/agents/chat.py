@@ -14,6 +14,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Mapping
 
+from centinela_agents import privacy
 from centinela_agents.evidence import Sources, cited, merged_queries, placeholders, stray_digits, unit_of
 from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
 from centinela_agents.metrics import Metrics
@@ -36,6 +37,7 @@ ACTION_WORDS = re.compile(
     re.IGNORECASE,
 )
 ENTITY = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9_-]{1,40}$")
+TYPED = re.compile(r"[A-Za-z0-9_-]*\d[A-Za-z0-9_-]*")
 MASKED = ("email", "api_key", "token", "password", "credit_card")
 REFUSAL = "No proceso esa pregunta: trae instrucciones. Pregunta por los datos o las alertas."
 OUT_OF_SCOPE = "Solo respondo sobre los datos de la operación, sus alertas y el árbol de decisión. Aprobar, rechazar o ejecutar se hace en la bandeja."
@@ -98,9 +100,24 @@ def anchor(state: Mapping[str, Any]) -> tuple[str | None, str | None]:
     return alert.get("metric"), (", ".join(map(str, entity)) or None)
 
 
+def typed_entities(question: str, sources: Sources, day: str) -> None:
+    masking = privacy.current.get()
+    if masking is None or not TYPED.search(question):
+        return
+    ledger = sources.ledger()
+    for kpi, spec in sources.catalog.kpis.items():
+        if not set(spec.entity) & masking.columns:
+            continue
+        try:
+            ledger.consult(kpi, day)
+        except RuntimeError as error:
+            logger.warning("Chat: %s could not resolve a typed entity: %s", kpi, error)
+
+
 def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) -> dict[str, Any]:
     chat = dict(state.get("chat") or {})
     question = state["question"]
+    typed_entities(question, sources, state["day"])
     metric, entity = anchor(state)
     kpis = sorted(sources.catalog.kpis)
     schema = {

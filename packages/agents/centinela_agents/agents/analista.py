@@ -14,7 +14,7 @@ import json
 import logging
 from typing import Any, Mapping
 
-from centinela_agents.evidence import Sources, UnknownFigure, cited, fills, merged_queries, stray_digits, mask_entity
+from centinela_agents.evidence import Sources, UnknownFigure, cited, fills, merged_queries, stray_digits
 from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
 from centinela_agents.schema import CauseIdentified, CauseNoEvidence
@@ -141,11 +141,8 @@ def explain_cause(provider: LLMProvider, state: Mapping[str, Any], sources: Sour
     rejections = "\n".join(f"- {reason}" for reason in state.get("cause_rejections") or []) or "- ninguno"
     insufficient = "sí: la causa anterior no sostuvo ninguna acción" if state.get("insufficient_cause") else "no"
     found = candidates(state)
-
-    # Use masked entity in prompt
-    masked_entity = ", ".join(mask_entity(detection["entity"]))
     prompt = f"""detection.metric: {metric}
-detection.entity: {masked_entity}
+detection.entity: {entity}
 simulated_day: {day}
 cause_rejections:
 {rejections}

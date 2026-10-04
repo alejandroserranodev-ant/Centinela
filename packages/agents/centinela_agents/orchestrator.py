@@ -33,8 +33,10 @@ import uuid
 from dataclasses import replace
 from typing import Any, Mapping
 
+from centinela_tools.masking import Masking
 from langgraph.types import Command
 
+from . import privacy
 from .agents.analista import explain_cause
 from .agents.chat import answer, classify, closing, screen
 from .agents.ejecutor import execute_action
@@ -57,9 +59,12 @@ logger = logging.getLogger(__name__)
 TOKEN_CAP = 50_000
 
 
-def rejection_target(provider: LLMProvider, state: Mapping[str, Any]) -> str:
+def rejection_target(provider: LLMProvider, state: Mapping[str, Any], catalog: Any) -> str:
     reason = (state.get("decision") or {}).get("reason") or ""
-    return classify_rejection(provider, reason, state.get("cause") or {}, state.get("actions"))["destino"]
+    masking = Masking()
+    privacy.register_state(masking, catalog, state)
+    with privacy.scope(masking):
+        return classify_rejection(provider, reason, state.get("cause") or {}, state.get("actions"))["destino"]
 
 
 class CentinelaOrchestrator:
@@ -144,7 +149,7 @@ class CentinelaOrchestrator:
             metrics=self.metrics,
             catalog=catalog,
             reader=reader,
-            classify=lambda state: rejection_target(provider, state),
+            classify=lambda state: rejection_target(provider, state, catalog),
             checkpointer=checkpointer,
             owners=owners,
             token_cap=token_cap,
@@ -323,7 +328,11 @@ class CentinelaOrchestrator:
             "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "periodo": None, "figuras": None},
             "queries": [],
         }
-        state = self._chat_graph.invoke(initial, dict(self.tracer.config(f"chat_{uuid.uuid4().hex[:12]}")) if self.tracer else None)
+        masking = Masking()
+        privacy.register_state(masking, self.catalog, initial)
+        traced = dict(self.tracer.config(f"chat_{uuid.uuid4().hex[:12]}")) if self.tracer else {}
+        config = {**traced, "configurable": {**(traced.get("configurable") or {}), **privacy.configured(masking)["configurable"]}}
+        state = self._chat_graph.invoke(initial, config)
         nodes = index(self.tree)
         steps = [
             {"node": node_id, "branch": branch, "agent": nodes[node_id].hoja.agente if node_id in nodes and nodes[node_id].hoja else None}
@@ -339,6 +348,7 @@ class CentinelaOrchestrator:
             "screen": screened,
             "failures": state.get("failures") or [],
             "costs": state.get("costs") or [],
+            "prompts": state.get("prompts") or [],
         }
 
     def run_day(self, ctx: Context, day: str, *, earlier=(), watched=None, limit: int = 3, cause_rejections=None, proposal_rejections=None):
