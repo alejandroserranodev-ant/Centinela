@@ -104,7 +104,9 @@ def grow(tree: Tree, grounds: Grounds, growth: Growth, rejections: Iterable[Reje
         move = drafted_split(tree, metric, reached) if reached else None
         if move is None:
             continue
-        evidence = tuple(sorted(set().union(*(rows[action] for action in reached))))
+        nodes = index(tree)
+        added = set(reached) - set(nodes[metric_leaf(nodes, metric)].hoja.excluye)
+        evidence = tuple(sorted(set().union(*(rows[action] for action in added))))
         found = expansion_problems(tree, move, grounds, growth.caps)
         if found:
             grown.append(Grown("estratega", move, evidence, None, tuple(found)))

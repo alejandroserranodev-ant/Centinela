@@ -1,7 +1,7 @@
 import hashlib
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Annotated, Literal, Mapping, Sequence
 
@@ -127,13 +127,17 @@ def split_move_problems(nodes: Mapping[str, Node], move: Split) -> list[str]:
     leaf = nodes.get(move.hoja)
     if leaf is None or leaf.hoja is None:
         return [f"{move.agente} splits {move.hoja}, which is no leaf of the tree"]
+    if move.nueva.hoja is None:
+        return [f"{move.nueva.id}, the new leaf of the split, carries no hoja"]
     found: list[str] = []
     if leaf.hoja.agente != move.agente:
         found.append(f"{move.agente} splits {move.hoja}, a leaf of {leaf.hoja.agente}")
     if move.nodo.divide != move.hoja:
         found.append(f"{move.nodo.id} must divide {move.hoja}")
     found += fresh_problems(nodes, [move.nodo, move.nueva])
-    if move.nueva.sigue != leaf.sigue:
+    if move.nueva.sigue is None:
+        found.append(f"{move.nueva.id} lacks its sigue")
+    elif move.nueva.sigue != leaf.sigue:
         found.append(f"{move.nueva.id} continues to {move.nueva.sigue}, where {move.hoja} continues to {leaf.sigue}")
     return found
 
@@ -241,6 +245,20 @@ def layer_hash(tree: Tree) -> str:
         sorted((resolved(node, nodes).model_dump() for node in tree.nodos if node.hoja is None and level(node.id) == 1), key=lambda node: node["id"]),
     ]
     return hashlib.sha256(json.dumps(layer, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
+
+
+def fingerprint(grounds: Grounds, growth: Growth) -> str:
+    skills = grounds.skills
+    loaded = {node.hoja.skill for node in grounds.base.nodos if node.hoja is not None}
+    files = sorted({*loaded, "estratega/acciones.md", *(path.relative_to(skills).as_posix() for path in (skills / "analista").glob("*.md"))})
+    read = {
+        "base": grounds.base.model_dump(mode="json"),
+        "registry": sorted(grounds.registry),
+        "metrics": asdict(grounds.metrics),
+        "growth": {"repetitions": dict(growth.repetitions), "caps": asdict(growth.caps)},
+        "skills": {name: (skills / name).read_text(encoding="utf-8") for name in files},
+    }
+    return hashlib.sha256(json.dumps(read, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
 
 
 def replay(base: Tree, moves: Sequence, grounds: Grounds, caps: Caps) -> tuple[Tree, list[tuple[int, list[str]]]]:

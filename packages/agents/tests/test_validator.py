@@ -7,7 +7,7 @@ import pytest
 
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import GATE
-from centinela_agents.validator import InvalidTree, checked_base, load_base, load_registry, problems
+from centinela_agents.validator import InvalidTree, checked_base, load_grounds, load_registry, problems
 from support import ARBOL, METRICAS, SKILLS, KERNEL_CATALOG, base_data, grounds, node_of, split_data
 
 
@@ -157,7 +157,7 @@ PLANTED = [
     ("exclusion of an unknown row", split_with(leaf={"excluye": ["act-saldo_vencido-r99"]}), "excludes act-saldo_vencido-r99, which no row of acciones.md names"),
     ("base leaf with an exclusion", set_leaf("hoja.estratega.proponer", excluye=["act-saldo_vencido-r1"]), "leaf hoja.estratega.proponer differs from the base"),
     ("retired last branch of a metric", set_key("detectar.inventario.cobertura_dias.minima", "retirado", "No aplica"), "metric cobertura_dias has no L3 branch in detectar"),
-    ("retired family", set_key("detectar.inventario", "retirado", "No aplica"), "metric cobertura_dias has no L3 branch in detectar"),
+    ("retired family", set_key("detectar.cartera", "retirado", "No aplica"), "metric saldo_vencido has no L3 branch in detectar"),
     ("retired L1 node", set_key("explicar.con_evidencia", "retirado", "No aplica"), "L1 node explicar.con_evidencia differs from the base"),
 ]
 
@@ -199,8 +199,8 @@ def test_a_metric_with_no_branch_skill_or_action_row_is_refused():
     assert "metric metrica_nueva has no row in skills/estratega/acciones.md" in found
 
 
-def test_load_base_returns_the_base_from_its_files():
-    assert load_base(ARBOL, METRICAS, SKILLS, KERNEL_CATALOG).version == 1
+def test_load_grounds_returns_the_base_from_its_files():
+    assert load_grounds(ARBOL, METRICAS, SKILLS, KERNEL_CATALOG).base.version == 1
 
 
 def test_checked_base_raises_with_every_problem():

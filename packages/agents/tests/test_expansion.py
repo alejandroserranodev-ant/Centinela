@@ -1,17 +1,18 @@
 # The three moves of an expansion and the fixed criteria: a valid split and a valid branch pass and
 # keep L0 and L1, each planted move is refused naming its criterion, the caps hold, and a replay
 # drops only the moves the version refuses. Each test named test_orq_ is an ORQ- case.
+import shutil
 from dataclasses import replace
 
 import pytest
 
 from centinela_agents.catalog import Catalog, Kpi
-from centinela_agents.expansion import Branch, Caps, MOVE, Retire, Split, apply_move, cap_problems, entry_of, expansion_problems, layer_hash, load_growth, replay
+from centinela_agents.expansion import Branch, Caps, MOVE, Retire, Split, apply_move, cap_problems, entry_of, expansion_problems, fingerprint, layer_hash, load_growth, replay
 from centinela_agents.metrics import load_metrics
-from centinela_agents.schema import Leaf, Node, Predicate, index
+from centinela_agents.schema import Tree, Leaf, Node, Predicate, index, level
 from centinela_agents.validator import load_grounds
 from centinela_agents.walk import Context, detect
-from support import ARBOL, DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, SKILLS, base_tree, grounds, reader_from, split_tree
+from support import ARBOL, DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, SKILLS, base_data, base_tree, grounds, node_of, reader_from, split_tree
 
 WIDE = Caps(depth=100, nodes_per_stage=100)
 DIVISION = "proponer.cartera.saldo_vencido.division_1"
@@ -38,7 +39,29 @@ def test_orq_a_split_passes_keeps_l0_and_l1_and_yields_the_split_tree():
     child = apply_move(base_tree(), split())
     assert child == split_tree()
     assert layer_hash(child) == layer_hash(base_tree())
+    assert child.leyes == base_tree().leyes
+    assert {node.id for node in child.nodos if node.hoja is None and level(node.id) == 1} == {node.id for node in base_tree().nodos if node.hoja is None and level(node.id) == 1}
     assert entry_of(split()) == DIVISION
+
+
+def test_the_layer_hash_moves_when_l0_or_an_l1_node_changes():
+    data = base_data()
+    law = data["leyes"][0]
+    law["fundamento"] = "iso31000.6.6"
+    assert layer_hash(Tree.model_validate(data)) != layer_hash(base_tree())
+    data = base_data()
+    node_of(data, "aprobar.decision")["predicado"]["valor"] = ["approve"]
+    assert layer_hash(Tree.model_validate(data)) != layer_hash(base_tree())
+
+
+def test_a_split_whose_new_node_is_no_leaf_is_refused_naming_that_problem():
+    found = expansion_problems(base_tree(), split(leaf={"hoja": None}), grounds(), WIDE)
+    assert found == ["hoja.estratega.proponer.saldo_vencido.1, the new leaf of the split, carries no hoja"]
+
+
+def test_a_split_whose_new_leaf_lacks_its_sigue_is_refused_naming_that_problem():
+    found = expansion_problems(base_tree(), split(leaf={"sigue": None}), grounds(), WIDE)
+    assert found == ["hoja.estratega.proponer.saldo_vencido.1 lacks its sigue"]
 
 
 def test_orq_a_branch_for_a_new_kpi_passes_and_its_detection_walks_it():
@@ -132,3 +155,54 @@ def test_a_replay_applies_each_move_in_order_and_drops_the_refused_ones():
 def test_load_grounds_returns_the_checked_base_and_its_registry():
     loaded = load_grounds(ARBOL, METRICAS, SKILLS, KERNEL_CATALOG)
     assert loaded.base == base_tree() and "iso31000.6.5.2" in loaded.registry
+
+
+def skills_copy(tmp_path):
+    shutil.copytree(SKILLS, tmp_path / "skills")
+    return tmp_path / "skills"
+
+
+def digest(growth=None, skills=SKILLS, **changes):
+    return fingerprint(replace(grounds(), skills=skills, **changes), growth or load_growth(ARBOL / "crecimiento.yaml"))
+
+
+def test_the_fingerprint_is_the_same_for_two_loads_of_the_same_inputs():
+    first = load_grounds(ARBOL, METRICAS, SKILLS, KERNEL_CATALOG)
+    second = load_grounds(ARBOL, METRICAS, SKILLS, KERNEL_CATALOG)
+    growth = load_growth(ARBOL / "crecimiento.yaml")
+    assert fingerprint(first, growth) == fingerprint(second, growth) == digest()
+    assert len(digest()) == 64
+
+
+def test_the_fingerprint_moves_when_the_base_the_registry_the_metrics_or_the_growth_settings_change():
+    data = base_data()
+    node_of(data, "aprobar.decision")["predicado"]["valor"] = ["approve"]
+    real = load_metrics(METRICAS)
+    growth = load_growth(ARBOL / "crecimiento.yaml")
+    changed = {
+        "base": digest(base=Tree.model_validate(data)),
+        "registry": digest(registry=grounds().registry | {"iso9999.1"}),
+        "metrics": digest(metrics=replace(real, threshold_sources={**real.threshold_sources, "saldo_vencido": "otro"})),
+        "repetitions": digest(growth=replace(growth, repetitions={"estratega": growth.repetitions["estratega"] + 1})),
+        "depth": digest(growth=replace(growth, caps=replace(growth.caps, depth=growth.caps.depth + 1))),
+        "nodes per stage": digest(growth=replace(growth, caps=replace(growth.caps, nodes_per_stage=growth.caps.nodes_per_stage + 1))),
+    }
+    assert len({digest(), *changed.values()}) == len(changed) + 1
+
+
+@pytest.mark.parametrize("name", ["estratega/acciones.md", "vigia/contrato.md", "analista/saldo_vencido.md", "analista/politicas.md"])
+def test_the_fingerprint_moves_when_a_skill_it_reads_changes(tmp_path, name):
+    skills = skills_copy(tmp_path)
+    assert digest(skills=skills) == digest()
+    with (skills / name).open("a", encoding="utf-8") as file:
+        file.write("\nchanged\n")
+    assert digest(skills=skills) != digest()
+
+
+def test_the_fingerprint_moves_when_an_analyst_skill_is_added_or_removed(tmp_path):
+    skills = skills_copy(tmp_path)
+    (skills / "analista" / "nueva.md").write_text("x", encoding="utf-8")
+    assert digest(skills=skills) != digest()
+    (skills / "analista" / "nueva.md").unlink()
+    (skills / "analista" / "saldo_vencido.md").unlink()
+    assert digest(skills=skills) != digest()

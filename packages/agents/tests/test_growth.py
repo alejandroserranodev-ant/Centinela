@@ -67,6 +67,7 @@ def test_a_second_row_of_the_same_metric_nests_and_its_retirement_restores_the_f
     assert metric_leaf(nodes, "saldo_vencido") == "hoja.estratega.proponer.saldo_vencido.2"
     retired = index(apply_move(second.tree, Retire(nodo=SECOND, motivo="No ayudó")))
     assert metric_leaf(retired, "saldo_vencido") == "hoja.estratega.proponer.saldo_vencido.1"
+    assert retired["hoja.estratega.proponer.saldo_vencido.1"].hoja.excluye == (R1,)
     assert metric_leaf(retired, "margen_pct") == "hoja.estratega.proponer"
 
 
@@ -83,6 +84,14 @@ def test_a_draft_the_criteria_refuse_comes_back_with_its_problems_and_no_tree():
     assert grown.tree is None and any("past the cap" in problem for problem in grown.problems)
 
 
+def test_a_row_the_leaf_already_excludes_lends_no_alert_to_the_new_version():
+    (first,) = grow(base_tree(), grounds(), GROWTH, rejected("A1", "A2", "A3"), ())
+    rejections = rejected("A1", "A2", "A3") + rejected("B1", "B2", "B3", actions=(R2,))
+    (second,) = grow(first.tree, grounds(), GROWTH, rejections, ())
+    assert second.evidence == ("B1", "B2", "B3")
+    assert second.move.nueva.hoja.excluye == (R1, R2)
+
+
 def test_orq_no_module_of_packages_agents_opens_a_database_connection():
     sources = [path.read_text(encoding="utf-8") for path in (AGENTS / "centinela_agents").rglob("*.py")]
-    assert not [text for text in sources if re.search(r"^\s*(import|from)\s+psycopg", text, re.MULTILINE)]
+    assert not [text for text in sources if re.search(r"^\s*(import|from)\s+(psycopg|sqlite3|asyncpg|sqlalchemy)", text, re.MULTILINE)]

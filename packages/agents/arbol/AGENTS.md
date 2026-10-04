@@ -219,7 +219,7 @@ agent, a `chat` leaf `detectar.raiz` reaches, and any node or end both roots rea
 ## The validator
 
 `centinela_agents/validator.py:problems(data, grounds)` returns every problem of a tree, and
-`centinela_agents/validator.py:load_base(arbol, metricas, skills, catalog)` raises with all of
+`centinela_agents/validator.py:load_grounds(arbol, metricas, skills, catalog)` raises with all of
 them, so an invalid base stops the start. **`tests/test_validator.py:PLANTED` is the complete list
 of what it refuses**, one planted violation per rule, each named for the rule it breaks; a rule
 that never fires fails there, and the base itself must pass with no problem. Its families:
@@ -242,7 +242,9 @@ that never fires fails there, and the base itself must pass with no problem. Its
 - a metric of `data/metricas.yaml` with no live L3 branch in `detectar`, one no retired node hides,
   no `skills/analista/<metric>.md`, or no row in
   [`skills/estratega/acciones.md`](../skills/estratega/acciones.md), which
-  `centinela_agents/validator.py:coverage_problems(tree, grounds)` reads;
+  `centinela_agents/validator.py:coverage_problems(tree, grounds)` reads, as
+  `centinela_agents/validator.py:exclusion_problems(tree, grounds)` reads the rows, both from
+  `grounds.skills`;
 - L0, an L1 node or a leaf of the base that differs from the base, reading every reference to a
   split node as one to its leaf, or an L1 node the base lacks.
 
@@ -309,6 +311,11 @@ that breaks any row below, and a refused move never becomes a version a run walk
 | the version's longest path and the nodes of each stage stay under the caps of `crecimiento.yaml`; a retirement is not held to them, because it only removes live nodes and a cap must never keep a person from retiring | `centinela_agents/expansion.py:cap_problems(tree, caps)` |
 | the evidence reached its count | `centinela_agents/growth.py:grow(tree, grounds, growth, rejections, consumed)` |
 
+`centinela_agents/expansion.py:fingerprint(grounds, growth)` digests everything the validator and
+the replay read: the base, the registry, the metrics, the caps and repetitions, `skills/estratega/acciones.md`, the
+skills the base leaves load and `skills/analista/*.md`. A digest that differs from the one a
+version was built under says its criteria may have moved.
+
 A refused draft is not retried with the criterion named, because a drafter handed the same
 evidence drafts the same move; how `apps/api` records it is
 [`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions).
@@ -321,7 +328,8 @@ reaches with a node reading `estado.detection.metric`, and gives the new leaf th
 `excluye`. A second row of the same metric splits that new leaf, so the exclusions accumulate and
 retiring the second restores the first. An alert counts once: the drafter skips every alert a
 version already names, so a retired expansion is drafted again only when new rejections reach the
-count.
+count. The alerts a version consumes are the ones behind the rows it adds to `excluye`, never
+those behind a row the leaf already excludes.
 
 - **The count is three**, `repeticiones.estratega.valor`, because one rejection is one person's
   judgement of one alert and two can coincide, while each one past three is another alert a person

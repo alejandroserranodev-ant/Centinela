@@ -84,16 +84,6 @@ def checked_base(data: Mapping[str, Any], registry: frozenset[str], metrics: Met
     return base
 
 
-def load_base(arbol: Path, metricas: Path, skills: Path, catalog: Catalog) -> Tree:
-    return checked_base(
-        load_yaml(arbol / "base.yaml"),
-        load_registry(arbol / "fundamentos.yaml"),
-        load_metrics(metricas),
-        catalog,
-        skills,
-    )
-
-
 def load_grounds(arbol: Path, metricas: Path, skills: Path, catalog: Catalog) -> Grounds:
     registry = load_registry(arbol / "fundamentos.yaml")
     metrics = load_metrics(metricas)
@@ -386,7 +376,7 @@ def leaf_problems(tree: Tree, skills: Path) -> list[str]:
 
 
 def exclusion_problems(tree: Tree, grounds: Grounds) -> list[str]:
-    known = {f"act-{metric}-{row.ref}" for metric in grounds.metrics.names for row in action_rows(metric)}
+    known = {f"act-{metric}-{row.ref}" for metric in grounds.metrics.names for row in action_rows(metric, grounds.skills)}
     found: list[str] = []
     for node in tree.nodos:
         leaf = node.hoja

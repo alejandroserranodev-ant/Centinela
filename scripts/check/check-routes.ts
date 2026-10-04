@@ -13,8 +13,8 @@ export const ENTRIES = new Map<string, Budget>([
 ]);
 
 export const ROUTES = new Map<string, Budget>([
-  ["the chat answered, refused or stayed silent when it should not have", [75500, "the chat's agent and its subtree are stated on the agents page and the tree's page"]],
-  ["an alert is missing, wrong, duplicated or fires on the wrong day", [99800, "the agents, the tree and the clock are the three places a detection is decided"]],
+  ["the chat answered, refused or stayed silent when it should not have", [75900, "the chat's agent and its subtree are stated on the agents page and the tree's page"]],
+  ["an alert is missing, wrong, duplicated or fires on the wrong day", [100200, "the agents, the tree and the clock are the three places a detection is decided"]],
   ["a number on screen disagrees with SQL", [58700, "a screen's figure comes from the fetch client or from what the API serves, and both pages say which"]],
   ["a number in an agent's answer or an alert disagrees with SQL", [47000, "a figure comes from the compiler and from the base KPI it compiles"]],
   ["something happened without approval, or the log is missing a step", [38600, "the decision checks, the in-process agents and the bitácora are stated on one page"]],
@@ -23,7 +23,7 @@ export const ROUTES = new Map<string, Budget>([
   ["what the challenge requires, what the jury tests, what is out of scope", [8500, "the brief's requirements are read on one page"]],
   ["a table, a CSV, a threshold, a policy document, the database setup, the generator", [24330, "one page owns the dataset, its setup and its generator"]],
   ["a KPI's definition, the kernel's language, a refusal by a guard", [47000, "the language is data's and the compiler is the tools', so both are read"]],
-  ["a node, a leaf, a level, a stage or the registry of the decision tree", [30500, "the tree's own page states every rule a node is written by"]],
+  ["a node, a leaf, a level, a stage or the registry of the decision tree", [31000, "the tree's own page states every rule a node is written by"]],
   ["an agent, the orchestrator, which model a step uses", [45000, "one page holds the agents, the orchestrator and the model providers"]],
   ["the instructions a model step loads, its skill", [6500, "the rules a skill is written by fit one short page"]],
   ["a tool an agent calls: SQL, policy search, impact, an action", [23500, "one page holds every tool, built or decided"]],
@@ -31,8 +31,8 @@ export const ROUTES = new Map<string, Budget>([
   ["an endpoint, the clock, the alert lifecycle, roles, the `bitácora`", [38600, "the API's page holds the clock, the lifecycle and the roles"]],
   ["a screen, a component, the Arena skin", [20200, "the screens' decisions and the skin's rules are one page"]],
   ["an evaluation case, or proving nothing regressed", [11300, "the evaluation page lists the cases and what runs them"]],
-  ["adding a metric that raises alerts, or a KPI that is evidence", [52700, "a metric is defined in the kernel first and wired into the tree second"]],
-  ["adding a node, an end, an orchestrator write, an agent decision or an action type", [30500, "the tree's checklists sit on the tree's own page"]],
+  ["adding a metric that raises alerts, or a KPI that is evidence", [53200, "a metric is defined in the kernel first and wired into the tree second"]],
+  ["adding a node, an end, an orchestrator write, an agent decision or an action type", [31000, "the tree's checklists sit on the tree's own page"]],
   ["adding a skill", [6500, "the checklist for a skill sits on the skills page"]],
   ["adding a tool or a guard", [23500, "the checklists for a tool and a guard sit on the tools page"]],
   ["adding an endpoint", [38600, "the endpoint table and its rule sit on the API's page"]],
