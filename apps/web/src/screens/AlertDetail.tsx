@@ -19,6 +19,7 @@ import { useSimulation } from '../state/Simulation';
 import { fillSentence, formatAlertTime, formatDate } from '../format';
 import { HowIGotHere } from './HowIGotHere';
 import { ProposedActions } from './ProposedActions';
+import { AgentPhasesModal } from './AgentPhasesModal';
 
 function Proof({ evidence }: { evidence: Evidence }) {
   const [source, setSource] = useState<Query | null>(null);
@@ -126,6 +127,7 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
   const [alert, setAlert] = useState<Alert | null>(null);
   const [failure, setFailure] = useState<Error | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [phasesModalOpen, setPhasesModalOpen] = useState(false);
 
   useEffect(() => {
     setFailure(null);
@@ -212,9 +214,12 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
             </span>
           ) : null}
         </p>
-        <div>
+        <div className="arena-row">
           <ArenaButton variant="ghost" size="sm" icon="ph-bold ph-chat-circle-text" onClick={() => openChat(alert.id)}>
             Preguntar sobre esta alerta
+          </ArenaButton>
+          <ArenaButton variant="secondary" size="sm" icon="ph-bold ph-flow-arrow" onClick={() => setPhasesModalOpen(true)}>
+            Ver fases de análisis
           </ArenaButton>
         </div>
       </header>
@@ -286,6 +291,8 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
           <HowIGotHere alert={alert} />
         </>
       )}
+
+      {alert && <AgentPhasesModal alert={alert} open={phasesModalOpen} onClose={() => setPhasesModalOpen(false)} />}
     </article>
   );
 }

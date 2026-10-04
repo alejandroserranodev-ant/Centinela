@@ -10,7 +10,7 @@ import { parameterName } from '../actionParameters';
 import { EditDialog } from './EditDialog';
 import { ReasonDialog } from './ReasonDialog';
 
-const TYPE: Record<ActionType, string> = {
+export const TYPE: Record<ActionType, string> = {
   email_draft: 'Borrador de correo',
   task: 'Tarea',
   purchase_order_draft: 'Borrador de orden de compra',
