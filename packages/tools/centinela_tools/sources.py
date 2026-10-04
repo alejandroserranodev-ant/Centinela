@@ -18,6 +18,7 @@ class Table:
     dates: Mapping[str, str]
     leaks: Mapping[str, tuple[Any, ...]]
     excluded: Mapping[str, str]
+    personal: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ def table_of(name: str, spec: Mapping[str, Any]) -> Table:
     dates = dict(spec.get("fechas", {}))
     leaks = spec.get("fuga", {})
     excluded = dict(spec.get("excluidas", {}))
+    personal = frozenset(spec.get("personales", []))
     if "dia" in columns:
         raise problem(f"{name}: a column named dia would shadow the argument of every kernel function")
     if set(columns.values()) - TYPES:
@@ -78,8 +80,10 @@ def table_of(name: str, spec: Mapping[str, Any]) -> Table:
         raise problem(f"{name}: a fuga column is readable and carries its razon")
     if set(excluded) & set(columns) or set(spec["clave"]) - set(columns):
         raise problem(f"{name}: an excluded column is not readable, and the key is readable")
+    if personal - set(columns):
+        raise problem(f"{name}: a personal column is readable")
     known = {column: tuple(leak.get("conocidos_al_crear", [])) for column, leak in leaks.items()}
-    return Table(name, tuple(spec["clave"]), columns, dates, known, excluded)
+    return Table(name, tuple(spec["clave"]), columns, dates, known, excluded, personal)
 
 
 def source_of(name: str, spec: Mapping[str, Any], tables: Mapping[str, Table]) -> Source:

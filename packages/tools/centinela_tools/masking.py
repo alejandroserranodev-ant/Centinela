@@ -1,105 +1,115 @@
-"""
-Personal data masking per Ley 1581.
-
-Masks sensitive entity IDs before they reach a model.
-- Placeholders are deterministic within a run, random across runs (per-run salt)
-- The mapping lives only for the run's duration
-- Rows arrive already masked to agents
-- Unmasking happens only in what a person reads (from SQL)
-"""
-
 import hashlib
+import hmac
+import logging
+import re
 import secrets
+from functools import cache
 from typing import Any, Mapping
 
+from .sources import Sources, load_sources
 
-class RunMasking:
-    """Per-run entity masking with deterministic placeholders."""
+logger = logging.getLogger(__name__)
 
-    # Columns that contain personal data (IDs that resolve to persons on screen)
-    PII_COLUMNS = frozenset({
-        "cliente_id",
-        "proveedor_id",
-        "vendedor_id",
-        "cliente_nombre",
-        "proveedor_nombre",
-        "vendedor_nombre",
-    })
+LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+WIDTH = 6
+EDGE_BEFORE = r"(?<![\w-])"
+EDGE_AFTER = r"(?![\w-])"
 
-    def __init__(self, run_id: str = ""):
-        """
-        Initialize masking for a run.
 
-        Args:
-            run_id: Unique identifier for this run (e.g., day + timestamp)
-                   If empty, a random salt is generated
-        """
-        self.run_id = run_id or secrets.token_hex(8)
-        self._mapping: dict[str, str] = {}  # Original → Placeholder
+@cache
+def catalogue() -> frozenset[str]:
+    return personal_columns(load_sources())
 
-    def mask(self, entity_id: str, prefix: str = "E") -> str:
-        """
-        Get consistent placeholder for an entity within this run.
-        Same entity always gets same placeholder during run.
-        Different run = different placeholder for same entity.
 
-        Args:
-            entity_id: Original value (cliente_id, sku, etc)
-            prefix: Placeholder prefix (E for entity, defaults)
+def personal_columns(sources: Sources | None = None) -> frozenset[str]:
+    if sources is None:
+        return catalogue()
+    return frozenset(column for table in sources.tables.values() for column in table.personal)
 
-        Returns:
-            Placeholder like "E-a1b2c3d4"
-        """
-        if entity_id in self._mapping:
-            return self._mapping[entity_id]
 
-        # Deterministic but salted hash
-        h = hashlib.sha256(f"{entity_id}|{self.run_id}".encode()).hexdigest()[:8]
-        placeholder = f"{prefix}-{h.upper()}"
-        self._mapping[entity_id] = placeholder
+def kind_of(column: str) -> str:
+    return column.removesuffix("_id").upper()
+
+
+def letters(digest: bytes, width: int) -> str:
+    number = int.from_bytes(digest, "big")
+    drawn = []
+    for _ in range(width):
+        number, index = divmod(number, len(LETTERS))
+        drawn.append(LETTERS[index])
+    return "".join(drawn)
+
+
+class Masking:
+    def __init__(self, columns: frozenset[str] | None = None, salt: bytes | None = None):
+        self.columns = catalogue() if columns is None else frozenset(columns)
+        self._salt = salt or secrets.token_bytes(16)
+        self._placeholders: dict[str, str] = {}
+        self._originals: dict[str, str] = {}
+        self._kinds = re.compile(EDGE_BEFORE + "(?:" + "|".join(sorted({kind_of(column) for column in self.columns})) + r")_[A-Z]{" + str(WIDTH) + "}[A-Z]*" + EDGE_AFTER) if self.columns else None
+        self._known: re.Pattern[str] | None = None
+
+    def register(self, column: str, value: Any) -> str | None:
+        if column not in self.columns or not isinstance(value, str) or not value.strip():
+            return None
+        key = value.casefold()
+        if key in self._placeholders:
+            return self._placeholders[key]
+        digest = hmac.new(self._salt, f"{column}\0{value}".encode(), hashlib.sha256).digest()
+        width = WIDTH
+        placeholder = f"{kind_of(column)}_{letters(digest, width)}"
+        while placeholder in self._originals:
+            width += 1
+            placeholder = f"{kind_of(column)}_{letters(digest, width)}"
+        self._placeholders[key] = placeholder
+        self._originals[placeholder] = value
+        self._known = None
         return placeholder
 
-    def unmask(self, placeholder: str) -> str | None:
-        """Reverse lookup (only valid during run)."""
-        for orig, ph in self._mapping.items():
-            if ph == placeholder:
-                return orig
-        return None
+    def register_row(self, row: Mapping[str, Any]) -> None:
+        for column, value in row.items():
+            self.register(column, value)
 
-    def mask_row(self, row: dict[str, Any]) -> dict[str, Any]:
-        """Mask all PII columns in a row."""
-        masked = {}
-        for key, value in row.items():
-            if key in self.PII_COLUMNS and isinstance(value, str):
-                masked[key] = self.mask(value)
-            else:
-                masked[key] = value
-        return masked
+    def register_tree(self, value: Any) -> None:
+        if isinstance(value, Mapping):
+            for key, inner in value.items():
+                if isinstance(inner, str):
+                    self.register(str(key), inner)
+                else:
+                    self.register_tree(inner)
+        elif isinstance(value, (list, tuple)):
+            for inner in value:
+                self.register_tree(inner)
 
-    def mask_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Mask multiple rows."""
-        return [self.mask_row(row) for row in rows]
+    def placeholder(self, original: str) -> str | None:
+        return self._placeholders.get(original.casefold())
 
+    def text(self, text: str) -> str:
+        if not self._placeholders:
+            return text
+        if self._known is None:
+            originals = sorted(self._originals.values(), key=len, reverse=True)
+            self._known = re.compile(EDGE_BEFORE + "(" + "|".join(map(re.escape, originals)) + ")" + EDGE_AFTER, re.IGNORECASE)
+        return self._known.sub(lambda match: self._placeholders[match.group(1).casefold()], text)
 
-# Global instance per run (created at request start, discarded at end)
-_current_masking: RunMasking | None = None
+    def unmask(self, text: str) -> str:
+        if self._kinds is None:
+            return text
 
+        def filled(match: re.Match[str]) -> str:
+            original = self._originals.get(match.group(0))
+            if original is None:
+                logger.warning("A model wrote %s, a placeholder no row of the run holds; it stays as written", match.group(0))
+                return match.group(0)
+            return original
 
-def set_run_masking(run_id: str) -> RunMasking:
-    """Set the masking context for this run."""
-    global _current_masking
-    _current_masking = RunMasking(run_id)
-    return _current_masking
+        return self._kinds.sub(filled, text)
 
-
-def get_run_masking() -> RunMasking:
-    """Get current run's masking (must be set first)."""
-    if _current_masking is None:
-        raise RuntimeError("No run masking context set. Call set_run_masking first.")
-    return _current_masking
-
-
-def clear_run_masking() -> None:
-    """Clear masking context (done at request end)."""
-    global _current_masking
-    _current_masking = None
+    def unmask_tree(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self.unmask(value)
+        if isinstance(value, Mapping):
+            return {key: self.unmask_tree(inner) for key, inner in value.items()}
+        if isinstance(value, list):
+            return [self.unmask_tree(inner) for inner in value]
+        return value

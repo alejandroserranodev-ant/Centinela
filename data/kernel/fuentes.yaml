@@ -3,14 +3,17 @@ tablas:
   vendedores:
     clave: [vendedor_id]
     columnas: { vendedor_id: text, region: text }
+    personales: [vendedor_id]
     excluidas: { nombre: "el nombre de una persona; ante un agente un vendedor es su vendedor_id" }
   clientes:
     clave: [cliente_id]
     columnas: { cliente_id: text, nombre: text, segmento: text, ciudad: text, region: text, vendedor_id: text, plazo_dias: integer, cupo_credito: bigint, fecha_alta: date }
+    personales: [cliente_id, nombre]
     fechas: { fecha_alta: evento }
   proveedores:
     clave: [proveedor_id]
     columnas: { proveedor_id: text, nombre: text, lead_time_dias: integer, pais: text }
+    personales: [proveedor_id, nombre]
   productos:
     clave: [sku]
     columnas: { sku: text, nombre: text, linea: text, proveedor_id: text, clase_abc: text, unidad: text }
