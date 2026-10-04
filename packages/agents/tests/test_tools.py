@@ -73,7 +73,6 @@ class TestBuscarPolitica:
         results = tool.search("límite de crédito")
 
         assert isinstance(results, list)
-        # Stub returns empty
         assert results == []
 
     def test_search_by_code(self):
@@ -82,7 +81,6 @@ class TestBuscarPolitica:
         results = tool.search_by_code("FIN-POL-004", "§3")
 
         assert isinstance(results, list)
-        # Stub returns empty
         assert results == []
 
     def test_policies_loaded(self):
@@ -99,7 +97,7 @@ class TestCalcularImpacto:
         """CalcularImpactoStub can be initialized."""
         tool = CalcularImpactoStub()
         assert tool.query_counter == 0
-        assert len(tool.formulas) == 7  # 8 minus dias_pago_prom
+        assert len(tool.formulas) == 7
 
     def test_calculate_traslado_costo(self):
         """Calculate traslado_costo formula."""

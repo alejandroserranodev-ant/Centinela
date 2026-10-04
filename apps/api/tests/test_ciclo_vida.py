@@ -1,6 +1,6 @@
 import pytest
 
-from centinela_api.ciclo_vida import ESTADO_A_STATUS, TransicionInvalida, transicionar
+from centinela_api.ciclo_vida import ESTADO_A_STATUS, TransicionInvalida, recorrer, transicionar
 
 
 def test_transiciones_validas():
@@ -34,3 +34,14 @@ def test_estado_a_status_cubre_el_ciclo_completo():
         "rejected",
         "executed",
     }
+
+
+def test_recorrer_acepta_un_camino_desde_new():
+    recorrer(["new", "analyzing", "proposed"])
+    recorrer(["new"])
+
+
+@pytest.mark.parametrize("estados", [[], ["analyzing", "proposed"], ["new", "proposed"], ["new", "analyzing", "analyzing"]])
+def test_recorrer_rechaza_un_camino_que_no_empieza_en_new_o_salta(estados):
+    with pytest.raises(TransicionInvalida):
+        recorrer(estados)

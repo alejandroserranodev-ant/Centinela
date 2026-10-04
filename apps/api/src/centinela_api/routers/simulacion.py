@@ -1,16 +1,16 @@
 import asyncio
+import datetime
 import logging
-import uuid
 
 import psycopg
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, simulacion
-from ..agentes import API_METRICS, get_context, get_orchestrator, state_to_alert
+from .. import bitacora, ciclo_vida, simulacion
+from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path
 from ..db import obtener_conexion
-from ..modelos import ActorAgent, SimulatedDay
+from ..modelos import ActorAgent, AgentStep, SimulatedDay
 from ..sse import flujo
 
 from centinela_agents.walk import detect
@@ -42,23 +42,24 @@ async def avanzar(
 
         try:
             ctx = get_context()
-            # Only process metrics the API Alert model supports
-            detections = [d for d in detect(ctx, day_str) if d.metric in API_METRICS]
+            with conn.transaction():
+                known = alertas_repo.ids(conn)
+            detections = prioritized(detect(ctx, day_str), known)
             orq = get_orchestrator()
 
             for detection in detections:
-                alert_id = f"alerta_{uuid.uuid4().hex[:16]}"
+                alert_id = alert_id_of(detection)
 
-                yield "agent_step", {
-                    "alertId": alert_id,
-                    "agent": "vigia",
-                    "status": "running",
-                    "description": f"Detectada anomalía en {detection.metric}",
-                }
+                inicio = datetime.datetime.now(datetime.UTC).isoformat()
+                yield "step", AgentStep(
+                    alert_id=alert_id,
+                    agent="vigia",
+                    status="running",
+                    description=f"Detectada anomalía en {detection.metric}",
+                    start=inicio,
+                )
 
                 try:
-                    # Run the orchestrator (Vigía → Analista → Estratega → GATE) in a thread
-                    # so the event loop stays responsive between SSE yields.
                     state = await asyncio.to_thread(
                         orq.start,
                         detection,
@@ -66,6 +67,7 @@ async def avanzar(
                         day=day_str,
                     )
                     alerta = state_to_alert(alert_id, state, detection, day_str)
+                    ciclo_vida.recorrer(status_path(alert_id, state))
 
                     with conn.transaction():
                         alertas_repo.guardar(conn, alerta)
@@ -74,20 +76,31 @@ async def avanzar(
                             ActorAgent(agent="vigia"),
                             f"Alerta detectada: {alerta.title.text}",
                             nuevo_dia,
+                            alerta.pesos_at_risk.query_id,
                         )
+                        for query in state.get("queries") or []:
+                            bitacora.registrar(
+                                conn, alert_id, "evidence",
+                                ActorAgent(agent="analista"),
+                                f"{query['kpi']} el {query['dia']}: {query['consulta']}",
+                                nuevo_dia,
+                                query["queryId"],
+                            )
 
                     new_alert_ids.append(alert_id)
 
-                    yield "agent_step", {
-                        "alertId": alert_id,
-                        "agent": "estratega",
-                        "status": "done",
-                        "description": (
+                    yield "step", AgentStep(
+                        alert_id=alert_id,
+                        agent="estratega",
+                        status="done",
+                        description=(
                             f"Propuestas {len(alerta.actions)} acción(es). Esperando decisión."
                             if alerta.actions
                             else "Procesado. Sin acciones automáticas."
                         ),
-                    }
+                        start=inicio,
+                        end=datetime.datetime.now(datetime.UTC).isoformat(),
+                    )
 
                 except Exception as e:
                     logger.error(f"Error processing detection {alert_id}: {e}", exc_info=True)

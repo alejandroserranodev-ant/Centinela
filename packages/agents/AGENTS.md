@@ -1,21 +1,52 @@
 # packages/agents: the orchestrator and the four agents
 
 This level holds the reasoning: the orchestrator and `Vigía`, `Analista`, `Estratega` and
-`Ejecutor`. It holds the decision tree, its validator and its interpreter as code; the agents hold
-no code yet, and this page states the domain each is built against. What the challenge asks of each
-agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its agents section. How
-an agent's instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md).
+`Ejecutor`. What runs: the validator of the decision tree, the walk of `detectar`, the catalogue and
+reader the kernel hands the tree, the compiler of the tree to a LangGraph graph that pauses for a
+person's decision, and the model leaves `centinela_agents/orchestrator.py:CentinelaOrchestrator`
+hands that compiler. Each leaf reads the kernel's `kpi_consultar` in code, loads its skill as the
+model's instructions, and calls the provider
+`centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` returns.
+`apps/api` builds that orchestrator in its own process and runs the day. `uv run pytest` holds the
+tree and the graph with stub leaves, and the leaves with a mocked provider and kernel;
+`uv run pytest -m modelo` runs the four agents against OpenAI and the kernel. What is decided,
+not built: the retry and the token cap, cost in the state, Langfuse traces, `AgentStep` emission
+from the graph, log events beyond `same_cause_dropped`, the chat route and self-expansion. Each section that states one opens
+with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
+instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
+each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md); how a provider
+is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 
 ## Why each file exists
 
 | Path | Why it exists |
 |---|---|
-| `arbol/base.yaml` | the base of the decision tree: the laws, and every node, leaf and end the orchestrator walks |
-| `arbol/fundamentos.yaml` | the registry: every clause and policy section a node may rest on |
-| `centinela_agents/` | the schema of the tree, its validator, the walk of `detectar`, and the compiler to the LangGraph graph |
+| `arbol/` | the base of the decision tree and its registry ([`arbol/AGENTS.md`](./arbol/AGENTS.md)) |
+| `centinela_agents/schema.py` | the tree's schema and its closed lists |
+| `centinela_agents/yaml_loader.py` | a YAML loader that reads only `true` and `false` as booleans |
+| `centinela_agents/metrics.py` | the descriptions and `umbrales` of `data/metricas.yaml`, and a threshold's shapes |
+| `centinela_agents/catalog.py` | the catalogue of KPI columns, the reader of a KPI on a day, and the connection to the kernel that builds both |
+| `centinela_agents/evidence.py` | what a leaf reads of the kernel: each query under its `queryId`, each figure as a numbered fact, and the refusal of a figure no query returned |
+| `centinela_agents/cache.py` | the in-process cache of model answers every provider of the factory sits behind |
+| `centinela_agents/skills.py` | the loading of a skill as a model's instructions, and the rows of `skills/estratega/acciones.md` |
+| `centinela_agents/predicate.py` | one comparison, and a threshold's value on a row |
+| `centinela_agents/validator.py` | every refusal of a tree, and the loading of the base |
+| `centinela_agents/state.py` | the state of an alert and the fields a node may read |
+| `centinela_agents/walk.py` | the walk of `detectar`, and the check that a detection still breaks |
+| `centinela_agents/graph.py` | the compiler to the LangGraph graph, the interrupt, the resume, the fallbacks |
+| `centinela_agents/failures.py` | the exceptions that name a leaf's failure |
+| `centinela_agents/llm_provider.py`, `centinela_agents/ollama_provider.py`, `centinela_agents/openai_provider.py`, `centinela_agents/provider_factory.py` | the provider interface, its two implementations, and the choice between them by environment ([`PHASE_1_SETUP.md`](./PHASE_1_SETUP.md)) |
+| `centinela_agents/schema.py` | also the output models of the leaves: `Cause`, `Action`, `ExecutedAction`, `Decision` ([`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md)) |
+| `centinela_agents/tools.py`, `centinela_agents/sql_vistas.py`, `centinela_agents/buscar_politica.py`, `centinela_agents/calcular_impacto.py`, `centinela_agents/action_tools.py` | the tool interfaces, their registry, the action stubs `Ejecutor` drafts with, and stubs of three tools no leaf calls ([`PHASE_3_SETUP.md`](./PHASE_3_SETUP.md)) |
+| `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
+| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start` and `resume` ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
+| `centinela_agents/security.py` | masking, secret detection and a prompt builder by trust level; `Ejecutor` masks an email's prompt with it ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
+| `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
+| `centinela_agents/output_validator.py` | checks of a leaf's output that only the tests run ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
 | `skills/` | what each agent is told ([`skills/AGENTS.md`](./skills/AGENTS.md)) |
-| `tests/` | one planted violation per rule of the validator, the walk of `detectar`, and the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` |
-| `pyproject.toml`, `uv.lock` | the package and its pinned dependencies, with `packages/tools` for the tests, which validate the base against the catalogue the kernel serves; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
+| `tests/` | the validator's planted violations, the walk of `detectar`, the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model, and the unit tests of each module above, `tests/test_evals.py` among them ([`PHASE_8_SETUP.md`](./PHASE_8_SETUP.md)); `tests/test_modelo.py` runs the four agents against the model and the kernel |
+| `PHASE_1_SETUP.md` … `PHASE_9_SETUP.md` | one page per subsystem above, the detail this page links |
+| `pyproject.toml`, `uv.lock` | the package, with `packages/tools`, the kernel's client, among its dependencies; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
 
 ## Commands
 
@@ -25,526 +56,394 @@ development machine has no `ensurepip` and uv builds the environment without it:
 | Command | What it does |
 |---|---|
 | `uv sync` | installs the package and its dependencies into `.venv` |
-| `uv run pytest` | validates the base tree and runs the routing cases on the compiled graph, with stub leaves and no model |
+| `uv run pytest` | validates the base tree, runs the routing cases on the compiled graph with stub leaves, and the unit tests of the leaves with a mocked provider and kernel; no model is called, because `pyproject.toml` deselects the marker `modelo` |
+| `uv run pytest -m modelo` | runs each agent's leaf against the model and the kernel the root `.env` and `.env.local` name, on the dataset's last day, in seconds on OpenAI; it skips when the provider has no key or does not answer, or the database does not |
 
 ## Decisions
 
-- **LangGraph is the orchestrator**, because it keeps state per alert and pauses the graph for human
-  approval. The approval is the interrupt at the gate `aprobar.decision`, which every path to
-  `Ejecutor` passes.
-- **Every model runs locally through Ollama**, because the team requires that no data leaves the
-  machine and the brief accepts open models through Ollama. One family, Qwen3, and one model loaded
-  at a time, because Ollama pays a load on every switch and the development machine has no room for
-  two. The model is sized to the machine that runs Ollama:
+- **LangGraph is the orchestrator**, because it keeps state per alert and pauses the graph for a
+  person. The pause is the interrupt at the gate `aprobar.decision`, which every path to `Ejecutor`
+  passes.
+- **`Vigía` detects with rules, not with a model.** Its triggers are the thresholds of
+  `data/metricas.yaml`, applied by the nodes of `detectar`. z-score and trend are descriptive
+  evidence and never trigger, because no document states a threshold for them.
+- **The kernel reaches the tree through three inputs**: the catalogue of KPI columns the validator
+  checks each `lee` against, `centinela_agents/catalog.py:catalog_from_kernel(answer)` over the
+  answer of `kpi_catalogo`; the reader the interpreter calls with a metric and a simulated day,
+  `centinela_agents/catalog.py:kernel_reader(call)` over `kpi_consultar`; and the call itself, which
+  the leaves read through. `centinela_agents/catalog.py:connect_kernel(env)` builds all three from
+  the DSNs of the environment. The reader and the leaves raise on a refusal, so a refused reading
+  never passes for a day with no alert. The tree holds no connection of its own: the kernel's
+  roles only read, as [`../../data/AGENTS.md`](../../data/AGENTS.md#rules-of-this-level) grants.
 
-  | Machine | Model |
-  |---|---|
-  | CPU only, under 16 GB of RAM | `qwen3:4b` |
-  | 16 GB or more | `qwen3:8b`, the team's default |
-  | a GPU with 24 GB or more | `qwen3:14b` or `qwen3:30b-a3b` |
+## Models
 
-  A model is admitted only when `ollama show <model>` lists `tools` among its capabilities.
-- **The two tiers the brief asks for are one model in two modes**: thinking on (`think: true`)
-  where an agent reasons (`Analista`, `Estratega`), thinking off where a step classifies, routes or
-  words a finding. Which mode a step uses is decided per step, not per agent.
-- **Every model call passes the JSON schema of its output in Ollama's `format` parameter**, because
-  a small model fills a schema more reliably than it writes free text, and a schema with no field
-  for an action is an agent that cannot propose one.
-- **`Vigía` detects with rules, not with a model.** Its triggers are the thresholds in
-  `metricas.yaml` (see [`../../data/AGENTS.md`](../../data/AGENTS.md)). z-score and trend are
-  computed and shown as descriptive evidence and never trigger, because no document states a
-  threshold for them.
-- **The kernel reaches the tree through two inputs**: the catalogue of KPI columns the validator
-  checks each `lee` against, and a reader the interpreter calls with a metric and a simulated day.
-  The tree never opens a connection, because no agent does.
-  `centinela_agents/catalog.py:catalog_from_kernel(answer)` builds the catalogue from the answer of
-  `kpi_catalogo`, and `centinela_agents/catalog.py:kernel_reader(call)` builds the reader from
-  `kpi_consultar`, raising on a refusal, so a refused reading never passes for a day with no alert.
+**Every agent runs on OpenAI's API, `gpt-4o-mini`, and the product stays able to run local
+models.** A leaf calls a model through `centinela_agents/llm_provider.py:LLMProvider`, with
+`generate_text(request)` for free text and `generate_structured(request)` for an output its JSON
+schema fixes. `centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)`
+chooses the implementation from `LLM_PROVIDER`, `openai` in the versioned `.env`, `ollama` when
+unset, `anthropic` raising, and the model from `LLM_MODEL`, which has no default. Both are read when
+`apps/api` first builds the orchestrator; the variables and the files they come from are
+[`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md). Each leaf is a function of its provider, so a
+test hands it a mock, and a machine that runs Ollama switches by the `.env` alone.
+
+**Why the cloud: the team's hardware could not run a local model at the pace of a demo.** The
+development machine, eight CPU cores, 9 GB of RAM and no GPU, ran `qwen3:4b-instruct` through
+Ollama at about two and a half tokens a second: one alert took three to four minutes and the
+integration test some ten, against a presentation of five. On `gpt-4o-mini` the four agents'
+tests take seconds. So the integration that runs and is tested end to end is the cloud one; the
+local path, `centinela_agents/ollama_provider.py:OllamaProvider`, is built and unit-tested, and
+was exercised against `qwen3:4b-instruct` until the time it took ruled it out, never as the
+product's path.
+
+- **`OpenAIProvider` passes the output's schema as a `json_schema` response format**, non-strict,
+  because the leaves' schemas leave fields optional, and `OllamaProvider` passes it in Ollama's
+  `format`: a model fills a schema more reliably than it writes free text, and a schema with no
+  field for an action is an agent that cannot propose one.
+- **The two tiers the brief asks for are a fast model and a reasoning slot**: every step uses
+  `LLM_MODEL`, and `LLM_MODEL_RAZONA`, empty by default, names another model for `Analista` and
+  `Estratega`, `centinela_agents/provider_factory.py:get_reasoning_provider()`. It is empty because
+  the team's API key serves `gpt-4o-mini` alone. Each leaf still sends its `thinking` flag, which
+  `OllamaProvider` passes as `think` and `OpenAIProvider` ignores, because a chat model of OpenAI
+  takes no such parameter.
+- **The code reads the kernel, and the model chooses and words.** A leaf reads its figures through
+  `kpi_consultar` before the model runs, and hands them as numbered facts; the model cites a fact by
+  its ref and writes `{0}` where it goes. `centinela_agents/evidence.py:Ledger` refuses a ref no
+  query returned, and `centinela_agents/evidence.py:stray_digits(text, allowed)` a figure written
+  outside a placeholder, because a model copies a number wrong more often than it chooses a fact
+  wrong, and one call per leaf is faster and cheaper than a loop of tool calls.
+- **A repeated request pays once.** `centinela_agents/provider_factory.py:cached(provider)` puts
+  every provider behind `centinela_agents/cache.py:CachingProvider(inner, size)`, an LRU of
+  `CENTINELA_CACHE_RESPUESTAS` answers keyed by the model and everything the request sends, at
+  temperature 0 only. A hit returns the stored answer with zero tokens and `cached` in its usage, so
+  a day run again, a repeated eval or a reopened alert costs nothing, and a cost count never charges
+  a hit. It lives in the process, because no agent writes anywhere. `OpenAIProvider` reports
+  `cached_tokens` besides, the part of a prompt OpenAI served from its own prompt cache, which
+  starts at 1,024 tokens of identical prefix: each prompt opens with its skill for that reason.
+- **Every output is short and capped**: a title, one sentence of cause with at most two pieces of
+  evidence, and one to three actions with an eight-word title, each call with its `max_tokens`,
+  because each token is paid and waited for.
+
+> **Limit.** Every prompt, with the alert's figures and entity identifiers, reaches OpenAI's
+> servers; only the prompt of an email draft is masked. The kernel's columns carry identifiers and
+> figures and no person's name, which bounds what leaves. The key lives in the ignored
+> `.env.local`, never in the versioned `.env`, because the repository is public and a key pushed to
+> it is revoked.
+
+**A local model, on a machine that can run one**, is admitted only when `ollama show <model>` lists
+`tools` among its capabilities, from the Qwen3 family, one loaded at a time, because Ollama pays a
+load on every switch. The tag `qwen3:4b` is the Thinking 2507 variant, which reasons whatever
+`think` says, so a CPU takes the instruct variant.
+
+| Machine | `LLM_PROVIDER` | `LLM_MODEL` | `LLM_MODEL_RAZONA` |
+|---|---|---|---|
+| the team's, and any without a GPU | `openai` | `gpt-4o-mini` | empty |
+| 16 GB of RAM or more | `ollama` | `qwen3:8b` | empty |
+| a GPU with 24 GB or more | `ollama` | `qwen3:14b` or `qwen3:30b-a3b` | a thinking model, when both fit |
 
 ## The universe
 
-**An agent knows `data/csv/` and `data/policies/`, reached through the kernel's KPIs and the
-`v_*` views, and nothing else.** No agent states a policy, a threshold or a fact those files do
-not hold. When a question falls outside them, the answer says so.
-
-**What the data cannot answer, and no agent covers:**
-
-| Topic | Why it is outside |
-|---|---|
-| payment agreements "registered in the system" (`FIN-POL-004` §6) | no table records them |
-| the quarterly review of a credit limit (`FIN-POL-004` §3) | no history of `cupo_credito` |
-| strategic customers with a shorter term (`FIN-POL-004` §2) | no column marks them |
-| written approval to sell below cost (`COM-POL-002` §4) | no field records it; an agent says "no approval is recorded in the data", never "the policy was breached" |
-| splitting orders to evade a cap (`COM-POL-002` §4) | the policy does not say how to recognise it, and defining it would invent a rule |
-| public holidays in "10 business days" (`OPE-POL-007` §4) | no calendar; business days are Monday to Friday, stated as an assumption |
-| an email address or phone of a customer or supplier | none exists; a draft addresses `cliente_id` or `proveedor_id` and `apps/web` resolves the name |
-| the goals of a customer or of the company, such as a sales target over six months | no table records them |
+**An agent knows `data/csv/` and `data/policies/`, reached through the kernel's KPIs and the `v_*`
+views, and nothing else.** No agent states a policy, a threshold or a fact those files do not hold;
+when a question falls outside them, the answer says so. What the data cannot answer, and the answer
+each topic gets, is the table of
+[`skills/analista/politicas.md`](./skills/analista/politicas.md#what-the-policies-do-not-cover).
 
 ## What a leaf may use
 
-**Each agent answers one question, and no agent answers another's.** Which agent acts next is a
-branch of the decision tree, in the next section; what an agent may use once a leaf calls it is
-this one, because a tool is a permission, not a route.
+**A leaf reads the kernel in code and gives its model no tool.**
+`centinela_agents/evidence.py:Sources` hands each leaf the kernel's call, the catalogue, the metrics
+and the tree's nodes. `Vigía` reads its KPI's row; `Analista` reads it and the rows every other KPI
+holds for the same entity on the simulated day; `Estratega` reads the KPI's row for its parameters
+and its impact. `Ejecutor` receives the action tools of the registry `apps/api` builds.
 
-| Agent | Its question | Model mode |
-|---|---|---|
-| `Vigía` | which written rule is broken today, by which entity, and how many pesos it exposes? | none to detect; thinking off to word the title |
-| `Analista` | why does it happen, according to the data and the policies? | thinking on |
-| `Estratega` | which action the policy prescribes fits, and what is it worth? | thinking on |
-| `Ejecutor` | how does the approved action become a draft, unchanged? | thinking off, for the body of an email only |
-| orchestrator | which step is the alert in, and who goes next? | thinking off, to classify a rejection reason only |
+> **Limit.** No leaf reads a `v_*` view or a policy: `centinela_agents/sql_vistas.py` and
+> `centinela_agents/buscar_politica.py` are stubs no leaf calls, and `centinela_agents/tools.py`
+> re-declares tools [`packages/tools`](../tools/AGENTS.md) owns. Its cost is a cause drawn from the
+> kernel's KPIs alone, and the hypotheses of `skills/analista/<metric>.md`, which name views, go
+> untested.
+
+**Each agent answers one question, and no agent answers another's.** Which agent acts next is a
+branch of the tree; what an agent may use once a leaf calls it is this section, because a tool is a
+permission, not a route. What each receives and returns is its skill's contract.
+
+| Agent | Its question | Model mode | Contract |
+|---|---|---|---|
+| `Vigía` | which written rule is broken on the simulated day, by which entity, and how many pesos it exposes? | none to detect; thinking off for the title | [`skills/vigia/contrato.md`](./skills/vigia/contrato.md) |
+| `Analista` | why does it happen, according to the data and the policies? | thinking on | [`skills/analista/contrato.md`](./skills/analista/contrato.md) |
+| `Estratega` | which action the policy prescribes fits, and what is it worth? | thinking on | [`skills/estratega/contrato.md`](./skills/estratega/contrato.md) |
+| `Ejecutor` | how does the approved action become a draft, unchanged? | thinking off | [`skills/ejecutor/contrato.md`](./skills/ejecutor/contrato.md) |
+| orchestrator | which step is the alert in, and who goes next? | thinking off, to classify a rejection reason | [`skills/orquestador/contrato.md`](./skills/orquestador/contrato.md) |
+
+The tools are the ones [`packages/tools`](../tools/AGENTS.md) decides; this section gives each
+agent its share.
 
 ### `Vigía` detects
 
-- **Input:** the simulated day, and the metric, entity and severity of every earlier alert.
-- **Tools:** `kpi_consultar` over the KPIs `metricas.yaml` names, on the simulated day.
-  No policy search: its thresholds are already in `metricas.yaml`.
-- **Leaves:** `detectar`, the walk of the stage `detectar` in code, and `titular`, the title.
-- **Output:** a detected alert: metric, entity, simulated day, the triggering figure with its
-  `queryId`, the broken rule with its `fuente_umbral`, severity, the `tramo` when the metric
-  defines `tramos`, and pesos at risk with its `queryId`.
-- **Ceiling:** it fires only where the walk of `detectar` reaches a leaf, which compares a KPI with
-  its `umbrales` in `metricas.yaml` on the simulated day. Pesos at risk follow the metric's
-  `pesos_en_riesgo`, computed in SQL. One alert per metric and entity, whatever state the earlier
-  one is in; it raises again only when severity rises a tier above the highest earlier alert,
-  because a rejected or executed alert whose rule still breaks would otherwise return every
-  simulated day.
+- **Leaves:** `detectar`, which is code, `centinela_agents/walk.py:detect(ctx, day)`, and `titular`.
+- **Tools:** `kpi_consultar`, in code, through the reader. No policy search: its thresholds are in
+  `data/metricas.yaml`.
+- **Ceiling:** it fires only where the walk of `detectar` reaches a leaf. Pesos at risk are the
+  KPI's `pesos_en_riesgo` column, computed in SQL. One alert per metric and entity, whatever state
+  the earlier one is in, because a rejected or executed alert whose rule still breaks would
+  otherwise return every simulated day. *Decided, not built:* it raises again when severity rises a
+  tier above the highest earlier alert.
+- **Its title** cites, as figures, the columns the walk compared and `pesos_en_riesgo`, each with
+  the `queryId` of the reading.
 - **Never:** explains, proposes, reads a policy.
+
+> **Limit.** Severity has no definition anywhere in the tree: `apps/web/src/api/types.ts:Severity`
+> types it, and no metric, KPI or rule computes it, while raising again and [the order](#the-day-run)
+> rest on it. The earlier alerts that
+> `centinela_agents/graph.py:start_alert(graph, detection, *, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)`
+> receives are `{id: status}` only, so no step can compare a metric, an entity or a severity with
+> them.
 
 ### `Analista` explains, and answers the chat
 
-- **Input:** a detected alert, or a chat question.
-- **Tools:** read-only SQL over every view, and policy search.
 - **Leaves:** `explicar`, and `responder_chat` on the chat's own route.
-- **Output:** a `Cause` as `apps/web/src/api/types.ts` declares it: `identified` with a sentence and
-  its evidence, or `no_evidence` with the reason and the queries reviewed, plus a `Confidence`.
-  It may add the id of another open alert the same cause explains.
-- **Ceiling:** a cause holds when queries show three things: **the same entity** (the cause touches
-  the alert's entity), **time** (the cause changes before or with the symptom), and **direction**
-  (the cause moves the metric the way it moved). It draws no statistical inference, forecasts
-  nothing and claims no more than "coincides with". At most one main cause and two contributing
-  ones. Hypotheses come from its skill for the alert's metric, plus one free hypothesis held to the
-  same three tests.
-- **In the chat** it answers about the data and the alerts with figures from queries. Asked what to
-  do, it quotes `Estratega`'s proposal for the alert, or says there is none.
+- **Tools:** none for its model. Its leaf reads `kpi_consultar` for the alert's KPI and for every
+  KPI that shares a column of the alert's entity, at most three rows each, and numbers each figure.
+  *Decided, not built:* `sql_vistas` and `buscar_politica`, and the chat.
+- **Ceiling:** a cause holds when the facts show **the same entity**, **time** (the cause changes
+  before or with the symptom) and **direction** (the cause moves the metric the way it moved). It
+  draws no statistical inference, forecasts nothing and claims no more than "coincides with". At
+  most one main cause and two contributing ones; hypotheses come from its skill for the alert's
+  metric, plus one free hypothesis held to the same tests. In the chat it answers with figures from
+  queries, and asked what to do, it quotes `Estratega`'s proposal for the anchored alert or says
+  there is none.
 - **Never:** looks for new alerts, proposes an action, estimates an impact.
 
 ### `Estratega` proposes
 
-- **Input:** the alert, its `Cause`, and the rejection reasons kept for its metric, the reason of a
-  `request_changes` among them.
-- **Leaves:** `proponer`, and `revision_manual`, which is code and calls no model: one `task` for a
-  manual review and nothing else, whose `owner` is the one `skills/estratega/acciones.md` names for
-  the metric. The tree reaches it on `no_evidence`, on a second insufficient cause, and on a failed
+- **Leaves:** `proponer`, and `revision_manual`, which is code and calls no model:
+  `centinela_agents/graph.py:manual_review(metric, owners)` proposes one `task` for a manual review
+  whose `owner` is the one [`skills/estratega/acciones.md`](./skills/estratega/acciones.md) names
+  for the metric, both as the leaf and as the fallback of a failed one, so the alert still reaches
+  the gate. The tree reaches it on `no_evidence`, on a second insufficient cause, and on a failed
   `proponer`.
-- **Tools:** read-only SQL, policy search, and the impact calculator in `packages/tools`.
-- **Output:** one to three `Action`s with `impact` and `confidence`.
-- **Ceiling:** every action is a row of `skills/estratega/acciones.md` for the metric, and
-  cites its policy section. No percentage is chosen by the model: a price change is the one that returns
-  the line to `margen_minimo_pct` or passes the cost increase through, as the calculator computes
-  it. With no formula, `impact` is `null` and the reason is stated.
-- **Never:** reopens the cause (it returns the alert to the orchestrator as an insufficient cause),
-  executes.
+- **Tools:** none for its model. The model chooses rows of `skills/estratega/acciones.md` by ref;
+  `centinela_agents/agents/estratega.py:parameters_of(row, values)` fills each parameter from the
+  KPI's row and the entity, and the impact is the KPI's `pesos_en_riesgo` with its `queryId`.
+- **Ceiling:** every action is a row of `skills/estratega/acciones.md` for the metric and cites
+  its policy section. No percentage is chosen by the model. With no formula, `impact` is `null` and
+  the reason is stated.
 
-### `Ejecutor` acts after approval
+> **Limit.** The formulas `skills/estratega/acciones.md` names are not computed: every row with a
+> formula takes the KPI's `pesos_en_riesgo` as its impact, and `price_increase_pct` and `units`,
+> which only a formula yields, stay out of `parameters`. Its cost is a price or purchase draft a
+> person completes by hand.
+- **Never:** reopens the cause, which it returns as an insufficient cause; executes.
 
-- **Input:** the approved or edited action, with the decision `apps/api` recorded.
+### `Ejecutor` acts after a decision
+
 - **Leaves:** `ejecutar`, for an action whose type has a tool in `packages/tools`, and
-  `nota_manual`, for one that has none: a `task` naming the manual step for a person. Either
-  receives the approved action and the recorded decision, and nothing else of the alert's state.
-- **Tools:** none for its model. The node `ejecutar` calls the action tool in code, each a draft or
-  a sandbox effect, and the model is called only to write the body of an approved `email_draft`.
-- **Output:** an `ExecutedAction`.
-- **Ceiling: no discretion.** It passes the approved `parameters` unchanged, keyed by alert and
-  action so a second run has no effect. The model writes only the body of an email, with the
-  figures it is given and the tone `FIN-POL-004` §6 sets: courteous, written, copied to the seller.
+  `nota_manual`, for one that has none. Either receives the alert id, the approved action with an
+  edit's `parameters`, and the recorded decision, and nothing else of the state,
+  `centinela_agents/graph.py:leaf_node(node, function, ctx)`.
+- **Tools:** none for its model. The leaf calls the action tool in code, a draft or a sandbox
+  effect; the model writes the body of an approved `email_draft` and the text of a manual note.
+- **Ceiling: no discretion.** It passes the approved `parameters` unchanged. The stubs of
+  `centinela_agents/action_tools.py` name each draft by its inputs,
+  `centinela_agents/action_tools.py:stable_id(prefix, parts)`, so a second run names the same
+  draft. The prompt of an email draft is masked by `centinela_agents/security.py:mask_data(text, placeholder_prefix)`.
 - **Never:** chooses between actions, recomputes, adds a recipient, runs without a recorded decision.
 
-### The orchestrator interprets the tree
+## The orchestrator
 
-It is the only part that knows which step an alert is in. It walks the decision tree and keeps
-nothing else to decide: every route is a branch of the tree, and the interpreter decides only how a
-step runs. It is code, except one step that classifies a rejection reason.
+It is the only part that knows which step an alert is in. It walks the tree and keeps nothing else
+to decide: every route is a branch of the tree, and the interpreter decides only how a step runs.
+It is code, except the step that classifies a rejection reason.
 
-- **Input:** from `apps/api`, one of three: the simulated day with the metric, entity, severity and
-  state of every earlier alert; a recorded decision (the `Decision`, its id, the role that made it
-  and the simulated day it was made) to resume one alert; or a `ChatQuestion` with its anchored
-  `Alert`, if any. With the first two, the rejection reasons `apps/api` keeps for the alert's
-  metric. With each, the version of the tree to walk.
-- **Tools: none.** Each step that might want one reads its input instead: the order reads
-  `pesosAtRisk`, which `Vigía` computed in SQL; the check on `same_cause_as` reads the earlier
-  alerts `apps/api` hands in; the classifier reads the reason, the `Cause` with its evidence, and
-  the actions with their impact and parameters, each placeholder replaced by its figure. No step
-  needs a query, a policy or an action, so the graph gives it no tool.
-- **Output:** the state of each alert's graph; an `AgentStep` when an agent's node starts and when
-  it ends, with a Spanish `description`, never for its own steps, because `Agent` names the four
-  agents only; and, to `apps/api`, the transitions it proposes, the log events, the target of a
-  rejection reason, and the cost of each alert.
-- **Ceiling:** it moves an alert only along a branch of the tree, and passes each agent's output on
-  unchanged. The only text a person reads that it writes is the fallback of a failed step, fixed in
-  "How a step runs" below. It names an alert by metric, entity and simulated day, so a day run twice
-  proposes the same ids and `apps/api` refuses the second.
+- **Input:** to start an alert, `start_alert` above: the detection, the alert id, the simulated
+  day, the earlier alerts, and the rejection reasons `apps/api` kept for the metric, already split
+  by the agent that reads them. To resume one,
+  `centinela_agents/graph.py:resume(graph, alert_id, decision)` with the decision `apps/api`
+  recorded. The version of the tree comes through `centinela_agents/graph.py:Compiler`.
+- **Tools: none.** No step needs a query, a policy or an action, so the graph gives it no tool.
+- **Output:** the state of each alert's graph: the transitions it proposes, the log events, the
+  target of a rejection reason.
+- **Ceiling:** it moves an alert only along a branch of the tree and passes each agent's output on
+  unchanged. The only text a person reads that it writes is the fallback of a failed step.
 - **Never:** detects, explains, proposes, executes, computes a figure, opens a database connection,
   persists the lifecycle, or resumes an alert past the interrupt without a recorded decision.
 
-## The orchestrator's graph
+> **Limit.** The decision the graph expects carries `id`, `kind`, `simulated_day`, `actionId`,
+> `parameters` and `reason`, and the states it proposes are Spanish (`nueva`, `en análisis`,
+> `propuesta`, `aprobada`, `rechazada`, `unida`, `ejecutada`). The web's
+> `apps/web/src/api/types.ts:Decision` carries no `id` and no day,
+> `apps/web/src/api/types.ts:AlertStatus` is English, and
+> `apps/web/src/api/types.ts:ChatQuestion` has no route in the graph. `apps/api` translates
+> between them, and nothing decides how.
 
-### Two runs
+### The alert graph
 
-**The day run is code and keeps no checkpoint.** Advancing the clock hands it the simulated day: it
-walks the stage `detectar` for every row of every KPI, `centinela_agents/walk.py:detect(ctx, day)`,
-checks each detection against the earlier alerts, orders the detected alerts, and runs the alert
-graph of each one **in series**, in that order.
+**One thread per alert, the alert id as the thread id.** The host injects the checkpointer, because
+an agent never opens a database connection; where the checkpoint is stored is `apps/api`'s. The
+checkpoint is working state, never the lifecycle record. Each run compiles the version it is handed,
+cached by `Compiler` per version and a hash of its content. The graph holds a node for each leaf,
+each predicate node and each end reachable from a `vigia` leaf `detectar.raiz` reaches.
 
-**The alert graph is LangGraph, compiled from the tree, one thread per alert, the alert id as the
-thread id.** Its host injects the checkpointer, because an agent never opens a database connection;
-where the checkpoint is stored is `apps/api`'s. The checkpoint is working state, never the
-lifecycle record.
-
-### The decision tree
-
-**The tree is data, validated by code and walked by a deterministic interpreter; a model acts
-only at a leaf.** Its base is [`arbol/base.yaml`](./arbol/base.yaml), beside the registry
-[`arbol/fundamentos.yaml`](./arbol/fundamentos.yaml), because routing is the orchestrator's
-concern. It is YAML, as `metricas.yaml` is, whose `umbrales` its predicates apply. A client's
-version is not a file: `apps/api` keeps it and hands it to each run, because no agent writes
-anywhere.
-
-**Every entry of the registry that cites a standard names a numbered clause, confirmed against its
-licensed text before a node rests on it.** The texts are licensed and are not in the repository, so
-the person who adds an entry confirms its clause in the review of its pull request, and an entry
-with no clause number is refused there, because no reader can check it.
-
-**The tree compiles to the LangGraph graph; an invalid base stops the start.**
-`centinela_agents/validator.py:load_base(arbol, metricas, skills, catalog)` validates the base and
-raises with every problem. `centinela_agents/graph.py:compile_tree(tree, *, leaves, metrics,
-catalog, reader, classify, checkpointer, owners)` makes a graph node of each leaf, each predicate node and
-each end reachable from a `vigia` leaf that `detectar.raiz` reaches, and a conditional edge out of
-each predicate node. Each run compiles the version `apps/api` hands in, cached by its `version` and
-a hash of its content, by `centinela_agents/graph.py:Compiler`, because two clients may hold
-different trees under one version number.
-
-**A predicate node is a graph node, not only the function of an edge.** It evaluates its
-predicate, records its id and branch in `camino`, applies the write bound to that branch, and its
-edge reads the target it chose. So the path an alert walked is in its state, a branch can carry
-the orchestrator's own write, and the gate `aprobar.decision` is where the graph pauses: it calls
-LangGraph's `interrupt()`, and `centinela_agents/graph.py:resume(graph, alert_id, decision)`
-resumes it with the recorded decision.
-
-#### The node
-
-```yaml
-- id: detectar.cartera.saldo_vencido.dias
-  fundamento: fin-pol-004.s4
-  predicado: { lee: kpi.saldo_vencido.max_dias_vencido, op: ">", umbral: saldo_vencido }
-  si: hoja.vigia.titular
-  no: detectar.cartera.saldo_vencido.cupo
-- id: hoja.vigia.titular
-  hoja: { agente: vigia, decision: titular, skill: vigia/contrato.md }
-  sigue: hoja.analista.explicar
-```
-
-| Field | Rule |
-|---|---|
-| `id` | unique; its first segment is a stage (`detectar`, `explicar`, `proponer`, `aprobar`, `ejecutar`, `cerrar`, `medir`), or `hoja` for a leaf |
-| `fundamento` | the id of one entry of the registry; required on a node, absent on a leaf, which inherits its parent's |
-| `predicado.lee` | a KPI column (`kpi.<metric>.<column>`), read only in `detectar`, or a field of the alert's state (`estado.<field>`) |
-| `predicado.op` | one of `>`, `>=`, `<`, `<=`, `=`, `!=`, `en` (membership in a closed list written in the node), `existe`; quoted in YAML, except `en` and `existe` |
-| `predicado.umbral` or `predicado.valor` | `umbral` names a metric of `metricas.yaml` or an approved KPI, and the value compared is its `umbrales` entry for the column `lee` reads; `valor` is a literal, admitted only for a state field |
-| `si`, `no` | both required, each a node, a leaf or an end |
-| `hoja` | `agente`, a `decision` from that agent's closed list, and `skill`, a file under `skills/` the step starts from |
-| `sigue` | on a leaf only: where the walk continues once the agent returns |
-
-| Agent | Its closed list of decisions |
-|---|---|
-| `vigia` | `detectar` (code), `titular`, `proponer_kpi`, `expandir` |
-| `analista` | `explicar`, `responder_chat`, `expandir` |
-| `estratega` | `proponer`, `revision_manual` (code), `expandir` |
-| `ejecutor` | `ejecutar`, `nota_manual`, `expandir` |
-
-**A predicate holds no literal threshold**, so a threshold stays in `metricas.yaml`; a threshold
-whose text has two conditions is two nodes. A comparison with a null value is false, so a row a KPI
-cannot measure fires nothing. A `lee` on the state names a field of "The state of an alert" below,
-a field of the candidate the day run walks `detectar` with (`estado.candidato.metrica`,
-`estado.candidato.descriptivo`), or a field the orchestrator derives when a node reads it:
-`estado.same_cause_as.status`, the state of the named alert among the earlier alerts;
-`estado.action.type`, the type of the approved action; and `estado.detection.vigente`, below.
-`centinela_agents/state.py:STATE_FIELDS` is the list the validator checks.
-
-#### The levels
-
-| Level | Holds | Changed by |
-|---|---|---|
-| L0 | the laws, `leyes` in the base, each on one entry of the registry | a pull request only |
-| L1 | every node whose id names no metric family: each stage's entry, its gates, its capped returns | a pull request only |
-| L2 | one branch per metric family, `<stage>.<family>`: `cartera`, `margen`, `inventario`, `comercial`, `abastecimiento`, `clientes` | the stage's agent by self-expansion, or a pull request |
-| L3 | the nodes of one metric and their leaves, `<stage>.<family>.<...>` | the stage's agent by self-expansion, or a pull request |
-
-**L1 is every node that names no family, not one node per stage**, because the gates and the
-capped returns are the same for every metric and must never move by self-expansion. A leaf's
-stage is its agent's. `cerrar` has no node: it is the set of ends below, which `apps/api` closes.
-`medir` has no node in the base, because its only decision, `proponer_kpi`, has no leaf in it.
-
-#### The ends
-
-| End | What the interpreter does on reaching it |
-|---|---|
-| `fin.sin_alerta` | ends the walk of `detectar`: no alert |
-| `fin.unida` | writes `merged_into` and proposes `unida` |
-| `fin.rechazada` | runs the classifier of the rejection reason; an exception or a target outside its closed list is `ninguno` |
-| `fin.recarga_agotada` | ends a second `request_changes`, which `resume` refuses before it reaches the graph |
-| `fin.ya_no_aplica` | records that the condition no longer holds; the alert stays `aprobada`, and `Ejecutor` is not called |
-| `fin.ejecutada` | proposes `ejecutada` |
-| `fin.fallo_ejecucion` | records the failure; the alert stays `aprobada` |
-
-**The orchestrator's own writes are bound to L1 nodes by id**, in
-`centinela_agents/graph.py:effects(node_id, branch, state)`, because L1 changes only by pull
-request. `explicar.destino_nuevo` on `si` absorbs the named alert into this one and proposes
-`unida` for it; on `no` it drops `same_cause_as` and logs it. `proponer.retorno_disponible` on `si`
-counts a return to `Analista`. `aprobar.recarga_disponible` on `si` counts the `request_changes`,
-keeps its reason in `proposal_rejections`, and clears the decision, so the gate waits again.
-Entering an `analista` leaf from `nueva` proposes `en análisis`, and entering `aprobar.decision`
-proposes `propuesta` once. A leaf that runs again clears the outputs of its decision it does not
-return, `centinela_agents/graph.py:LEAF_OUTPUTS`, so a second proposal never keeps the first's
-`insufficient_cause`.
-
-#### The validator
-
-`centinela_agents/validator.py:problems(data, grounds)` refuses a tree where:
-
-- a node fails the schema, or a predicate fails the atomicity test: more than one operand, an
-  `umbral` and a `valor` together, `en` without a closed list;
-- a `valor` spells a boolean another way, `True`, `yes`, `on` or the like: the tree's YAML reads only
-  `true` and `false` as booleans, so any other spelling would be text that never equals a boolean;
-- a node lacks its `fundamento`, its `si` or its `no`, or rests on an id absent from the registry;
-- a path from `detectar.raiz` reaches an `Ejecutor` leaf without passing `aprobar.decision` and
-  `ejecutar.vigente`;
-- the graph has a cycle other than the two capped returns, the `si` of
-  `proponer.retorno_disponible` to `explicar` and of `aprobar.recarga_disponible` to `proponer`,
-  each reading the counter `effects` counts equal to 0;
-- a branch names no node, leaf or end of the closed list, a node reaches no end, or `detectar.raiz`
-  does not reach a node or leaf, because an orphan `vigia` leaf would be an entry no walk checks;
-- a `lee` names a KPI column the catalogue does not hold, a state field `STATE_FIELDS` does not
-  declare, or a KPI outside `detectar`, because an alert reads its measure only through
-  `ejecutar.vigente`;
-- a KPI node of `detectar` is reached where the candidate may be another metric, because the walk
-  would read one metric's column on another's row;
-- an `umbral` names a metric absent from `metricas.yaml` and from the approved KPIs, or one with no
-  threshold for the column `lee` reads;
-- a leaf's `skill` is no file under `skills/`, or its `decision` is outside its agent's list;
-- a metric of `metricas.yaml` has no L3 branch in `detectar`, no file in `skills/analista/`, or no
-  row in `skills/estratega/acciones.md`;
-- L0 or an L1 node differs from the base, or a leaf of the base changes its agent, its decision or
-  its `sigue`; a new leaf is allowed, so a branch grows without rerouting the base.
-
-The catalogue is an input: the validator checks each `lee` on a KPI against the catalogue it is
-handed, never against a database. `uv run pytest` plants one violation per rule.
-
-#### The node ejecutar.vigente
-
-Before every `Ejecutor` leaf, `ejecutar.vigente` reads `estado.detection.vigente`:
-`centinela_agents/walk.py:still_breaks(state, ctx)` reads, on the simulated day of the decision,
-the KPI row of the alert's entity and re-applies each node of `detectar` the detection passed on
-`si`, with the same `umbral`. `si` goes on to `ejecutar.automatizable`; `no`, no row for the
-entity, or a path none of whose KPI nodes is left in the tree, ends at `fin.ya_no_aplica`, because
-nothing runs on a condition no node can check again. Two rows for one entity raise, and the resume
-fails, because the entity is the key of the KPI and a second row breaks the kernel's contract. It is
-code, so `Ejecutor` keeps no discretion, and it rests on `iso9001.10.2.1.c`: an action addresses a
-nonconformity, which a resolved one no longer has.
-
-### How a step runs
-
-The fallback of a failed step, the token cap, the retry and the order of a day's alerts are
-settings of the interpreter, not nodes, because they decide how a step runs, not which step runs.
-
-**A resume is refused** without a recorded decision id or the simulated day of the decision, with a
-kind outside `approve`, `edit`, `reject` and `request_changes`, with a reject or a `request_changes`
-that carries no reason, with an approval or an edit whose `actionId` names no proposed action, with
-an edit that carries no `parameters`, or with a second `request_changes`, by
-`centinela_agents/graph.py:resume(graph, alert_id, decision)`. `ejecutar.vigente` reads the KPI on
-the day the decision names. The
-graph never passes the gate on a decision `apps/api` did not record.
-
-**A transition `apps/api` refuses ends that alert's run**, because the record wins over the
-checkpoint. **A decision never expires**: no policy states a deadline, so the interrupt waits.
-
-**The loop to `Analista` is capped at one return**, because each pass is a thinking run on the one
-loaded model, and a cause that fails `Estratega` twice is one the data does not support with a
-listed action, which is the case manual review exists for.
-
-**A `request_changes` is capped at one per alert**, for the same reason: each pass is a thinking
-run on the one loaded model.
-
-**A fallback writes a value, never a route**: the metric's `descripcion` and the entity for the
-title, `no_evidence` for the cause, no actions for the proposal, the manual review's one `task` for
-`revision_manual`, and no executed action for `Ejecutor`. The manual review's owner comes from the
-table of `skills/estratega/acciones.md`, read by `centinela_agents/graph.py:manual_owners(acciones)`
-and handed to `compile_tree` as `owners`, so a failed `revision_manual` still reaches the gate with
-its task and the alert never stalls.
-The tree routes each one, at `explicar.con_evidencia`, `proponer.con_acciones` and
-`ejecutar.resultado`.
-
-**A step fails** when its model call fails twice: the call is retried once on a timeout, on a
-connection error, or on an output its schema refuses. A step also fails when the alert reaches its
-token cap, checked after each call; every model step left on that alert then takes its fallback.
-The timeout per call and the token cap are settings of the graph, sized to the machine that runs
-Ollama, as the model is. The fallback `reason` of `analista`/`explicar` is one of these, by failure:
-
-| Failure | `reason` |
-|---|---|
-| timeout | "El análisis no terminó: se agotó el tiempo de respuesta del modelo." |
-| token cap | "El análisis no terminó: la alerta alcanzó su tope de tokens." |
-| refused schema | "El análisis no terminó: el modelo no devolvió una respuesta válida." |
-| any other error: a tool, a connection | "El análisis no terminó: falló una herramienta o la conexión." |
+**A predicate node is a graph node, not only the function of an edge.** It evaluates its predicate,
+records its id and branch in `camino`, applies the write bound to that branch, and its edge reads
+the target it chose. So the path an alert walked is in its state, a branch carries the
+orchestrator's own write, and the gate `aprobar.decision` is where the graph pauses on LangGraph's
+`interrupt()` until `resume` hands it the recorded decision.
 
 ### The state of an alert
 
+`centinela_agents/state.py:AlertState` declares it. Every leaf but `Ejecutor`'s receives the whole
+state; *Read by* is what each is meant to use of it. A key a leaf returns that the state does not
+declare is dropped without a trace, so the leaves return none.
+
 | Field | Written by | Read by |
 |---|---|---|
-| `alert_id`, `simulated_day` | orchestrator | every node, `apps/api` |
-| `detection`: metric, entity, `cifra`, `regla`, `fuente_umbral`, severity, `tramo`, `pesos_en_riesgo` | `Vigía` | `Analista`, `Estratega`, orchestrator (order), `apps/api` |
+| `alert_id`, `simulated_day`, `entry` (the leaf `detectar` reached) | `start_alert` | every node, `apps/api` |
+| `detection`: `metric`, `entity`, `path` (each node of `detectar` and its branch), `row` (the KPI row) | `start_alert` | the leaves, `ejecutar.vigente` through `still_breaks` |
+| `earlier_alerts`: the state of each earlier alert, by id | `start_alert` | `estado.same_cause_as.status` |
+| `cause_rejections`, `proposal_rejections` | `start_alert`; a `request_changes` adds to the second | `Analista`, `Estratega` |
 | `title` | `Vigía` | `apps/api` |
-| `cause_rejections` | orchestrator, from its input | `Analista` only |
-| `proposal_rejections` | orchestrator, from its input and from a `request_changes` | `Estratega` only |
-| `cause`, with its `confidence` | `Analista`, or the fallback of `analista`/`explicar` | `Estratega`, orchestrator (`kind`), `apps/api` |
-| `same_cause_as` | `Analista` | orchestrator |
-| `analyst_returns` | orchestrator | orchestrator |
-| `insufficient_cause` | `Estratega` | orchestrator, `Analista` |
-| `actions` | `Estratega` | `apps/api`; `Ejecutor` receives the approved one only |
-| `decision` | `apps/api`, on resume | orchestrator, `Ejecutor` |
-| `rejection_target` | orchestrator | `apps/api` |
-| `executed_action` | `Ejecutor` | `apps/api` |
-| `merged_into`, `merged_alerts` | orchestrator | `apps/api` |
-| `queries` | each agent, from its tool calls | `apps/api` |
-| `cost`: prompt tokens, output tokens and model calls, per agent | orchestrator | `apps/api` |
-| `failures`: step, `timeout`, `token_cap`, `schema` or `error`, attempts | orchestrator | `apps/api` |
-| `status`: the last state `apps/api` accepted | orchestrator | orchestrator |
-| `entry`: the leaf the walk of `detectar` reached | orchestrator | orchestrator |
-| `earlier_alerts`: the state of each earlier alert | orchestrator, from its input | orchestrator, for `estado.same_cause_as.status` |
-| `proposal_returns` | orchestrator | orchestrator |
-| `camino`: each node and the branch it took | orchestrator | `apps/api` |
-| `events`: a dropped `same_cause_as` | orchestrator | `apps/api` |
-| `next_node`, the target a predicate node chose | orchestrator | orchestrator |
-| `fin`: the end the walk reached | orchestrator | `apps/api` |
+| `cause`, `same_cause_as` | `Analista`, or the fallback | `Estratega`, the nodes of `explicar`, `apps/api` |
+| `actions`, `insufficient_cause` | `Estratega`, or `revision_manual` | the nodes of `proponer`, `apps/api`; `Ejecutor` receives the approved one |
+| `decision` | the gate, from `resume` | the nodes of `aprobar`, `Ejecutor` |
+| `executed_action` | `Ejecutor` | `ejecutar.resultado`, `apps/api` |
+| `analyst_returns`, `proposal_returns` | the bound writes | the capped returns |
+| `merged_into`, `merged_alerts`, `rejection_target`, `fin` | the ends and the bound writes | `apps/api` |
+| `status`: the state the graph last proposed or the decision set | the orchestrator | the orchestrator |
+| `transitions`: each `[alert id, state]` the graph proposes | the orchestrator | `apps/api` |
+| `camino`, `next_node`, `failures`, `events` | the orchestrator | `apps/api`; `next_node` the edges |
+| `queries`: each `kpi_consultar` a leaf ran, with its `queryId`, KPI, day and SQL | the leaves of `Vigía`, `Analista` and `Estratega` | the fallback of `explicar`, for `queriesReviewed`; `apps/api`, which logs each as `evidence` |
 
-`cost` and the `attempts` of a failure come with the retry and the token cap, and the code has
-neither yet: `centinela_agents/state.py:AlertState` holds no `cost`, and a failure carries only its
-step and its kind.
+### How a step runs
 
-Each output reaches `apps/api` as a log event, typed as `LogEventType` declares:
+**A fallback writes a value, never a route**, `centinela_agents/graph.py:fallback(leaf, state,
+error, ctx)`: the metric's `descripcion` and the entity for the title, `no_evidence` for the cause,
+no actions for the proposal, the manual review's task for `revision_manual`, and no executed action
+for `Ejecutor`. The tree routes each at `explicar.con_evidencia`, `proponer.con_acciones` and
+`ejecutar.resultado`. The failure lands in `failures` with its step and kind,
+`centinela_agents/graph.py:failure_kind(error)` over the exceptions of
+`centinela_agents/failures.py`, and the `reason` of a failed `explicar` is the Spanish sentence
+`centinela_agents/graph.py:REASONS` holds for that kind.
 
-| Output | `type` | Actor |
-|---|---|---|
-| a detected alert | `alert` | `vigia` |
-| a `Cause`: each `Evidence`, or its `no_evidence`, fallback included | `evidence` | `analista` |
-| a merge, naming the alert that remains | `alert` | `analista` |
-| the `Actions`, manual review included | `proposal` | `estratega` |
-| an executed draft, then its result or its failure | `action`, `result` | `ejecutor` |
+**A resume is refused** for each case of `centinela_agents/graph.py:decision_problem(decision,
+state)`, and when nothing awaits a decision; `ejecutar.vigente` reads the KPI on the day the
+decision names. The graph never passes the gate on a decision `apps/api` did not record.
 
-The target of a rejection reason joins the `decision` event `apps/api` writes for the person.
+**The loop to `Analista` is capped at one return**, because each pass is a paid model run, and a cause that fails `Estratega` twice is one the data does not support with a
+listed action, which is the case manual review exists for. A `request_changes` is capped at one per
+alert by [`apps/api`](../../apps/api/AGENTS.md#decisions-and-roles), which states why. **A decision never expires**: no policy states a deadline, so the interrupt waits.
 
-### Proposing a transition, not owning it
-
-**The orchestrator proposes each transition an agent causes, and persists none.** Which
-transition comes from where, who validates it and why, is the lifecycle on
-[`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md).
+> **Decided, not built.** A step fails when its model call fails twice: the call is retried once on
+> a timeout, a connection error or an output its schema refuses. A step also fails when the alert
+> reaches its token cap, checked after each call, and every model step left on that alert then
+> takes its fallback. The timeout per call and the token cap are settings of the graph, sized to the
+> machine that runs Ollama. A failure is to carry its `attempts`. A transition `apps/api` refuses
+> ends that alert's run, because the record wins over the checkpoint.
 
 ### Routing
 
-- **The chat always goes to `Analista`, in chat mode, with no classifier**, because the chat belongs
-  to `Analista`. The anchored alert comes from `apps/api` with the question, so `Analista` can
-  quote its `actions`. A chat run touches no alert's state and proposes no transition.
-- **A rejection reason goes to the classifier** in `skills/orquestador/`, at `fin.rechazada`, the
-  only step of the orchestrator that calls the model, thinking off. Its target decides who reads the
-  reason on the next run of the same metric:
+**A rejection reason goes to the classifier** at `fin.rechazada`, the only step of the orchestrator
+that calls a model, with [`skills/orquestador/contrato.md`](./skills/orquestador/contrato.md). The
+host hands it to `compile_tree` as `classify`; its target is one of
+`centinela_agents/graph.py:REJECTION_TARGETS`, and decides who reads the reason on the next run of
+the same metric: `causa` to `Analista`, `propuesta` to `Estratega`, `ambos` to both, and `ninguno`
+to no agent, the reason staying in the `bitácora`. `centinela_agents/orchestrator.py:rejection_target(provider, state)`
+is that `classify`: it hands
+`centinela_agents/agents/orquestador.py:classify_rejection(provider, reason, cause, actions)` the
+decision's reason, the cause and the actions, and returns its `destino`;
+`centinela_agents/graph.py:classified(classify, state)` answers `ninguno` when it fails. `apps/api` keeps the reason with its target, metric and entity,
+and hands it in split into `cause_rejections` and `proposal_rejections`, so each agent learns only
+from its own mistakes.
 
-  | Target | Read by |
-  |---|---|
-  | `causa` | `Analista` |
-  | `propuesta` | `Estratega` |
-  | `ambos` | `Analista` and `Estratega` |
-  | `ninguno` | no agent; it stays in the `bitácora` |
+> **Decided, not built.** **The chat always goes to `Analista`, in chat mode, with no
+> classifier**, because the chat belongs to `Analista`. The anchored alert comes from `apps/api`
+> with the question, so `Analista` can quote its `actions`. A chat run touches no alert's state and
+> proposes no transition. A chat question does not wait for the day run, only for the model call in
+> course.
 
-  `apps/api` keeps the reason with its target, metric and entity, and hands the kept reasons in
-  with each run; the orchestrator places each in `cause_rejections` or `proposal_rejections`, so
-  each agent learns only from its own mistakes.
+### The day run
 
-### Order
+**The day run is `apps/api`'s, and keeps no checkpoint.** Advancing the clock walks `detectar` for
+every row of every KPI on the simulated day, `centinela_agents/walk.py:detect(ctx, day)`, drops each
+detection whose alert exists, orders the rest, and runs the alert graph of each **in series**, as
+[`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md#the-agents-run-in-this-process) says. It
+names an alert by metric and entity, so a detection an earlier alert covers proposes the same id
+and is dropped.
 
-**The alerts of one day run in series, by `pesosAtRisk` from the largest**, ties broken by severity
-from `critical` down, then by alert id. In series, because one model is loaded and parallel requests
-share its memory and compute, so running alerts side by side buys no speed on this machine. By
-pesos, because the largest exposure reaches the inbox first, and because a merge keeps the alert
-analysed first, which is the larger: `explicar.destino_analizado` joins this alert to one analysed
-before it, and `explicar.destino_nuevo` joins to this alert one the day run has not reached yet. A
-chat question does not wait for the day run, only for the model call in course.
+**The order is by `pesos_en_riesgo` from the largest, and a day raises at most
+`CENTINELA_ALERTAS_POR_DIA` alerts**, three by default. In series, because a local model is loaded once and
+parallel requests share its memory and compute, and in the cloud the order of the inbox is the
+order of the run. By pesos, because the largest exposure reaches the
+inbox first, and because a merge keeps the alert analysed first, which is the larger:
+`explicar.destino_analizado` joins this alert to one analysed before it, and
+`explicar.destino_nuevo` joins to this alert one the day run has not reached. Capped, because the
+dataset's last day breaks a threshold in some two hundred and fifty rows and an alert costs seconds
+of model; the rest fire again on a later day, when the earlier ones are in the inbox.
 
-### Cost and trace
+### Cost, trace and log
 
-**After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
-call to the alert's `cost`, under the agent that made it.** A chat answer carries its own cost,
-with its anchored alert. `apps/api` persists both.
+> **Decided, not built.** The state has no `cost`, no trace is opened, no `AgentStep` is emitted,
+> and the only event the graph writes is `same_cause_dropped`, in
+> `centinela_agents/graph.py:effects(node_id, branch, state)`.
+> `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
+> and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; no running path
+> uses them.
 
-**Each alert is one Langfuse trace, its id the alert id**, opened when the day run hands the
-detection to the alert graph; the resume after a decision adds its spans to the same trace. The
-detection of a day is a trace of its own, and so is each chat question.
+- **After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
+  call to the alert's `cost`, under the agent that made it.** A chat answer carries its own cost.
+  `apps/api` persists both.
+- **Each alert is one Langfuse trace, its id the alert id**, opened when the day run hands the
+  detection to the alert graph; the resume adds its spans to the same trace. The detection of a day
+  is a trace of its own, and so is each chat question.
+- **An `AgentStep` marks when an agent's leaf starts and ends**, with a Spanish `description`, never
+  for the orchestrator's own steps, because `apps/web/src/api/types.ts:Agent` names the four agents.
+- **Each output reaches `apps/api` as a log event** of `apps/web/src/api/types.ts:LogEventType`: a
+  detection and a merge as `alert`, a `Cause` as `evidence`, the actions as `proposal`, an executed
+  draft as `action` then `result`. The target of a rejection reason joins the `decision` event
+  `apps/api` writes for the person.
 
-### What is the orchestrator's, and what is not
+### What is not the orchestrator's
 
-| Concern | Owner |
-|---|---|
-| detecting, and skipping an alert an earlier one covers | `Vigía`, against the earlier alerts `apps/api` hands in |
-| the order of the day's alerts | orchestrator |
-| the title, the cause, the proposal, the draft | `Vigía`, `Analista`, `Estratega`, `Ejecutor` |
-| marking two alerts as one cause | `Analista` |
-| merging them | orchestrator |
-| walking the tree, compiling a version, refusing an invalid base | orchestrator |
-| the manual review `task` | `Estratega`, in code |
-| the interrupt at `aprobar.decision` | orchestrator |
-| checking that a decision's role may approve and that an edit keeps the action's keys | `apps/api` |
-| resuming an alert | `apps/api` calls; the orchestrator refuses a resume with no recorded decision |
-| classifying a rejection reason | orchestrator |
-| keeping rejection reasons | `apps/api` |
-| proposing a transition | orchestrator, or `apps/api` for a person's decision |
-| validating and persisting a transition, the `bitácora` | `apps/api` |
-| idempotency of an action, masking personal data | `packages/tools` |
-| counting cost, opening the trace | orchestrator |
-| persisting cost, storing the checkpoint, streaming `AgentStep` | `apps/api` |
+`apps/api` checks that a decision's role may make it and that an edit keeps the action's keys,
+calls the resume, keeps the rejection reasons, validates and persists each transition the
+orchestrator proposes, stores the checkpoint, persists cost, streams `AgentStep` and owns the
+`bitácora`: its page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action and
+masking personal data are decided to be `packages/tools`'; `centinela_agents/action_tools.py` and
+`centinela_agents/security.py` hold them in this package instead.
 
-## Coverage: every rule has one owner per step
-
-**Every metric in `metricas.yaml` has one owner at each step**, and each owner reads its own file:
+## Coverage: every metric has one owner per step
 
 | Step | Owner | Reads, per metric |
 |---|---|---|
-| detect | `Vigía` | its L3 branch of `detectar` in the tree, and the metric's entry in `metricas.yaml`: view, `umbrales`, `fuente_umbral`, `pesos_en_riesgo` |
-| explain | `Analista` | `skills/analista/<metric>.md`: its hypotheses and the views that test them |
-| propose | `Estratega` | the metric's rows in `skills/estratega/acciones.md`, the closed list of actions with the policy section each comes from |
+| detect | `Vigía` | its L3 branch of `detectar`, and its `umbrales` in `data/metricas.yaml` |
+| explain | `Analista` | the KPIs that share its entity; `skills/analista/<metric>.md` names hypotheses no leaf tests yet |
+| propose | `Estratega` | the metric's rows in `skills/estratega/acciones.md` |
 | execute | `Ejecutor` | the approved action alone |
 
-**A gap is a refusal.** The validator refuses a metric of `metricas.yaml` with no L3 branch in
-`detectar`, no file in `skills/analista/`, or no row in `skills/estratega/acciones.md`, so the
-base does not load with a gap. Run from this directory: `uv run pytest tests/test_validator.py`.
-
-**The gaps between agents, closed:** the chat belongs to `Analista`; pesos at risk (exposure)
-belong to `Vigía` and what an action recovers belongs to `Estratega`; two alerts with one cause are
-marked by `Analista` and merged by the orchestrator; a policy passage that gives orders is flagged
-by policy search and reported, never obeyed, by `Analista` and `Estratega`; personal data is masked
-in `packages/tools` before any agent sees it.
+**A gap is a refusal**: the validator refuses a metric missing any of the first three, so the base
+does not load with a gap ([`arbol/AGENTS.md`](./arbol/AGENTS.md#the-validator)). **The gaps between
+agents, closed:** the chat belongs to `Analista`; pesos at risk belong to `Vigía` and what an action
+recovers to `Estratega`; two alerts with one cause are marked by `Analista` and merged by the
+orchestrator; a policy passage that gives orders is reported, never obeyed, by `Analista` and
+`Estratega`; personal data is masked in `packages/tools` before any agent sees it.
 
 ## Rules of this level
+
 - **A route is a branch of the tree.** No code outside the interpreter decides which step an alert
   takes, so a change of route is a change to `arbol/base.yaml`. *The validator refuses an invalid
   base at startup, and `uv run pytest` holds the routes.*
-
-- **The model never produces a number.** Every figure in an explanation or a proposal comes from a
-  tool call, and the call travels with the figure as evidence. *No gate holds this.*
-- **An agent is given only the tools its section of "What a leaf may use" names.** The graph passes
-  the action tools to no model: the node `ejecutar` calls them in code. *No gate holds this.*
-- **One cause, one alert**, ranked by pesos at risk.
+- **The model never produces a number.** Every figure in a title, an explanation or a proposal
+  comes from a `kpi_consultar` the leaf ran, and its `queryId` travels with the figure as evidence.
+  *`centinela_agents/evidence.py` refuses a cited fact no query returned and a figure written
+  outside a placeholder, and `tests/test_agents.py` and `tests/test_modelo.py` hold it.*
+- **An agent is given only the tools its section of "What a leaf may use" names.** No model is
+  given an action tool: the leaf `ejecutar` calls it in code. *No gate holds this.*
+- **One cause, one alert**, ranked by pesos at risk. *`uv run pytest` holds the merge.*
 - **"Not enough evidence" is a complete answer.** An agent that cannot support a claim says so
-  instead of guessing, and states its confidence and assumptions when it can.
-- **A rejection's reason is kept** and read back by the agent the orchestrator routes it to.
-- **Everything is at autonomy level `Propone`** during the hackathon.
-- **Every run is traced in Langfuse**, and a change to a skill, a prompt or the tree runs `uv run
-  pytest` and the set in [`../../evals/AGENTS.md`](../../evals/AGENTS.md).
+  instead of guessing, and states its confidence and assumptions when it can. *No gate holds this.*
+- **A rejection's reason is kept** and read back by the agent its target names. *No gate holds this.*
+- **Every agent runs at autonomy level `Propone`**: it proposes, and a person decides. *The
+  validator holds it: no path reaches `Ejecutor` without passing `aprobar.decision`.*
+- **A change to a skill, a prompt or the tree runs `uv run pytest`** and the set in
+  [`../../evals/AGENTS.md`](../../evals/AGENTS.md).

@@ -29,7 +29,7 @@ MANIFEST = GUIDE / "guide.json"
 LINK = re.compile(r"(\[(?:[^\]\\]|\\.)*\])\(([^)\s]+)\)")
 DRAWS = re.compile(r"^\*?Draws: (.+?)\*?$")
 DRAWN = re.compile(r"`([^`]+)` § ([^;]+)")
-DECIDED = "> **Decided, not implemented.**"
+DECIDED = "> **Decided, not built.**"
 CODE_SUFFIXES = {".py", ".ts", ".tsx", ".js", ".sql", ".css", ".html"}
 CONFIG_SUFFIXES = {".json", ".yaml", ".yml"}
 DATA_SUFFIXES = {".csv", ".pdf", ".xlsx"}
@@ -177,7 +177,9 @@ def extract(text, start, end):
 
 def inventory(stamp):
     files = git("ls-tree", "-r", "--name-only", "HEAD").splitlines()
-    parts = ["apps/web", "apps/api", "packages/agents", "packages/tools", "data", "evals", "docs"]
+    levels = sorted(str(PurePosixPath(f).parent) for f in files if PurePosixPath(f).name == "AGENTS.md")
+    levels = [d for d in levels if d != "."]
+    parts = [d for d in levels if not any(d.startswith(other + "/") for other in levels)]
     rows, lists = [], []
     for part in parts:
         mine = [f for f in files if f.startswith(part + "/")]

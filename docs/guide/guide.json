@@ -31,6 +31,9 @@
           "source": "packages/agents/AGENTS.md",
           "children": [
             {
+              "source": "packages/agents/arbol/AGENTS.md"
+            },
+            {
               "source": "packages/agents/skills/AGENTS.md"
             }
           ]
@@ -76,6 +79,9 @@
         },
         {
           "source": "DOUBTS.md"
+        },
+        {
+          "source": "scripts/check/AGENTS.md"
         },
         {
           "source": "docs_guide.md",

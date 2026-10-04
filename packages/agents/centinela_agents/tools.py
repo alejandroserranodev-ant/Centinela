@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
-# SQL Vistas Tool
 
 
 @dataclass
@@ -53,16 +52,15 @@ class SqlVistasProvider(ABC):
         pass
 
 
-# Policy Search Tool
 
 
 @dataclass
 class PolicyPassage:
     """Result of policy search."""
-    policy_code: str  # FIN-POL-004, OPE-POL-007, COM-POL-002
-    section: str  # e.g., "§4"
-    text: str  # Quoted passage from policy
-    relevance: float  # 0-1, relevance score
+    policy_code: str
+    section: str
+    text: str
+    relevance: float
 
 
 class BuscarPoliticaProvider(ABC):
@@ -92,17 +90,16 @@ class BuscarPoliticaProvider(ABC):
         pass
 
 
-# Impact Calculator Tool
 
 
 @dataclass
 class ImpactResult:
     """Result of impact calculation."""
-    value: float | int  # Calculated impact value
-    unit: str  # COP, units, %, etc.
-    queryId: str  # ID of the query that calculated it
-    formula: str  # Which formula was used
-    assumptions: list[str] = field(default_factory=list)  # Limitations of calculation
+    value: float | int
+    unit: str
+    queryId: str
+    formula: str
+    assumptions: list[str] = field(default_factory=list)
     error: str | None = None
 
 
@@ -113,7 +110,7 @@ class CalcularImpactoProvider(ABC):
     def calculate(
         self,
         formula_name: str,
-        entidad: str,  # cliente_id, sku, vendedor_id, etc.
+        entidad: str,
         simulated_day: str,
     ) -> ImpactResult:
         """
@@ -144,17 +141,16 @@ class CalcularImpactoProvider(ABC):
         pass
 
 
-# Action Tools
 
 
 @dataclass
 class EmailDraftResult:
     """Result of email_draft action."""
     draft_id: str
-    subject: str | None  # Optional subject
-    body: str  # Email body (written by Ejecutor LLM, with masked data)
-    to: str  # cliente_id or proveedor_id (resolved by apps/web)
-    cc: list[str] = field(default_factory=list)  # vendedor_id, etc.
+    subject: str | None
+    body: str
+    to: str
+    cc: list[str] = field(default_factory=list)
 
 
 class EmailDraftTool(ABC):
@@ -163,8 +159,8 @@ class EmailDraftTool(ABC):
     @abstractmethod
     def execute(
         self,
-        recipient: str,  # cliente_id or proveedor_id
-        body: str,  # Email body from Ejecutor
+        recipient: str,
+        body: str,
         subject: str | None = None,
         cc: list[str] | None = None,
     ) -> EmailDraftResult:
@@ -192,7 +188,7 @@ class EmailDraftTool(ABC):
 class TaskResult:
     """Result of task action."""
     task_id: str
-    owner: str  # Role (Comercial, Compras, Jefe de cartera, etc.)
+    owner: str
     title: str
     description: str | None = None
 
@@ -203,7 +199,7 @@ class TaskTool(ABC):
     @abstractmethod
     def execute(
         self,
-        owner: str,  # Role name from acciones.md
+        owner: str,
         title: str,
         description: str | None = None,
         parameters: dict[str, Any] | None = None,
@@ -235,8 +231,8 @@ class PurchaseOrderDraftResult:
     proveedor_id: str
     sku: str
     quantity: int
-    warehouse: str  # bodega_id
-    estimated_arrival: str  # YYYY-MM-DD
+    warehouse: str
+    estimated_arrival: str
 
 
 class PurchaseOrderDraftTool(ABC):
@@ -274,8 +270,8 @@ class PurchaseOrderDraftTool(ABC):
 class PriceChangeDraftResult:
     """Result of price_change_draft action."""
     change_id: str
-    sku: str | None  # For SKU-level changes
-    linea: str | None  # For line-level changes
+    sku: str | None
+    linea: str | None
     price_increase_pct: float
     new_price: float | None
 
@@ -310,7 +306,6 @@ class PriceChangeDraftTool(ABC):
         pass
 
 
-# Tool Registry
 
 
 @dataclass
@@ -335,7 +330,7 @@ class ToolRegistry:
             Dict of available tools for that agent
         """
         if agent == "vigia":
-            return {}  # Vigía uses no tools (detection is code)
+            return {}
         elif agent == "analista":
             return {
                 "sql_vistas": self.sql_vistas,

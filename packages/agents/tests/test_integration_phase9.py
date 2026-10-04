@@ -71,7 +71,6 @@ class TestOutputValidator:
         output = {
             "kind": "identified",
             "sentence": "Test",
-            # Missing 'evidence'
         }
 
         with pytest.raises(OutputValidationError) as exc_info:
@@ -128,7 +127,7 @@ class TestOutputValidator:
 
         with pytest.raises(OutputValidationError) as exc_info:
             validator.validate_action(output)
-        assert exc_info.value.category == "domain"
+        assert exc_info.value.category == "schema"
 
     def test_validate_executed_action_valid(self):
         """Validate valid executed action."""
@@ -163,7 +162,7 @@ class TestOutputValidator:
 
         with pytest.raises(OutputValidationError) as exc_info:
             validator.validate_decision(output)
-        assert exc_info.value.category == "domain"
+        assert exc_info.value.category == "schema"
 
     def test_validate_rejection_classifier_valid(self):
         """Validate valid rejection classifier."""
@@ -245,20 +244,17 @@ class TestMetricsCollectionIntegration:
             day="2026-10-03"
         )
 
-        # OpenAI call
         openai_usage = TokenUsage(100, 50, "gpt-4o-mini", "openai")
         collector.record_agent_call("Agent1", openai_usage, 100.0)
 
-        # Ollama call (free)
         ollama_usage = TokenUsage(200, 100, "llama2", "ollama")
         collector.record_agent_call("Agent2", ollama_usage, 200.0)
 
         collector.finish()
 
         summary = collector.get_summary()
-        # Only OpenAI call has cost
         assert summary["total_cost_usd"] > 0
-        assert summary["agents"]["Agent2"]["cost_usd"] == 0.0  # Ollama is free
+        assert summary["agents"]["Agent2"]["cost_usd"] == 0.0
 
     def test_metrics_with_error_handling(self):
         """Handle retries and failures in metrics."""
@@ -271,16 +267,12 @@ class TestMetricsCollectionIntegration:
 
         usage = TokenUsage(100, 50, "gpt-4o-mini", "openai")
 
-        # First attempt fails
         collector.record_failure("Agent")
 
-        # Retry 1
         collector.record_retry("Agent")
 
-        # Retry 2
         collector.record_retry("Agent")
 
-        # Final success
         collector.record_agent_call("Agent", usage, 300.0)
 
         collector.finish("completed")
@@ -300,7 +292,6 @@ class TestValidatorErrorHandling:
         invalid_cause = {
             "kind": "identified",
             "sentence": "Test",
-            # Missing evidence - will fail validation
         }
 
         with pytest.raises(OutputValidationError):
@@ -312,13 +303,10 @@ class TestValidatorErrorHandling:
         invalid_cause = {
             "kind": "identified",
             "sentence": "Test",
-            # Missing evidence
         }
 
         result = validator.validate_cause(invalid_cause)
-        # Should return None but not raise
         assert result is None
-        # Warning should be logged
         assert len(caplog.records) > 0
 
     def test_validation_error_contains_category(self):
@@ -338,7 +326,6 @@ class TestEndToEndIntegration:
 
     def test_full_alert_flow_with_metrics(self):
         """Complete alert processing with metrics collection."""
-        # Initialize
         collector = MetricsCollector(
             alert_id="e2e-alert-1",
             metric="cost_anomaly",
@@ -347,11 +334,9 @@ class TestEndToEndIntegration:
         )
         validator = OutputValidator(strict=False)
 
-        # Vigía detects alert
         vigia_usage = TokenUsage(100, 50, "gpt-4o-mini", "openai")
         collector.record_agent_call("Vigía", vigia_usage, 150.0)
 
-        # Analista analyzes
         analista_output = {
             "kind": "identified",
             "sentence": "Pricing change detected",
@@ -364,7 +349,6 @@ class TestEndToEndIntegration:
         analista_usage = TokenUsage(200, 100, "gpt-4o-mini", "openai")
         collector.record_agent_call("Analista", analista_usage, 200.0)
 
-        # Estratega proposes
         action_output = {
             "id": "a1",
             "title": "Downsize instances",
@@ -377,10 +361,8 @@ class TestEndToEndIntegration:
         estratega_usage = TokenUsage(150, 75, "gpt-4o-mini", "openai")
         collector.record_agent_call("Estratega", estratega_usage, 180.0)
 
-        # Finish
         collector.finish("completed")
 
-        # Verify complete metrics
         summary = collector.get_summary()
         assert summary["total_calls"] == 3
         assert len(summary["agents"]) == 3

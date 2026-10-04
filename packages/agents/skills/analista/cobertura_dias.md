@@ -20,7 +20,7 @@ its delay is `:dia - fecha_esperada`, computed in the query.
    If an order of the entity has `fecha_recibida` after the late order's `fecha_esperada` and on or
    before `:dia`, cite its `oc_id` and `cantidad` as a delivery received while the late order was open.
    Otherwise, cite none.
-5. If H1 holds and the input lists a `dias_retraso` alert whose `entidad` is the late `oc_id`, set
+5. If H1 holds and the input lists a `dias_retraso` alert whose `entity` is the late `oc_id`, set
    `same_cause_as` to its `id`. Otherwise, set none.
 6. If H3 was run, add to `assumptions` that it measures the `sku` in both warehouses, because no view
    gives demand by `bodega_id`. Otherwise, add nothing.

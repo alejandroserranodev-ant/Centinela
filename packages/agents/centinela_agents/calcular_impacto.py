@@ -124,11 +124,9 @@ class CalcularImpactoStub(CalcularImpactoProvider):
 
         formula = self.formulas[formula_name]
 
-        # Stub: return zero impact
-        # Real: execute queries in formula.queries, calculate impact
         return ImpactResult(
             value=0,
-            unit="COP" if "impacto" in formula["output"] else "%",
+            unit="COP" if "impact" in formula["output"] else "%",
             queryId=query_id,
             formula=formula_name,
             assumptions=["Stub implementation returns 0; use real SQL for actual impact"],

@@ -19,6 +19,10 @@ def listar(conn: psycopg.Connection, status: AlertStatus | None) -> list[Alert]:
     return [_a_alerta(fila) for fila in filas]
 
 
+def ids(conn: psycopg.Connection) -> set[str]:
+    return {fila[0] for fila in conn.execute("SELECT id FROM api.alertas").fetchall()}
+
+
 def obtener(conn: psycopg.Connection, id: str) -> Alert | None:
     fila = conn.execute(
         "SELECT id, status, cuerpo FROM api.alertas WHERE id = %s", (id,)

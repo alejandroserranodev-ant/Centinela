@@ -1,236 +1,55 @@
-# Fase 1: Provider Layer ✅ COMPLETADA
+# The model providers
 
-## Archivos Creados
+This page covers how `packages/agents` reaches a language model: the provider interface, its
+two implementations and the factory that picks one. The file keeps its historical name and sits
+beside [`AGENTS.md`](./AGENTS.md) because the team keeps the file structure; `AGENTS.md` is the
+level page, states the level's rules and links here. How to configure a provider (variables,
+`.env`, keys) is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 
-```
-packages/agents/centinela_agents/
-├── llm_provider.py              # Base class (Protocol)
-├── ollama_provider.py           # Ollama implementation (local HTTP)
-├── openai_provider.py           # OpenAI implementation (remote API)
-└── provider_factory.py          # Factory for provider selection
+## The interface
 
-tests/
-└── test_providers.py            # Unit tests for all providers
-```
+`centinela_agents/llm_provider.py:LLMProvider(config)` is the abstract class every provider
+implements: `health_check()`, `generate_text(request)` and `generate_structured(request)`. A
+request carries a system prompt, a user prompt, an optional temperature and `top_p`, a `thinking`
+flag and an optional token cap; `LLMStructuredRequest` adds the JSON schema the answer must
+follow. A response carries the text, the stop reason, the model and a `usage` dict with
+`prompt_tokens` and `completion_tokens`; `LLMStructuredResponse` adds the parsed dict.
+`centinela_agents/llm_provider.py:ModelConfig` holds the provider, the model, the sampling
+defaults (temperature 0, `top_p` 1), `thinking` and `timeout_seconds`.
 
-## Configuración
+The provider does not retry. Whoever calls it decides what a failure means, and the agent leaves
+catch every exception themselves ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)).
 
-### Opción 1: Ollama (Recomendado para desarrollo local)
+## The implementations
 
-#### Instalación
-```bash
-# En Windows, descargar desde https://ollama.ai/download/windows
-# O en Linux/Mac: curl -fsSL https://ollama.ai/install.sh | sh
+- **`centinela_agents/ollama_provider.py:OllamaProvider(config)`** posts to `/api/chat` with
+  `requests`, at `OLLAMA_API_URL`, else `OLLAMA_BASE_URL`, else `http://localhost:11434`. Its
+  constructor lists `/api/tags` and raises `ValueError` when the server is down or the model is
+  not pulled, so constructing one fails without a running Ollama; `health_check()` asks the same
+  and answers `False` instead. A request sends `temperature`, `top_p` and the token cap
+  `num_predict` under `options`, and the thinking flag as `think`, always, because a `qwen3` model
+  thinks when `think` is absent. A structured request sends the schema as Ollama's `format`. It
+  reads the stop reason from `done_reason` and token counts from `prompt_eval_count` and
+  `eval_count`.
+- **`centinela_agents/openai_provider.py:OpenAIProvider(config, skip_health_check)`** uses the
+  `openai` client with `OPENAI_API_KEY` and calls `models.list()` on construction unless told to
+  skip it. A structured request sends the schema as a non-strict `json_schema` response format,
+  leaving the system prompt the skill alone. It ignores the thinking flag, which OpenAI's chat
+  models do not take. Its client waits `timeout_seconds` of the config, and a call past it raises
+  `TimeoutError`. It is the provider the agents run on, for the reason
+  [`AGENTS.md`](./AGENTS.md#models) gives.
 
-# Iniciar servidor
-ollama serve
-# Default: http://localhost:11434
-```
+## The factory
 
-#### Descargar modelo
-```bash
-# Modelos disponibles (elige uno según RAM):
-ollama pull qwen3:4b      # CPU-only, <16GB RAM (rápido, menos preciso)
-ollama pull qwen3:8b      # 16GB+ RAM (recomendado)
-ollama pull qwen3:14b     # GPU 24GB+ (más preciso)
-```
+`centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` reads
+`LLM_PROVIDER` (default `ollama`) and `LLM_MODEL` (required, `ValueError` without it) unless the
+arguments override them, and returns the matching provider. `anthropic` raises
+`NotImplementedError`. The module imports both implementations at load time, and `pyproject.toml`
+declares both clients, `openai` and `requests`. `apps/api` calls it once to build the orchestrator
+([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)).
 
-#### Configurar en .env
-```bash
-# packages/agents/.env
-LLM_PROVIDER=ollama
-LLM_MODEL=qwen3:8b
-OLLAMA_BASE_URL=http://localhost:11434
-```
+## Tests
 
-#### Ejecutar
-```bash
-cd packages/agents
-uv sync
-uv run pytest tests/test_providers.py -v -k "Ollama"
-```
-
-### Opción 2: OpenAI (API remota)
-
-#### Instalación
-```bash
-# Paquete openai ya en pyproject.toml
-uv sync
-```
-
-#### API Key
-1. Ve a https://platform.openai.com/account/api-keys
-2. Crea una nueva API key
-3. Copia el valor
-
-#### Configurar en .env
-```bash
-# packages/agents/.env (NUNCA en Git)
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o-mini
-OPENAI_API_KEY=sk-proj-...
-```
-
-#### Ejecutar
-```bash
-cd packages/agents
-uv run pytest tests/test_providers.py -v -k "OpenAI"
-```
-
-## Uso desde Código
-
-### Ejemplo 1: Generar texto (sin schema)
-```python
-from centinela_agents.provider_factory import get_provider
-from centinela_agents.llm_provider import LLMRequest
-
-provider = get_provider()  # Lee LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY from env
-
-request = LLMRequest(
-    system_prompt="Eres un asistente útil en español.",
-    user_prompt="¿Cuál es la capital de Colombia?",
-    temperature=0.3,
-)
-
-response = provider.generate_text(request)
-print(response.text)
-print(f"Tokens: {response.usage}")
-```
-
-### Ejemplo 2: Generar JSON estructurado (con schema)
-```python
-from centinela_agents.provider_factory import get_provider
-from centinela_agents.llm_provider import LLMStructuredRequest
-import json
-
-provider = get_provider()
-
-schema = {
-    "type": "object",
-    "properties": {
-        "causa": {
-            "type": "string",
-            "description": "Breve explicación"
-        },
-        "confianza": {
-            "type": "string",
-            "enum": ["alta", "media", "baja"]
-        }
-    },
-    "required": ["causa", "confianza"]
-}
-
-request = LLMStructuredRequest(
-    system_prompt="Analiza el siguiente dato.",
-    user_prompt="El cliente tiene 45 días de retraso. ¿Por qué?",
-    schema=schema,
-    thinking=False,  # thinking=True para modelos que lo soportan (gpt-4o)
-)
-
-response = provider.generate_structured(request)
-print(json.dumps(response.parsed, indent=2))
-print(f"Tokens: {response.usage}")
-```
-
-### Ejemplo 3: Cambiar provider sin cambiar código
-```python
-import os
-
-# Solo cambiar variable de entorno:
-os.environ["LLM_PROVIDER"] = "openai"
-os.environ["LLM_MODEL"] = "gpt-4o-mini"
-
-provider = get_provider()  # Ahora usa OpenAI
-# El resto del código es idéntico
-```
-
-## Cómo Validar Conectividad
-
-### Script de prueba
-```python
-# packages/agents/test_connectivity.py
-from centinela_agents.provider_factory import get_provider
-from centinela_agents.llm_provider import LLMRequest, LLMStructuredRequest
-
-try:
-    provider = get_provider()
-    print(f"✅ Provider listo: {provider.config.provider} ({provider.config.model})")
-    
-    # Test texto libre
-    resp = provider.generate_text(LLMRequest(
-        system_prompt="Responde breve.",
-        user_prompt="Hola"
-    ))
-    print(f"✅ Texto: {resp.text[:50]}...")
-    print(f"   Tokens: prompt={resp.usage['prompt_tokens']}, completion={resp.usage['completion_tokens']}")
-    
-    # Test JSON
-    schema = {"type": "object", "properties": {"msg": {"type": "string"}}}
-    resp = provider.generate_structured(LLMStructuredRequest(
-        system_prompt="Devuelve JSON.",
-        user_prompt="Test",
-        schema=schema
-    ))
-    print(f"✅ JSON: {resp.parsed}")
-    
-except Exception as e:
-    print(f"❌ Error: {e}")
-    import traceback
-    traceback.print_exc()
-```
-
-Ejecutar:
-```bash
-cd packages/agents
-uv run python test_connectivity.py
-```
-
-## Decisiones de Diseño
-
-### 1. Abstracción vs. Especificidad
-- **Base class + implementaciones** permite agregar proveedores sin cambiar agentes
-- Cada implementación maneja detalles específicos (Ollama: `format`, OpenAI: `response_format`)
-
-### 2. Timeouts y Errores
-- **Timeouts:** `ModelConfig.timeout_seconds` (default 30s)
-- **Retry:** Delegado a quien llama (graph.py), no en el provider
-- **Errores claros:** ValueError, TimeoutError, ConnectionError son específicos
-
-### 3. Structured Output
-- **Ollama:** Usa `format` (JSON schema constraint)
-- **OpenAI:** Usa `response_format: {"type": "json_object"}`
-- **Ambos:** Validan JSON, pero Ollama fuerza schema; OpenAI solo fuerza JSON válido
-
-### 4. Extended Thinking (thinking=True)
-- **Ollama:** Parámetro soportado en qwen3+ con instrucción explícita
-- **OpenAI:** Solo en gpt-4o+ (y después en modelos superiores)
-- **Anthropic:** Ready but not yet implemented
-
-## Testing
-
-### Run all provider tests
-```bash
-cd packages/agents
-uv run pytest tests/test_providers.py -v
-```
-
-### Run only Ollama tests
-```bash
-uv run pytest tests/test_providers.py -v -k "TestOllama"
-```
-
-### Run connectivity check (requires running server)
-```bash
-# Ensure ollama serve or OpenAI API is configured
-uv run python -m pytest tests/test_providers.py::TestOllamaProvider::test_health_check_fails_without_server -v
-```
-
-## Siguiente: Fase 2 (Schemas)
-
-Los providers están listos. El siguiente paso es **Fase 2: Schemas y Validación**, donde crearemos Pydantic schemas para:
-- `Cause` (identified | no_evidence)
-- `Action` (con title, description, type, parameters, impact, confidence)
-- `ExecutedAction`
-- `Decision` (approve, edit, reject, request_changes)
-
-Estos schemas se usarán con `generate_structured()` para garantizar que las salidas de los agentes son siempre válidas.
+`uv run pytest tests/test_providers.py` runs the provider tests with mocked HTTP.
+`tests/test_manifest.py` fails when a module of the package imports a distribution the manifest
+does not declare.

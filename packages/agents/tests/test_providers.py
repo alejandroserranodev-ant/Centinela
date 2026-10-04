@@ -182,7 +182,6 @@ class TestOpenAIProvider:
 
                 provider = OpenAIProvider(config)
 
-                # Mock the response
                 mock_response = MagicMock()
                 mock_response.choices = [MagicMock(
                     message=MagicMock(content="Test response"),
@@ -242,3 +241,94 @@ class TestProviderFactory:
         }):
             with pytest.raises(ValueError, match="Unknown LLM provider"):
                 get_provider()
+
+
+def bare_ollama(**config):
+    provider = OllamaProvider.__new__(OllamaProvider)
+    provider.config = ModelConfig(provider="ollama", model="qwen3:8b", **config)
+    provider.base_url = "http://localhost:11434"
+    provider.timeout = provider.config.timeout_seconds
+    return provider
+
+
+OLLAMA_REPLY = {"message": {"content": '{"ok": true}'}, "done_reason": "length", "prompt_eval_count": 3, "eval_count": 2}
+
+
+class TestOllamaRequestShape:
+    @pytest.mark.parametrize("call", ["text", "structured"])
+    def test_sampling_goes_under_options_and_thinking_as_think(self, call):
+        provider = bare_ollama(temperature=0.2, top_p=0.9)
+        with patch("centinela_agents.ollama_provider.requests.post") as mock_post:
+            mock_post.return_value.json.return_value = OLLAMA_REPLY
+            if call == "text":
+                provider.generate_text(LLMRequest(system_prompt="s", user_prompt="u", thinking=True, max_tokens=64))
+            else:
+                provider.generate_structured(LLMStructuredRequest(system_prompt="s", user_prompt="u", schema={"type": "object"}, thinking=True, max_tokens=64))
+            payload = mock_post.call_args.kwargs["json"]
+        assert payload["options"] == {"temperature": 0.2, "top_p": 0.9, "num_predict": 64}
+        assert payload["think"] is True
+        assert not {"temperature", "top_p", "thinking", "num_predict"} & payload.keys()
+
+    def test_an_explicit_zero_temperature_is_sent_as_zero(self):
+        provider = bare_ollama(temperature=0.7)
+        with patch("centinela_agents.ollama_provider.requests.post") as mock_post:
+            mock_post.return_value.json.return_value = OLLAMA_REPLY
+            provider.generate_text(LLMRequest(system_prompt="s", user_prompt="u", temperature=0.0))
+            payload = mock_post.call_args.kwargs["json"]
+        assert payload["options"]["temperature"] == 0.0
+        assert payload["think"] is False
+
+    @pytest.mark.parametrize("call", ["text", "structured"])
+    def test_the_stop_reason_is_ollamas_done_reason(self, call):
+        provider = bare_ollama()
+        with patch("centinela_agents.ollama_provider.requests.post") as mock_post:
+            mock_post.return_value.json.return_value = OLLAMA_REPLY
+            if call == "text":
+                response = provider.generate_text(LLMRequest(system_prompt="s", user_prompt="u"))
+            else:
+                response = provider.generate_structured(LLMStructuredRequest(system_prompt="s", user_prompt="u", schema={"type": "object"}))
+        assert response.stop_reason == "length"
+
+
+class TestOllamaHealthCheck:
+    def test_a_server_that_is_down_answers_false(self):
+        provider = bare_ollama()
+        with patch("centinela_agents.ollama_provider.requests.get") as mock_get:
+            import requests
+            mock_get.side_effect = requests.ConnectionError("refused")
+            assert provider.health_check() is False
+
+    def test_a_model_not_pulled_answers_false(self):
+        provider = bare_ollama()
+        with patch("centinela_agents.ollama_provider.requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.json.return_value = {"models": [{"name": "llama3:8b"}]}
+            assert provider.health_check() is False
+
+    def test_a_pulled_model_answers_true(self):
+        provider = bare_ollama()
+        with patch("centinela_agents.ollama_provider.requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.json.return_value = {"models": [{"name": "qwen3:8b"}]}
+            assert provider.health_check() is True
+
+
+class TestOpenAITimeout:
+    def test_the_timeout_is_the_configs_and_reaches_the_client(self):
+        config = ModelConfig(provider="openai", model="gpt-4o-mini", timeout_seconds=12)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            with patch("centinela_agents.openai_provider.OpenAI") as mock_client_class:
+                provider = OpenAIProvider(config, skip_health_check=True)
+        assert provider.timeout == 12
+        assert mock_client_class.call_args.kwargs["timeout"] == 12
+
+    def test_a_timed_out_call_raises_timeout_error_naming_the_seconds(self):
+        from openai import APITimeoutError
+
+        config = ModelConfig(provider="openai", model="gpt-4o-mini", timeout_seconds=12)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            with patch("centinela_agents.openai_provider.OpenAI") as mock_client_class:
+                provider = OpenAIProvider(config, skip_health_check=True)
+                mock_client_class.return_value.chat.completions.create.side_effect = APITimeoutError(request=MagicMock())
+                with pytest.raises(TimeoutError, match="after 12s"):
+                    provider.generate_text(LLMRequest(system_prompt="s", user_prompt="u"))

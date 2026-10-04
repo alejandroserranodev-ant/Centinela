@@ -13,9 +13,16 @@ Environment variables:
 import os
 from typing import Literal
 
+from .cache import CachingProvider
 from .llm_provider import LLMProvider, ModelConfig
 from .ollama_provider import OllamaProvider
 from .openai_provider import OpenAIProvider
+
+
+def cached(provider: LLMProvider) -> LLMProvider:
+    """Wrap a provider in the answer cache, sized by CENTINELA_CACHE_RESPUESTAS; 0 turns it off."""
+    size = int(os.getenv("CENTINELA_CACHE_RESPUESTAS", "256"))
+    return CachingProvider(provider, size) if size > 0 else provider
 
 
 def get_provider(
@@ -53,9 +60,9 @@ def get_provider(
     )
 
     if provider == "ollama":
-        return OllamaProvider(config)
+        return cached(OllamaProvider(config))
     elif provider == "openai":
-        return OpenAIProvider(config)
+        return cached(OpenAIProvider(config))
     elif provider == "anthropic":
         raise NotImplementedError("Anthropic provider not yet implemented")
     else:
@@ -63,3 +70,13 @@ def get_provider(
             f"Unknown LLM provider: {provider}. "
             f"Choose one of: ollama, openai, anthropic"
         )
+
+
+def get_reasoning_provider() -> LLMProvider | None:
+    """
+    The provider of the steps that reason (Analista, Estratega), when LLM_MODEL_RAZONA names a model.
+
+    Returns None when it is unset or empty, and those steps use the provider of every other step.
+    """
+    model = os.getenv("LLM_MODEL_RAZONA", "").strip()
+    return get_provider(model_name=model, thinking=True) if model else None

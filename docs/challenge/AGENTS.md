@@ -59,17 +59,22 @@ with a proposal ready to approve.**
 
 ## Reference architecture and stack
 
-| Layer | Choice in this repository | Alternatives the brief accepts |
+The brief recommends a stack and lets a team change a piece it can justify:
+
+| Layer | The brief recommends | Alternatives the brief accepts |
 |---|---|---|
-| frontend | Vite + React single-page application, built on Arena React | Next.js, which the brief recommends; Streamlit for a prototype only, which lowers the UX score |
-| API | Python + FastAPI + Pydantic, REST + SSE streaming | Node.js + Hono or NestJS |
+| language models | Claude: a large model to reason, a fast one to classify | GPT, Gemini; open models through Ollama |
 | orchestration | LangGraph, for state and the pause for human approval | Claude Agent SDK, OpenAI Agents SDK, ADK, CrewAI |
 | tools | MCP servers: read-only SQL, policies, actions | the model's native function calling |
-| language models | Qwen3 through Ollama, local; one model, thinking on to reason and off to classify | Claude, which the brief recommends; GPT, Gemini |
 | data | PostgreSQL + pgvector | DuckDB for local analysis |
 | anomaly detection | business rules + statistics (z-score, trend) | scikit-learn Isolation Forest, Prophet |
-| observability and evals | Langfuse traces + promptfoo | LangSmith, Arize Phoenix, Ragas |
+| backend | Python + FastAPI + Pydantic | Node.js + Hono or NestJS |
+| frontend | Next.js + React + Tailwind + shadcn/ui + Recharts | Streamlit for a prototype only, which lowers the UX score |
+| observability and evals | Langfuse + promptfoo | LangSmith, Arize Phoenix, Ragas |
 | deployment | Docker Compose; demo on Cloud Run, Render or Vercel | local with a secure tunnel |
+
+Each level states the piece it chose and why, on its own page. How the whole system is deployed
+for the demo is chosen on no level.
 
 **Golden rule: SQL or Python computes every number; the model reasons, explains and writes, and
 never invents a figure.**

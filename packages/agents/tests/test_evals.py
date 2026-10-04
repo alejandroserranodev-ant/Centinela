@@ -198,14 +198,14 @@ class TestHallucinationDetection:
             CauseIdentified(
                 kind="identified",
                 sentence="Test",
-                evidence=[],  # Invalid: empty
+                evidence=[],
             )
 
     def test_schema_missing_required_field(self):
         """Reject missing required fields."""
         with pytest.raises(ValidationError):
             CauseIdentified(
-                sentence="Test",  # Missing 'kind'
+                sentence="Test",
                 evidence=[],
             )
 
@@ -292,7 +292,7 @@ class TestHallucinationDetection:
         with pytest.raises(ValidationError):
             Action(
                 id="a1",
-                title=None,  # Cannot be null
+                title=None,
                 description="Test",
                 type="email_draft",
                 parameters={},
@@ -329,9 +329,7 @@ class TestRegressionDetection:
 
     def test_boundary_confidence_zero(self):
         """Confidence 0.0 works."""
-        # This would fail if ranges were 0-100 instead of 0-1
         conf = Confidence(level="low")
-        # No specific validation on numeric bounds in Confidence itself
         assert conf.level == "low"
 
     def test_boundary_confidence_one(self):
@@ -344,13 +342,12 @@ class TestRegressionDetection:
         cause = CauseNoEvidence(
             kind="no_evidence",
             reason="Insufficient",
-            queriesReviewed=[],  # Empty is OK
+            queriesReviewed=[],
         )
         assert len(cause.queriesReviewed) == 0
 
     def test_action_with_zero_impact(self):
         """Action with zero impact is valid."""
-        # Not explicitly testing numeric range validation
         action = Action(
             id="a1",
             title="Test",

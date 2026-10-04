@@ -1,26 +1,29 @@
 """
 Orchestrator singleton for Centinela API.
 
-Initialized lazily on first use. The orchestrator runs Vigía, Analista, Estratega,
-and Ejecutor agents using LangGraph with InMemorySaver (state is per-process).
+Initialized lazily on first use. The orchestrator runs Vigía, Analista, Estratega and Ejecutor
+over the kernel's KPIs, which centinela_agents.catalog.connect_kernel reaches with the DSNs of the
+root .env, using LangGraph with InMemorySaver (state is per-process).
 """
 
+import hashlib
 import logging
+import os
 import re
-import uuid
-from pathlib import Path
 from typing import Any
 
-from centinela_agents.catalog import Catalog, Kpi
+from centinela_agents.action_tools import EmailDraftStub, PriceChangeDraftStub, PurchaseOrderDraftStub, TaskStub
+from centinela_agents.catalog import Catalog, KernelAccess, connect_kernel
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
-from centinela_agents.provider_factory import get_provider
+from centinela_agents.provider_factory import get_provider, get_reasoning_provider
 from centinela_agents.schema import Tree
 from centinela_agents.tools import ToolRegistry
 from centinela_agents.walk import Context, Detection
 from centinela_agents.yaml_loader import load_yaml
 from langgraph.checkpoint.memory import InMemorySaver
 
+from . import config
 from .modelos import (
     Action,
     Alert,
@@ -36,77 +39,27 @@ from .modelos import (
 
 logger = logging.getLogger(__name__)
 
-# --- Paths ---
-# agentes.py lives at: apps/api/src/centinela_api/agentes.py
-# parents[4] = project root
-_ROOT = Path(__file__).resolve().parents[4]
+_ROOT = config.RAIZ
 _ARBOL = _ROOT / "packages" / "agents" / "arbol" / "base.yaml"
 _METRICAS = _ROOT / "data" / "metricas.yaml"
 
-
-# --- KPI Catalog (mirrors packages/agents/tests/support.py VIEW_CATALOG) ---
-
-def _kpi(entity: list, *columns: str) -> Kpi:
-    return Kpi(entity=tuple(entity), columns=frozenset({*entity, *columns}))
-
-
-VIEW_CATALOG = Catalog({
-    "margen_pct": _kpi(["semana", "linea"], "ventas", "costo", "margen_pct", "caida_pts", "margen_minimo_pct"),
-    "saldo_vencido": _kpi(["cliente_id"], "segmento", "cupo_credito", "plazo_dias", "saldo_abierto", "saldo_vencido", "max_dias_vencido", "dias_pago_prom_120d"),
-    "concentracion_vencida_pct": _kpi(["cliente_id"], "saldo_vencido", "concentracion_vencida_pct"),
-    "dias_pago_prom": _kpi(["cliente_id", "mes_factura"], "dias_pago_prom", "facturas_pagadas", "aumento_pct"),
-    "cobertura_dias": _kpi(["sku", "bodega_id"], "linea", "clase_abc", "existencia", "demanda_prom_30d", "cobertura_dias", "unidades_pendientes"),
-    "variacion_costo_pct": _kpi(["sku"], "linea", "clase_abc", "proveedor_id", "costo_unitario", "costo_anterior", "variacion_pct", "fecha_vigencia", "dias_habiles_sin_traslado"),
-    "dias_retraso": _kpi(["oc_id"], "proveedor_id", "sku", "bodega_id", "fecha_esperada", "cantidad", "costo_unitario", "recibida", "dias_retraso"),
-    "descuento_en_exceso": _kpi(["vendedor_id", "semana"], "descuento_en_exceso"),
-    "margen_bruto_negativo": _kpi(["pedido_id", "linea_n"], "sku", "margen_bruto"),
-    "veces_intervalo_habitual": _kpi(["cliente_id"], "pedidos", "ultima_compra", "intervalo_prom_dias", "dias_sin_comprar", "veces_intervalo_habitual"),
-})
-
-# Metrics supported by the API Alert model
 API_METRICS = frozenset({
     "margen_pct", "saldo_vencido", "dias_pago_prom",
     "cobertura_dias", "descuento_en_exceso", "veces_intervalo_habitual",
 })
+ALERTS_PER_DAY = "CENTINELA_ALERTAS_POR_DIA"
 
-# --- Demo KPI rows (satisfy detection predicates in arbol/base.yaml) ---
-_DEMO_ROWS: dict[str, list[dict]] = {
-    "saldo_vencido": [
-        {
-            "cliente_id": "CLI-001",
-            "segmento": "Mayorista",
-            "cupo_credito": 5_000_000,
-            "saldo_abierto": 1_200_000,
-            "saldo_vencido": 800_000,
-            "max_dias_vencido": 20,     # > 15 → detectar.cartera.saldo_vencido.dias
-            "plazo_dias": 30,
-            "dias_pago_prom_120d": 35,
-        },
-    ],
-    "cobertura_dias": [
-        {
-            "sku": "SKU-A01",
-            "bodega_id": "BOD-01",
-            "linea": "Electrodomesticos",
-            "clase_abc": "A",
-            "existencia": 50,
-            "demanda_prom_30d": 20.0,
-            "cobertura_dias": 2.5,      # < 10 for class A → detectar.inventario.cobertura_dias.minima
-            "unidades_pendientes": 0,
-        },
-    ],
-}
-
-
-def _demo_reader(metric: str, day: str) -> list[dict]:
-    """Demo KPI reader: returns sample rows regardless of simulated day."""
-    return _DEMO_ROWS.get(metric, [])
-
-
-# --- Lazy singletons ---
-
+_kernel: KernelAccess | None = None
 _orchestrator: CentinelaOrchestrator | None = None
 _context: Context | None = None
+
+
+def get_kernel() -> KernelAccess:
+    """Return the kernel's catalogue, reader and call, connecting on first use."""
+    global _kernel
+    if _kernel is None:
+        _kernel = connect_kernel(os.environ)
+    return _kernel
 
 
 def get_orchestrator() -> CentinelaOrchestrator:
@@ -121,9 +74,8 @@ def get_context() -> Context:
     """Return the walk context singleton, building it on first call."""
     global _context
     if _context is None:
-        tree = _load_tree()
-        metrics = load_metrics(_METRICAS)
-        _context = Context.of(tree, metrics, VIEW_CATALOG, _demo_reader)
+        kernel = get_kernel()
+        _context = Context.of(_load_tree(), load_metrics(_METRICAS), kernel.catalog, kernel.reader)
     return _context
 
 
@@ -132,23 +84,42 @@ def _load_tree() -> Tree:
 
 
 def _build_orchestrator() -> CentinelaOrchestrator:
-    tree = _load_tree()
-    metrics = load_metrics(_METRICAS)
-    provider = get_provider()
-    tools = ToolRegistry()          # all tool providers optional; agents degrade gracefully
-    checkpointer = InMemorySaver()  # per-process state; lost on restart
+    kernel = get_kernel()
+    tools = ToolRegistry(
+        email_draft=EmailDraftStub(),
+        task=TaskStub(),
+        purchase_order_draft=PurchaseOrderDraftStub(),
+        price_change_draft=PriceChangeDraftStub(),
+    )
     return CentinelaOrchestrator(
-        provider=provider,
+        provider=get_provider(),
         tools=tools,
-        tree=tree,
-        metrics=metrics,
-        catalog=VIEW_CATALOG,
-        reader=_demo_reader,
-        checkpointer=checkpointer,
+        tree=_load_tree(),
+        metrics=load_metrics(_METRICAS),
+        catalog=kernel.catalog,
+        reader=kernel.reader,
+        checkpointer=InMemorySaver(),
+        kernel=kernel.call,
+        reasoning_provider=get_reasoning_provider(),
     )
 
 
-# --- Graph state → API Alert conversion ---
+def alert_id_of(detection: Detection) -> str:
+    """One alert per metric and entity: the id is derived from both."""
+    key = "|".join([detection.metric, *map(str, detection.entity)])
+    return "alerta_" + hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def pesos_of(detection: Detection) -> float:
+    value = detection.row.get("pesos_en_riesgo")
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
+def prioritized(detections: list[Detection], known: set[str]) -> list[Detection]:
+    """The day's new detections of the API's metrics, the most pesos at risk first, at most CENTINELA_ALERTAS_POR_DIA."""
+    fresh = [d for d in detections if d.metric in API_METRICS and alert_id_of(d) not in known]
+    return sorted(fresh, key=pesos_of, reverse=True)[: int(os.environ.get(ALERTS_PER_DAY, "3"))]
+
 
 _STATUS_MAP: dict[str, str] = {
     "nueva": "new",
@@ -160,13 +131,13 @@ _STATUS_MAP: dict[str, str] = {
 }
 
 _UNIT_MAP: dict[str, str] = {
-    "COP": "COP", "%": "percent", "pts": "points", "points": "points",
+    "COP": "COP", "%": "percent", "percent": "percent", "pts": "points", "points": "points",
     "days": "days", "días": "days", "units": "units", "unidades": "units",
 }
 
 
 def _safe_unit(unit: str | None) -> str:
-    return _UNIT_MAP.get(unit or "COP", "COP")
+    return _UNIT_MAP.get(unit or "units", "units")
 
 
 def _derive_severity(metric: str, row: dict) -> str:
@@ -187,32 +158,16 @@ def _derive_severity(metric: str, row: dict) -> str:
     return "high"
 
 
-def _derive_pesos_at_risk(metric: str, row: dict) -> float:
-    if metric == "saldo_vencido":
-        return float(row.get("saldo_vencido") or 0)
-    if metric == "margen_pct":
-        ventas = float(row.get("ventas") or 0)
-        caida = float(row.get("caida_pts") or 0)
-        return ventas * caida / 100
-    if metric == "cobertura_dias":
-        demanda = float(row.get("demanda_prom_30d") or 0)
-        return demanda * 10 * 30_000  # rough: 10 days of stock * avg unit price
-    return 0.0
-
-
 def _convert_figures(raw: list | None) -> list[Figure]:
     result = []
     for f in raw or []:
-        if not isinstance(f, dict):
+        query_id = f.get("queryId") or f.get("query_id") if isinstance(f, dict) else None
+        if not query_id:
             continue
         try:
-            result.append(Figure(
-                value=float(f.get("value", 0)),
-                unit=_safe_unit(f.get("unit")),
-                query_id=f.get("queryId") or f.get("query_id") or "q_0",
-            ))
-        except Exception:
-            pass
+            result.append(Figure(value=float(f["value"]), unit=_safe_unit(f.get("unit")), query_id=query_id))
+        except (KeyError, TypeError, ValueError):
+            logger.warning(f"Dropped a figure that is no number: {f}")
     return result
 
 
@@ -235,15 +190,12 @@ def _convert_cause(cause_data: dict | None) -> Any:
             claim_raw = e.get("claim", "")
             if isinstance(claim_raw, dict):
                 claim_raw = claim_raw.get("text", "")
-            figs = e.get("figures") or []
-            first_qid = figs[0].get("queryId", "q_0") if figs else "q_0"
-            evidence_list.append(Evidence(
-                claim=Sentence(text=str(claim_raw), figures=_convert_figures(figs)),
-                query_id=first_qid,
-            ))
+            figures = _convert_figures(e.get("figures"))
+            if figures:
+                evidence_list.append(Evidence(claim=Sentence(text=str(claim_raw), figures=figures), query_id=figures[0].query_id))
 
         if not evidence_list:
-            evidence_list = [Evidence(claim=Sentence(text="Análisis completado"), query_id="q_0")]
+            return CauseNoEvidence(kind="no_evidence", reason="La causa no trajo evidencia con consultas.", queries_reviewed=[])
 
         return CauseIdentified(kind="identified", sentence=sentence, evidence=evidence_list)
 
@@ -262,17 +214,8 @@ def _convert_action(action_data: dict) -> Action | None:
         if isinstance(description, dict):
             description = description.get("text", "")
 
-        agent_impact = action_data.get("impact")
-        api_impact = None
-        if isinstance(agent_impact, dict) and agent_impact.get("value") is not None:
-            api_impact = Impact(
-                figure=Figure(
-                    value=float(agent_impact["value"]),
-                    unit=_safe_unit(agent_impact.get("unit")),
-                    query_id=agent_impact.get("queryId") or agent_impact.get("query_id") or "q_0",
-                ),
-                period="once",
-            )
+        impact_figures = _convert_figures([action_data["impact"]] if isinstance(action_data.get("impact"), dict) else [])
+        api_impact = Impact(figure=impact_figures[0], period="once") if impact_figures else None
 
         conf = action_data.get("confidence") or {}
         if isinstance(conf, dict):
@@ -284,7 +227,7 @@ def _convert_action(action_data: dict) -> Action | None:
             confidence = Confidence(level="medium")
 
         return Action(
-            id=action_data.get("id") or f"act_{uuid.uuid4().hex[:8]}",
+            id=action_data["id"],
             title=action_data.get("title") or "Acción propuesta",
             description=Sentence(text=str(description), figures=[]),
             type=action_data.get("type", "task"),
@@ -297,6 +240,23 @@ def _convert_action(action_data: dict) -> Action | None:
         return None
 
 
+def status_path(alert_id: str, state: dict) -> list[str]:
+    """The API statuses the graph took the alert through, in order."""
+    return [
+        _STATUS_MAP[status]
+        for alert, status in state.get("transitions") or []
+        if alert == alert_id and status in _STATUS_MAP
+    ]
+
+
+def detection_query(state: dict, metric: str) -> str | None:
+    """The queryId under which the leaves recorded the alert's KPI, if one did."""
+    for query in state.get("queries") or []:
+        if isinstance(query, dict) and query.get("kpi") == metric:
+            return query.get("queryId")
+    return None
+
+
 def _labels(metric: str, entity: tuple, metrics: Metrics, catalog: Catalog) -> list[str]:
     """The metric's short name and its entity as `<dimension> <value>`, skipping the time bucket."""
     kpi = catalog.kpis.get(metric)
@@ -306,8 +266,6 @@ def _labels(metric: str, entity: tuple, metrics: Metrics, catalog: Catalog) -> l
         for column, value in zip(kpi.entity if kpi else (), entity)
         if value is not None and not re.match(r"\d{4}-\d{2}-\d{2}", str(value))
     ]
-
-
 def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: str) -> Alert:
     """Convert a LangGraph alert state to an API Alert model."""
     metric = detection.metric
@@ -318,7 +276,6 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
 
     status = _STATUS_MAP.get(state.get("status", "nueva"), "new")
     severity = _derive_severity(metric, row)
-    pesos_val = _derive_pesos_at_risk(metric, row)
 
     title_data = state.get("title") or {}
     title = Sentence(
@@ -326,8 +283,15 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
         figures=_convert_figures(title_data.get("figures")),
     )
 
-    cause = _convert_cause(state.get("cause"))
+    cause_data = state.get("cause") or {}
+    cause = _convert_cause(cause_data)
     actions = [a for a in (_convert_action(a) for a in (state.get("actions") or [])) if a]
+    cause_confidence = cause_data.get("confidence") if isinstance(cause_data, dict) else None
+    confidence = (
+        Confidence(level=cause_confidence.get("level", "low"), assumptions=list(cause_confidence.get("assumptions") or []))
+        if isinstance(cause_confidence, dict)
+        else Confidence(level="low", assumptions=[])
+    )
 
     executed_action = None
     ea = state.get("executed_action")
@@ -344,9 +308,13 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
         metric=metric,
         labels=labels,
         title=title,
-        pesos_at_risk=Figure(value=pesos_val, unit="COP", query_id="q_detect"),
+        pesos_at_risk=Figure(
+            value=pesos_of(detection),
+            unit="COP",
+            query_id=detection_query(state, metric) or f"kpi_consultar:{metric}:{day_str}",
+        ),
         recoverable_per_month=None,
-        confidence=Confidence(level="medium", assumptions=[]),
+        confidence=confidence,
         simulated_date=day_str,
         cause=cause,
         actions=actions,

@@ -177,6 +177,7 @@ class ChatMessage(Esquema):
 class ChatQuestion(Esquema):
     """User question for Centinela (Analista)."""
     question: str = Field(..., description="Natural language question about alert or metric")
+    alert_id: str | None = Field(None, description="Alert the question is asked from, if any")
 
 
 class SimulatedDay(Esquema):

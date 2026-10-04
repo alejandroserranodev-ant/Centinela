@@ -27,7 +27,8 @@ differs from the view that holds it.
 
 ## What the policies do not cover
 
-If a question needs one of these, answer that the data does not record it:
+You know the data and the three policies, and nothing else. If a question needs one of
+these, give its answer, and state nothing the data does not record:
 
 | Topic | Answer |
 |---|---|
@@ -36,3 +37,6 @@ If a question needs one of these, answer that the data does not record it:
 | strategic customers (`FIN-POL-004` §2) | "Los datos no marcan clientes estratégicos." |
 | written approval to sell below cost (`COM-POL-002` §4) | "No consta aprobación en los datos." |
 | split orders (`COM-POL-002` §4) | "La política no define cómo reconocer un pedido fraccionado." |
+| public holidays in "10 business days" (`OPE-POL-007` §4) | "Días hábiles contados de lunes a viernes, sin festivos." |
+| an email address or phone of a customer or supplier | "Los datos no registran correos ni teléfonos." |
+| the goals of a customer or of the company, such as a sales target | "Los datos no registran metas de clientes ni de la empresa." |

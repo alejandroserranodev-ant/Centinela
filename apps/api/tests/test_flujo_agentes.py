@@ -85,7 +85,7 @@ class TestEndpointsExisten:
             json=alerta_input.model_dump(by_alias=True),
             headers={"X-Agent": "vigia"},
         )
-        assert response.status_code == 422  # Header requerido
+        assert response.status_code == 422
 
     def test_post_interno_alertas_rechaza_clave_invalida(self, client, alerta_input):
         """POST /interno/alertas con clave inválida debe fallar."""
@@ -98,13 +98,11 @@ class TestEndpointsExisten:
 
     def test_put_interno_alertas_id_causa_existe(self, client):
         """PUT /interno/alertas/{id}/causa debe aceptar requests válidas."""
-        # Este test valida que el endpoint existe y valida autenticación
         response = client.put(
             "/interno/alertas/alerta_test/causa",
             json={"cause": {"kind": "no_evidence", "reason": "test"}},
             headers={"X-Agent": "analista"},
         )
-        # Sin header X-Agent-Key: 422 o 401
         assert response.status_code in (422, 401)
 
     def test_put_interno_alertas_id_propuesta_existe(self, client):
@@ -114,7 +112,6 @@ class TestEndpointsExisten:
             json={"actions": []},
             headers={"X-Agent": "estratega"},
         )
-        # Sin auth: 422 o 401
         assert response.status_code in (422, 401)
 
     def test_post_interno_alertas_id_ejecutar_existe(self, client):
@@ -128,7 +125,6 @@ class TestEndpointsExisten:
             },
             headers={"X-Agent": "ejecutor"},
         )
-        # Sin auth: 422 o 401
         assert response.status_code in (422, 401)
 
 
@@ -139,7 +135,6 @@ class TestEnmascaramiento:
         """El módulo masking debe importar correctamente."""
         from centinela_api import masking
 
-        # Valida funciones clave existen
         assert hasattr(masking, "mask_cliente_id")
         assert hasattr(masking, "mask_cliente_nombre")
         assert hasattr(masking, "mask_dict_for_model")
@@ -159,11 +154,9 @@ class TestEnmascaramiento:
         data = {"cliente": "Juan Pérez", "cliente_id": "C0042", "city": "Bogotá"}
         masked = mask_dict_for_model(data)
 
-        # Nombres enmascarados
         assert masked["cliente"] != "Juan Pérez"
         assert masked["cliente_id"] != "C0042"
 
-        # Datos públicos preservados
         assert masked["city"] == "Bogotá"
 
     def test_mask_sql_result_procesa_multiples_filas(self):
@@ -179,4 +172,4 @@ class TestEnmascaramiento:
         assert len(masked) == 2
         assert masked[0]["cliente"] != "Juan"
         assert masked[1]["cliente"] != "María"
-        assert masked[0]["valor"] == 1000  # Números preservados
+        assert masked[0]["valor"] == 1000

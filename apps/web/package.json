@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
     "arena:audit": "arena-to-prod --audit --strict=audit,restated,markers,glyph"
   },
   "dependencies": {
