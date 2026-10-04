@@ -1,6 +1,8 @@
 # Bug spec 1: the orchestrator's runtime, as `packages/agents/AGENTS.md` states it
 
-**Status:** pending its plan. **Runs after** spec 5, `current-kpis-in-kernel`, and **before**
+**Status:** planned in
+[`2026-10-04-orchestrator-runtime-plan.md`](./2026-10-04-orchestrator-runtime-plan.md); where
+"Amendments the code forced" below departs from a decision, the amendment wins. **Runs after** spec 5, `current-kpis-in-kernel`, and **before**
 spec 3, `tree-expansion`, because spec 3 builds on a day run, a cost and an `AgentStep` that this
 spec writes. **Depends on:** spec 2, `decision-tree`, for the interpreter it completes; spec 4,
 `kpi-kernel`, for `kpi_consultar`, which returns rows with their query, and for the ISO 22400-2
@@ -37,6 +39,69 @@ holds no rule that makes an alert `critical`, `high`, `medium` or `low`, yet the
 the rule that an alert is raised again only when its severity rises depend on it.
 `docs/guide/chapters/status.md` lists the tree's growth as the only pending design of
 `packages/agents`, so it does not show any of this.
+
+## Amendments the code forced
+
+The code moved after this spec was written: the chat became its own subtree, the leaves call an
+OpenAI or Ollama provider through `centinela_agents/llm_provider.py:LLMProvider`, and `apps/api`
+grew the day run, the merge and the absorption this spec places in `packages/agents`. Each
+amendment names the decision it replaces and why.
+
+- **The chat keeps its subtree.** "The chat is a function, not a node" is withdrawn:
+  `conversar.raiz`, `CentinelaOrchestrator.ask` and `chat.py:closing` already hold what it asked,
+  a failed answer included, and the validator already keeps the chat off every alert path.
+- **The model wrapper is a provider, scoped by the interpreter.** `LeafFunction` keeps its one
+  argument, because the leaves close over two providers (`provider` and `reasoning`) and a new
+  argument would touch every leaf and every stub. The orchestrator wraps each provider in
+  `centinela_agents/metered.py:MeteredProvider`, and `graph.py:leaf_node` opens a meter for the
+  node's agent before the leaf runs, through a context variable the wrapper reads. The retry, the
+  cost and the token cap are the spec's; the counted fields are the provider's normalised
+  `prompt_tokens` and `completion_tokens`, not Ollama's names, and a cached answer counts as
+  `cached`, never as a call.
+- **The timeout per call stays the provider's**, `ModelConfig.timeout_seconds`, because the
+  provider's HTTP client is the only place that can stop a call. The wrapper retries the
+  `TimeoutError` it raises.
+- **The detection reads its KPI through `evidence.py:Ledger`**, not through a new reader type:
+  the ledger already returns each query with its rows under the `queryId` the leaves use, so
+  `KpiReader` and every stub reader stay. `walk.py:Context` gains the kernel's call.
+- **The unit of `cifra` is `evidence.py:unit_of(column)`**, the unit every other figure of the tree
+  takes, because the column a node compares is not always measured in the metric's `unidad`:
+  `margen_pct` compares `caida_pts`, in points, while its `unidad` is `%`.
+- **The alert id keeps the prefix `alerta_`**, which `api.alertas`, its default and the API's
+  examples use: `alerta_` and the first 16 hex digits of the SHA-256 of the canonical JSON
+  `[metric, entity, day]`. `start_alert` keeps its `alert_id` parameter, because the routing tests
+  name their alerts; `run_day` is the only caller that names one, through `day.py:alert_id`.
+- **The order keeps a metric first, and the cap.** The day run orders the largest
+  `pesos_en_riesgo` of each metric first, then the rest, each by `pesos_en_riesgo` from the
+  largest (null last), then severity from `critical` down, then alert id, and runs at most the
+  `limit` its caller passes, as `packages/agents/AGENTS.md` "The day run" decides and argues. The
+  caller passes the metrics it watches, because `apps/api`'s `Alert` accepts only some metrics.
+- **A refused merge runs the alert again without that target**, as `apps/api` does today and
+  tests: the verdict names the refused target, the run drops it from the earlier alerts and
+  restarts the alert on a fresh thread. Any other refused transition ends the alert, as the spec
+  says.
+- **Only an alert in `propuesta` is a merge candidate**, plus the day's detections not yet run as
+  `nueva`, as `apps/api` hands them today, because only a `propuesta` alert's graph waits.
+- **The earlier alerts carry their entity.** Coverage compares metric and entity, and the stored
+  `Alert` holds labels, not the entity's values, so `api.alertas` gains a column `entidad`. A row
+  stored before the column exists has none and covers nothing.
+- **`resume` keeps returning the state.** Its steps are written to the graph's stream like any
+  other, and the decision route, which answers with one JSON body and no stream, does not read
+  them.
+- **A trace groups by session.** Langfuse's LangChain handler takes the trace's grouping from the
+  run's metadata, so an alert's start and its resume share the session `alert id`, and a chat
+  question has a session of its own. The detection of a day runs no graph and no model, so it has
+  no trace. `langfuse` is a dependency of the package; without its keys there is no handler and
+  every run completes.
+- **The day run yields a failed alert and goes on.** An exception out of one alert's graph is
+  yielded as `day.py:AlertFailed`, which takes no verdict, and the next alert runs, as `apps/api`
+  skips a failed detection today.
+- **The detection is a step.** `run_day` yields a `vigia` step for `detectar` before each alert's
+  graph, so the person sees the detection before the title, as the screen shows it today.
+- **`apps/api` persists the alert's `cost`** in `api.alertas.costos`, which exists and nothing
+  writes.
+- **The rejection reasons by metric are an input `run_day` takes and `apps/api` passes empty**,
+  because `apps/api` keeps no classified reason yet; its page keeps that marked as not built.
 
 ## Decisions
 
