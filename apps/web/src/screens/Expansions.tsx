@@ -69,7 +69,8 @@ export function Expansions({ allowed }: { allowed: boolean }) {
       return;
     }
     const retired = await retireExpansion(retiring.id, reason);
-    setExpansions(expansions.map((e) => (e.id === retired.id ? retired : e)));
+    const patched = expansions.map((e) => (e.id === retired.id ? retired : e));
+    setExpansions(await listExpansions().catch(() => patched));
     setRetiring(null);
     notify({ tone: 'success', title: 'Cambio retirado', message: 'Aplica desde el próximo día.' });
   };
@@ -101,7 +102,7 @@ export function Expansions({ allowed }: { allowed: boolean }) {
                   Retirado por {e.retiredBy ?? 'alguien'}: {e.retireReason}
                 </span>
               ) : e.status === 'inactive' ? (
-                <ArenaTag>Inactiva</ArenaTag>
+                <ArenaTag>Inactivo</ArenaTag>
               ) : (
                 <span className="arena-stack">
                   <ArenaTag>Activo</ArenaTag>
