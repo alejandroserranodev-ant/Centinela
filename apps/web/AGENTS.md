@@ -168,8 +168,8 @@ and what each shows is
   inactive change no longer walks and the API refuses its retirement. An inactive row says why, from
   `inactiveReason`, and the "Quién" column names an agent as the `Bitácora` does. It reloads the
   list after a retirement, so a change that nested under the retired one reads inactive at once; a
-  retirement the API refuses shows its message in the dialog, and a 409 reloads the list so the row
-  shows its real status. Evidence links are the `link` button of `src/app.css`, as the `Bitácora`'s.
+  retirement the API refuses shows its message in the dialog, and a 409 or a 422 reloads the list
+  so the row shows its real status. Evidence links are the `link` button of `src/app.css`, as the `Bitácora`'s.
 - **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
   leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta", naming its
   `mergedInto` by title with the action that opens it, and one with no cause of its own,

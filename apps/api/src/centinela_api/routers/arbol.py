@@ -1,3 +1,5 @@
+import logging
+
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -11,6 +13,10 @@ router = APIRouter(tags=["tree"], dependencies=[Depends(persona_actual)])
 
 SOLO_QUIEN_RETIRA = "Los cambios del árbol los retiran la analista o la gerencia"
 SIN_MOTIVO = "Para retirar un cambio del árbol hace falta un motivo"
+YA_NO_APLICA = "Ese cambio del árbol ya no se aplica, así que no hay nada que retirar"
+NO_ADMITE = "El árbol no admite ese retiro, porque dejaría de cumplir sus reglas"
+
+logger = logging.getLogger(__name__)
 
 
 def _titulos(conn: psycopg.Connection) -> dict:
@@ -39,5 +45,8 @@ async def retirar(
         raise HTTPException(404, "No existe ese cambio del árbol") from e
     except arboles.YaRetirada as e:
         raise HTTPException(409, "Ese cambio del árbol ya está retirado") from e
+    except arboles.YaNoAplica as e:
+        raise HTTPException(422, YA_NO_APLICA) from e
     except arboles.RetiroRechazado as e:
-        raise HTTPException(422, f"El árbol no admite ese retiro: {e}") from e
+        logger.warning("Retiring version %s was refused: %s", id, e.problemas)
+        raise HTTPException(422, NO_ADMITE) from e

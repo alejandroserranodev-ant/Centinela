@@ -1426,7 +1426,7 @@ export interface components {
             id: string;
             /**
              * Inactivereason
-             * @description Why an inactive change no longer holds: a merged base dropped it, or a retired change it nests under left it unreachable; null unless inactive
+             * @description Why an inactive change no longer holds: a change to the base or to anything else the validator reads dropped it, or a retired change it nests under left it unreachable; null unless inactive
              */
             inactiveReason: ("dropped_by_base" | "parent_retired") | null;
             /**
@@ -1446,7 +1446,7 @@ export interface components {
             simulatedDate: string | null;
             /**
              * Status
-             * @description Whether the change still holds: active; retired by a person; or inactive, when a merged base dropped it or a retired change it nests under left it unreachable
+             * @description Whether the change still holds: active; retired by a person; or inactive, when a change to the base or to anything else the validator reads dropped it, or a retired change it nests under left it unreachable
              * @enum {string}
              */
             status: "active" | "retired" | "inactive";

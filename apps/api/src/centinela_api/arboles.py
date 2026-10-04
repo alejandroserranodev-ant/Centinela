@@ -50,6 +50,10 @@ class YaRetirada(Exception):
     pass
 
 
+class YaNoAplica(Exception):
+    pass
+
+
 class RetiroRechazado(Exception):
     def __init__(self, problemas: list[str]):
         super().__init__("; ".join(problemas))
@@ -165,9 +169,9 @@ def vigente(conn: psycopg.Connection, grounds, growth, dia: datetime.date) -> Tr
         fila = cambios[posicion]
         if fila.origen == "retiro" and fila.retira in caen:
             continue
-        logger.warning("Version %s does not apply over the new base: %s", fila.id, problemas)
+        logger.warning("Version %s no longer passes the criteria on replay: %s", fila.id, problemas)
         insertar(conn, padre=id, origen=DESCARTADA, arbol=arbol, grounds=grounds, growth=growth, dia=dia, agente=fila.agente, autor=fila.autor, movimiento=fila.movimiento, retira=fila.id)
-        bitacora.registrar(conn, None, "arbol", actor(fila), f"Un cambio del árbol no se aplicó sobre la base nueva y se descartó: {describir(MOVE.validate_python(fila.movimiento), previas_de(filas, fila))}", dia)
+        bitacora.registrar(conn, None, "arbol", actor(fila), f"Un cambio del árbol ya no cumple las reglas vigentes del árbol y se descartó: {describir(MOVE.validate_python(fila.movimiento), previas_de(filas, fila))}", dia)
     return con_version(arbol, id)
 
 
@@ -249,7 +253,7 @@ def retirar(conn: psycopg.Connection, id: int, motivo: str, persona: Persona, di
             raise YaRetirada(id)
         arbol = vigente(conn, grounds, growth, dia)
         if estados(versiones(conn))[id].status != "active":
-            raise RetiroRechazado([f"version {id} no longer holds in the tree"])
+            raise YaNoAplica(id)
         cambio = MOVE.validate_python(fila.movimiento)
         movimiento = Retire(nodo=entry_of(cambio), motivo=motivo.strip())
         problemas = expansion_problems(arbol, movimiento, grounds, growth.caps)

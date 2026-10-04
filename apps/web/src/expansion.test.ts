@@ -3,8 +3,9 @@ import { test } from 'node:test';
 
 import { inactiveLine } from './expansion.ts';
 
-test('tells a move a new base dropped from one whose parent was retired', () => {
+test('tells a move the changed rules dropped from one whose parent was retired', () => {
   assert.notEqual(inactiveLine('dropped_by_base'), inactiveLine('parent_retired'));
+  assert.match(inactiveLine('dropped_by_base'), /reglas/);
   assert.match(inactiveLine('parent_retired'), /retiró/);
 });
 

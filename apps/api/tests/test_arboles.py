@@ -1,7 +1,8 @@
 # The tree's versions in apps/api over an in-memory store: the base row a first day writes, the
 # expansion three rejections draft, the evidence a version already used or a refused draft spent,
-# the replay a merged base forces, the status each expansion takes from the current tree, and the
-# retirement of an expansion and its refusals, and why an inactive one is so.
+# the replay a change to what the validator reads forces, the status each expansion takes from
+# the current tree, and the retirement of an expansion and its refusals, and why an inactive one
+# is so.
 import datetime as dt
 from dataclasses import replace
 from unittest.mock import MagicMock
@@ -112,7 +113,7 @@ def test_una_base_nueva_descarta_y_registra_la_expansion_que_ya_no_pasa(almacen,
     arbol = arboles.del_dia(MagicMock(), DIA)
     assert DIVISION not in {nodo.id for nodo in arbol.nodos}
     detalle = arboles.bitacora.registrar.call_args_list[-1].args[4]
-    assert detalle.startswith("Un cambio del árbol no se aplicó sobre la base nueva y se descartó")
+    assert detalle.startswith("Un cambio del árbol ya no cumple las reglas vigentes del árbol y se descartó")
 
 
 def test_un_fallo_al_crecer_deja_correr_el_dia_sobre_la_version_vigente(almacen, monkeypatch, caplog):
@@ -187,7 +188,7 @@ def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactiva_y_no_se_ret
     assert arboles.bitacora.registrar.call_count == 2
     (expansion,) = arboles.expansiones(almacen.filas, {})
     assert (expansion.id, expansion.status, expansion.inactive_reason) == ("2", "inactive", "dropped_by_base")
-    with pytest.raises(arboles.RetiroRechazado):
+    with pytest.raises(arboles.YaNoAplica):
         arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
 
 
@@ -216,7 +217,7 @@ def test_una_division_anidada_bajo_una_retirada_queda_inactiva_y_no_se_retira(al
     assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "expansion"]
     arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
     assert [(expansion.id, expansion.status, expansion.inactive_reason) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive", "parent_retired"), ("2", "retired", None)]
-    with pytest.raises(arboles.RetiroRechazado):
+    with pytest.raises(arboles.YaNoAplica):
         arboles.retirar(MagicMock(), 3, "No ayudó", GERENTE, DIA, {})
 
 

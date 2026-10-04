@@ -31,7 +31,7 @@ implement.
 | `src/centinela_api/simulacion.py` | reads and advances the clock |
 | `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
-| `src/centinela_api/arboles.py` | the tree's versions: the store, the replay over a new base, the growth of a day and the retirement of an expansion |
+| `src/centinela_api/arboles.py` | the tree's versions: the store, the replay when what the validator reads changes, the growth of a day and the retirement of an expansion |
 | `src/centinela_api/rechazos.py` | records each rejection the classifier targeted, with its metric and the actions it rejected, and lists them as evidence |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
 | `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `bandeja`, `configuracion`, `arbol`, `interno` |
@@ -89,7 +89,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | GET | `/configuracion` | the `Settings`: watched metrics, their thresholds and owners, autonomy per action type | | `getSettings` |
 | PUT | `/configuracion` | saves the `Settings` whole and returns them as stored | 403 unless analista or gerente; 422 for a failed check | `saveSettings` |
 | GET | `/arbol/expansiones` | the expansions of the tree, newest first, as `TreeExpansion`: the agent, the change in Spanish, the alerts behind it, and its status, `active`, `retired` or `inactive`, with who retired it and why, or with `inactiveReason` | | `listExpansions` |
-| POST | `/arbol/expansiones/{id}/retiro` | retires an expansion with a `RetireExpansion` reason and returns it | 403 unless analista or gerente; 404 for an unknown expansion; 409 for one already retired; 422 for a blank reason, an `inactive` expansion, or one the validator refuses | `retireExpansion` |
+| POST | `/arbol/expansiones/{id}/retiro` | retires an expansion with a `RetireExpansion` reason and returns it | 403 unless analista or gerente; 404 for an unknown expansion; 409 for one already retired; 422 for a blank reason, an `inactive` expansion, or one the validator refuses, each in Spanish, with the validator's reasons in the log | `retireExpansion` |
 
 **`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, quien, conn)`
 reads the simulated day and the anchored alert, logs the question under the person signed in, and
@@ -213,25 +213,24 @@ a move is, what refuses it and what the drafter returns is
 
 | `origen` | Written when |
 |---|---|
-| `base` | a merged base replaced the one the newest version was built on |
+| `base` | the base, or anything else the validator reads, changed since the newest version was written |
 | `expansion` | a move the drafter returned passed its criteria |
 | `retiro` | a person retired an expansion |
-| `descartada` | a draft the criteria refused, which carries its move and its evidence; or a move a merged base refuses, which carries its move and names, in `retira`, the row it drops, whose evidence stays on that row. No run walks it |
+| `descartada` | a draft the criteria refused, which carries its move and its evidence; or a move a replay refuses, which carries its move and names, in `retira`, the row it drops, whose evidence stays on that row. No run walks it |
 
-- **A merged base replays the client's moves.** `src/centinela_api/arboles.py:vigente(conn, grounds, growth, dia)`
-  returns the newest version while its stored hash equals
-  `src/centinela_api/arboles.py:huella(grounds, growth)`, which covers everything the validator and
-  the replay read: the base, the registry, the metrics, the KPI catalogue,
-  `packages/agents/arbol/crecimiento.yaml` and the skills, `packages/agents/skills/estratega/acciones.md`
-  among them; a hash stored over fewer inputs differs, so the column `base_hash` needs no
-  migration. Otherwise it replays every `expansion` and `retiro` in order over the new base, writes
-  a `base` row, and writes each move the new base refuses once as `descartada`, with a warning in
-  the log and an `arbol` row of the `bitácora`; a retirement of an expansion dropped in the same
-  pass writes nothing, and the expansion stays `retired`. A move written so is never replayed on a later base and its evidence stays
-  consumed, which departs from replaying every move on every base, because a refused move would
-  otherwise be logged again on every day run, and a move that came back on a later base could share
-  a node id the drafter has since given another split. Who merged a base is in the commit log, not
-  in the row.
+- **A change to what the validator reads replays the client's moves.**
+  `src/centinela_api/arboles.py:vigente(conn, grounds, growth, dia)` returns the newest version
+  while its stored `base_hash` equals `src/centinela_api/arboles.py:huella(grounds, growth)`, the
+  fingerprint whose inputs
+  [`../../packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md#how-the-tree-grows)
+  lists. Otherwise it replays every `expansion` and `retiro` in order over the base, writes a
+  `base` row, and writes each move the replay refuses once as `descartada`, with a warning in the
+  log and an `arbol` row of the `bitácora`; a retirement of an expansion dropped in the same pass
+  writes nothing, and the expansion stays `retired`. A move written so is never replayed again and
+  its evidence stays consumed, which departs from replaying every move on every replay, because a
+  refused move would otherwise be logged again on every day run, and a move that came back on a
+  later replay could share a node id the drafter has since given another split. Who changed an
+  input is in the commit log, not in the row.
 - **The tree grows at the start of each day run.** `src/centinela_api/arboles.py:del_dia(conn, dia)`
   takes an advisory lock, reads the version in force through `vigente`, hands the drafter the
   rejections of `api.rechazos` and every alert a row already names, and writes each move that
@@ -246,9 +245,10 @@ a move is, what refuses it and what the drafter returns is
   ids of the actions it rejected and the reason, written by the decision route after the resume;
   a rejection recorded with no paused graph has no target and keeps nothing.
 - **An expansion is `active`, `retired` or `inactive`**, derived from the current tree: `inactive`
-  is a move a merged base dropped, `inactiveReason` `dropped_by_base`, or one no longer live because
-  a move it nests under was retired, `parent_retired`. Between a merged base and the next day run
-  they describe the tree built on the old base, because a read never writes a version.
+  is a move a replay dropped, `inactiveReason` `dropped_by_base`, or one no longer live because a
+  move it nests under was retired, `parent_retired`. Between a change to what the validator reads
+  and the next day run they describe the tree built on the old inputs, because a read never writes
+  a version.
 - **A person retires an expansion**, `src/centinela_api/arboles.py:retirar(conn, id, motivo, persona, dia, titulos)`:
   under the same lock, it refuses an expansion already retired or one not `active`, the retirement
   of the expansion's first node passes the criteria, then a `retiro` row and an `arbol` row of the
@@ -450,7 +450,7 @@ figures its detail's placeholders point to.
 | `costo` | `/chat`, one per model step, through `src/centinela_api/bitacora.py:registrar_costo(conn, alerta_id, actor, detalle, dia_simulado)`; `GET /bitacora` never serves it |
 | `refusal` | `/chat`, a question the screen flagged, one outside the chat's use, or one asking to act |
 | `configuracion` | `PUT /configuracion`, the person who saved and each change, with no alert |
-| `arbol` | the growth of a day, under the agent whose move it is, a move refused or dropped by a merged base, and a retirement, under the person, each with no alert |
+| `arbol` | the growth of a day, under the agent whose move it is, a move refused by the criteria or dropped by a replay, and a retirement, under the person, each with no alert |
 
 On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
 and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL

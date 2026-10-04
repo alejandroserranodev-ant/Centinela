@@ -1,5 +1,6 @@
 # The endpoints of the tree's expansions: the list, newest first, and the retirement with each of
-# its refusals, and the session both ask for, over a mocked store and connection.
+# its refusals and the Spanish each one shows, and the session both ask for, over a mocked store
+# and connection.
 import datetime as dt
 from unittest.mock import ANY, MagicMock
 
@@ -62,10 +63,23 @@ def test_retirar_devuelve_la_expansion_retirada(con, monkeypatch):
         (GERENTE, {"reason": "No ayudó"}, arbol_router.arboles.ExpansionDesconocida(2), 404),
         (GERENTE, {"reason": "No ayudó"}, arbol_router.arboles.YaRetirada(2), 409),
         (GERENTE, {"reason": "No ayudó"}, arbol_router.arboles.RetiroRechazado(["metric x has no L3 branch in detectar"]), 422),
-        (GERENTE, {"reason": "No ayudó"}, arbol_router.arboles.RetiroRechazado(["version 2 no longer holds in the tree"]), 422),
+        (GERENTE, {"reason": "No ayudó"}, arbol_router.arboles.YaNoAplica(2), 422),
     ],
     ids=["auditor", "no reason", "unknown", "already retired", "refused", "inactive"],
 )
 def test_retirar_rechaza(con, monkeypatch, persona, cuerpo, error, estado):
     monkeypatch.setattr(arbol_router.arboles, "retirar", MagicMock(side_effect=error))
     assert con(persona).post("/arbol/expansiones/2/retiro", json=cuerpo).status_code == estado
+
+
+@pytest.mark.parametrize(
+    "error, detalle",
+    [
+        (arbol_router.arboles.YaNoAplica(2), arbol_router.YA_NO_APLICA),
+        (arbol_router.arboles.RetiroRechazado(["metric x has no L3 branch in detectar"]), arbol_router.NO_ADMITE),
+    ],
+    ids=["inactive", "refused"],
+)
+def test_un_retiro_rechazado_se_explica_en_castellano(con, monkeypatch, error, detalle):
+    monkeypatch.setattr(arbol_router.arboles, "retirar", MagicMock(side_effect=error))
+    assert con(GERENTE).post("/arbol/expansiones/2/retiro", json={"reason": "No ayudó"}).json()["detail"] == detalle

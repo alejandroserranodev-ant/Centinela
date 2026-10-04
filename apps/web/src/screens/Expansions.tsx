@@ -66,7 +66,7 @@ export function Expansions({ allowed }: { allowed: boolean }) {
     try {
       retired = await retireExpansion(retiring.id, reason);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
+      if (e instanceof ApiError && (e.status === 409 || e.status === 422)) {
         setExpansions(await listExpansions().catch(() => expansions));
       }
       throw e;
