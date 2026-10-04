@@ -14,6 +14,7 @@ Model: LLM thinking OFF (only for email body, minimal reasoning)
 import logging
 from typing import Any
 
+from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import (
     LLMProvider,
     LLMRequest,
@@ -126,6 +127,8 @@ Escribe solo el cuerpo del correo, en español.""")
         )
     )
     body = response.text.strip()
+    if not body or "{" in body or "}" in body:
+        raise SchemaRefused("Ejecutor's email body is empty or carries a template or a placeholder")
     if email_tool:
         email_tool.execute(recipient=recipient, body=body)
     logger.info("Ejecutor: email draft created for %s", recipient)

@@ -262,8 +262,8 @@ and the only context is the alert it is anchored to.
   reaches the gate, an orchestrator write or another agent's leaf
   ([`arbol/AGENTS.md`](./arbol/AGENTS.md#the-chat)).
 
-> **Limit.** `centinela_agents/security.py:mask_data(text, placeholder_prefix)` masks any two words
-> as a name, so the answer is masked with its email, key, token, password and card patterns alone,
+> **Limit.** `centinela_agents/security.py:mask_data(text, placeholder_prefix)` masks any two
+> capitalized words as a name, so the answer is masked with its email, key, token, password and card patterns alone,
 > `centinela_agents/agents/chat.py:masked(text)`; a person's name written in a question reaches the
 > model and the answer.
 

@@ -341,6 +341,25 @@ class TestEjecutor:
         assert result["executed_action"]["type"] == "email_draft"
         assert result["executed_action"]["result"].startswith("Borrador de correo para cliente_123 guardado: Estimado")
 
+    @pytest.mark.parametrize("text", ["", '{ "actionId": "a2", "result": "Se enviará" }', "Su saldo es de {0}."])
+    def test_an_email_body_that_is_a_template_or_a_placeholder_is_refused(self, text):
+        provider = MagicMock()
+        provider.generate_text.return_value = MagicMock(text=text)
+        action = {"id": "a2", "type": "email_draft", "title": "Email de cobro", "parameters": {"recipient": "C1"}}
+
+        with pytest.raises(SchemaRefused):
+            execute_action(provider, action, {"kind": "approve", "actionId": "a2"}, ToolRegistry())
+
+    def test_the_email_prompt_carries_only_the_orders_of_its_leaf(self):
+        provider = MagicMock()
+        provider.generate_text.return_value = MagicMock(text="Estimado cliente.")
+        action = {"id": "a2", "type": "email_draft", "title": "Email de cobro", "parameters": {"recipient": "C1"}}
+
+        execute_action(provider, action, {"kind": "approve", "actionId": "a2"}, ToolRegistry())
+
+        system = provider.generate_text.call_args.args[0].system_prompt
+        assert "the body of an email draft" in system and '"actionId"' not in system
+
     def test_an_email_draft_reaches_its_tool(self):
         provider = MagicMock()
         provider.generate_text.return_value = MagicMock(text="Estimado cliente.")

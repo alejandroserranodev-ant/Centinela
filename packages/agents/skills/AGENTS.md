@@ -7,7 +7,9 @@ the orchestrator that calls a model. What each agent may and may not do is
 three things here: a leaf's `skill` must name a file under this directory,
 `estratega/acciones.md` is parsed, and each leaf of `../centinela_agents/agents/` loads its
 agent's contract as its model's system prompt, `../centinela_agents/skills.py:skill(agent, names)`;
-`Ejecutor` also loads `ejecutor/plantillas.md`. The leaf's user prompt carries only the alert and
+`Ejecutor` also loads the orders of its one leaf, `ejecutor/plantillas.md` for an email body, never
+both leaves' orders, because a small model follows the other leaf's format; `ejecutor/nota_manual.md`
+holds a manual note's, which no running leaf asks a model for. The leaf's user prompt carries only the alert and
 the facts its code read; a leaf of `Chat` adds the person's question, marked as untrusted data, and
 both of its steps load `chat/contrato.md`.
 

@@ -19,13 +19,15 @@ logger = logging.getLogger(__name__)
 SENSITIVE_PATTERNS = {
     "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
     "phone": r"\+\d{1,3}(?:[-.\s]?\d{2,4}){2,4}\b|\b\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
-    "name": r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b",
+    "name": r"\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+\b",
     "id_passport": r"\b\d{8,10}[A-Z]?\b",
     "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
     "api_key": r"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}",
     "token": r"ghp_[A-Za-z0-9]{30,}",
     "password": r"password['\"]?\s*[:=]\s*['\"]?[^\s'\"]+",
 }
+
+CASED = frozenset({"name"})
 
 SECRET_PATTERNS = {
     "openai_key": r"sk-(?!ant-)(?:proj-)?[A-Za-z0-9_-]{20,}",
@@ -54,9 +56,9 @@ def mask_data(text: str, placeholder_prefix: str = "{{MASKED") -> str:
     counter = {key: 0 for key in SENSITIVE_PATTERNS}
 
     for pattern_name, pattern in SENSITIVE_PATTERNS.items():
-        for match in re.finditer(pattern, masked, re.IGNORECASE):
+        for match in re.finditer(pattern, masked, 0 if pattern_name in CASED else re.IGNORECASE):
             counter[pattern_name] += 1
-            placeholder = f"{placeholder_prefix}_{pattern_name.upper()}_{counter[pattern_name]}}}"
+            placeholder = f"{placeholder_prefix}_{pattern_name.upper()}_{counter[pattern_name]}}}}}"
             masked = masked.replace(match.group(0), placeholder)
 
     return masked

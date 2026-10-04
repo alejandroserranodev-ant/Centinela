@@ -88,7 +88,7 @@ masks the ids as the safe reading, and masks a name wherever one could enter.
   these two stay.
 - **Masking is not detection.** It replaces the columns the catalogue marks as personal, by column,
   and the free text of a cause or a question by the run's mapping; it does not guess names with a
-  pattern, because `security.py:mask_data` already shows that a pattern masks any two words.
+  pattern, because `security.py:mask_data` already shows that a pattern masks any two capitalized words.
 
 ## Pages this spec changes
 
