@@ -2,13 +2,15 @@ from unittest.mock import MagicMock, patch
 
 from langgraph.checkpoint.memory import InMemorySaver
 
+from centinela_agents.day import AlertRun, Verdict
 from centinela_agents.graph import classified
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.action_tools import TaskStub
 from centinela_agents.tools import ToolRegistry
-from support import DAY, DECISION_DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, approve, base_tree, reader_from, saldo_detection
+from centinela_agents.walk import Context
+from support import DAY, DECISION_DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, approve, base_tree, reader_from, saldo_detection, split_tree
 
 STATE = {
     "alert_id": "A1",
@@ -76,3 +78,31 @@ def test_use_thresholds_swaps_what_the_recheck_reads_and_keeps_the_graph_and_the
     state = orchestrator.resume("A1", approve(action_id=action_id))
     assert state["fin"] == "fin.ya_no_aplica"
     assert state.get("executed_action") is None
+
+
+def test_a_paused_alert_resumes_on_the_graph_of_the_version_it_started_on():
+    orchestrator, action_id = paused_saldo_alert()
+    first = orchestrator.graph
+    orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
+    assert orchestrator.graph is not first
+    assert orchestrator.graph_of("A1") is first
+    assert orchestrator.get_state("A1")["arbol_version"] == 1
+    assert orchestrator.is_awaiting_decision("A1")
+    assert ["ejecutar.vigente", "si"] in orchestrator.resume("A1", approve(action_id=action_id))["camino"]
+    assert orchestrator.start(saldo_detection(), alert_id="A2", day=DAY)["arbol_version"] == 2
+
+
+def test_run_day_walks_the_tree_in_use_whatever_tree_its_context_carries():
+    orchestrator, _ = paused_saldo_alert()
+    orchestrator.use_tree(base_tree().model_copy(update={"version": 5}))
+    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: {"saldo_vencido": [SALDO_ROW]}}))
+    run, sent, states = orchestrator.run_day(ctx, DAY), None, []
+    while True:
+        try:
+            event = run.send(sent)
+        except StopIteration:
+            break
+        sent = Verdict(recorded=True) if isinstance(event, AlertRun) else None
+        if isinstance(event, AlertRun):
+            states.append(event.state)
+    assert [state["arbol_version"] for state in states] == [5]

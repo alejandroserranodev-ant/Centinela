@@ -18,10 +18,11 @@ class Context:
     reader: KpiReader
     owners: Mapping[str, str] = field(default_factory=dict)
     call: KernelCall | None = None
+    version: int = 0
 
     @classmethod
     def of(cls, tree: Tree, metrics: Metrics, catalog: Catalog, reader: KpiReader, owners: Mapping[str, str] | None = None, call: KernelCall | None = None) -> "Context":
-        return cls(index(tree), metrics, catalog, reader, dict(owners or {}), call)
+        return cls(index(tree), metrics, catalog, reader, dict(owners or {}), call, tree.version)
 
 
 @dataclass(frozen=True)

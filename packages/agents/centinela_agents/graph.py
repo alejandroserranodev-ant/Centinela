@@ -294,12 +294,13 @@ def run_config(alert_id: str, tracer=None) -> dict[str, Any]:
     return {**(dict(tracer.config(alert_id)) if tracer is not None else {}), **thread(alert_id)}
 
 
-def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections) -> dict[str, Any]:
+def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, arbol_version=None) -> dict[str, Any]:
     earlier = {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id}
     return {
         "alert_id": alert_id,
         "simulated_day": day,
         "entry": detection.entry,
+        "arbol_version": arbol_version,
         "earlier_alerts": earlier,
         "alert_briefs": {other: dict(brief) for other, brief in (alert_briefs or {}).items() if other in earlier},
         "detection": detection_state(detection),
@@ -314,14 +315,14 @@ def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts,
     }
 
 
-def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None) -> Iterator[dict[str, Any]]:
-    initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)
+def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None) -> Iterator[dict[str, Any]]:
+    initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, arbol_version)
     fresh(graph, alert_id)
     yield from graph.stream(initial, run_config(alert_id, tracer), stream_mode="custom")
 
 
-def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None) -> dict[str, Any]:
-    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer):
+def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None) -> dict[str, Any]:
+    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer, arbol_version=arbol_version):
         pass
     return graph.get_state(thread(alert_id)).values
 

@@ -150,11 +150,21 @@ class CentinelaOrchestrator:
             token_cap=token_cap,
         )
 
-        self.graph = self.compiler.graph(tree)
+        self._graphs: dict[int, Any] = {}
+        self.use_tree(tree)
         logger.info(f"Orchestrator initialized with tree v{tree.version}")
 
     def use_thresholds(self, thresholds: Mapping[str, Mapping[str, Any]]) -> None:
         self._thresholds.update({name: dict(values) for name, values in thresholds.items()})
+
+    def use_tree(self, tree: Tree) -> None:
+        self.tree = tree
+        self.graph = self.compiler.graph(tree)
+        self._graphs[tree.version] = self.graph
+
+    def graph_of(self, alert_id: str):
+        version = (self.graph.get_state(thread(alert_id)).values or {}).get("arbol_version")
+        return self._graphs.get(version, self.graph)
 
     def start(
         self,
@@ -200,6 +210,7 @@ class CentinelaOrchestrator:
                 cause_rejections=cause_rejections or [],
                 proposal_rejections=proposal_rejections or [],
                 tracer=self.tracer,
+                arbol_version=self.tree.version,
             )
 
             if awaiting_decision(self.graph, alert_id):
@@ -223,7 +234,7 @@ class CentinelaOrchestrator:
         Returns:
             True if alert is at approval gate (aprobar.decision)
         """
-        return awaiting_decision(self.graph, alert_id)
+        return awaiting_decision(self.graph_of(alert_id), alert_id)
 
     def resume(
         self,
@@ -254,9 +265,9 @@ class CentinelaOrchestrator:
         )
 
         try:
-            state = resume(self.graph, alert_id, decision, tracer=self.tracer)
+            state = resume(self.graph_of(alert_id), alert_id, decision, tracer=self.tracer)
 
-            if awaiting_decision(self.graph, alert_id):
+            if awaiting_decision(self.graph_of(alert_id), alert_id):
                 logger.info(f"Alert {alert_id} awaits next decision")
             else:
                 logger.info(f"Alert {alert_id} processing complete")
@@ -277,7 +288,7 @@ class CentinelaOrchestrator:
         Returns:
             Complete alert state
         """
-        return self.graph.get_state(thread(alert_id)).values
+        return self.graph_of(alert_id).get_state(thread(alert_id)).values
 
     def ask(self, question: str, day: str, alert: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """
@@ -334,4 +345,5 @@ class CentinelaOrchestrator:
         }
 
     def run_day(self, ctx: Context, day: str, *, earlier=(), watched=None, limit: int = 3, cause_rejections=None, proposal_rejections=None):
+        ctx = replace(ctx, nodes=index(self.tree), version=self.tree.version)
         return run_day(self.graph, ctx, day, earlier=earlier, watched=watched, limit=limit, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=self.tracer)
