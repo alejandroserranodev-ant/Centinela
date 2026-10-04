@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,5 +11,5 @@ load_dotenv(RAIZ / ".env.local", override=True)
 
 DSN_ADMIN = os.environ.get("DSN_ADMIN")
 AGENT_SECRET_KEY = os.environ.get("AGENT_SECRET_KEY", "insecure-dev-key")
-
-ROLES_CON_DECISION = frozenset({"gerente", "lider_proceso"})
+AUTH_SECRET_KEY = os.environ.get("AUTH_SECRET_KEY", "").encode() or secrets.token_bytes(32)
+CENTINELA_USUARIOS = os.environ.get("CENTINELA_USUARIOS", "")

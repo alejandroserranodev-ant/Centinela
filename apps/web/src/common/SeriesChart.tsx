@@ -18,14 +18,8 @@ const SCALE: Record<FigureUnit, Scale> = {
 };
 
 const TITLE_BY_SOURCE: Record<QuerySource, string> = {
-  v_ventas: 'Ventas',
-  v_margen_semanal_linea: 'Margen semanal',
-  v_cartera_cliente: 'Cartera',
-  v_dias_pago_mensual: 'Días de pago por mes',
-  v_cobertura_inventario: 'Cobertura de inventario',
-  v_descuentos_fuera_politica: 'Descuentos fuera de política',
-  v_actividad_cliente: 'Actividad del cliente',
   alertas: 'Alertas',
+  kernel: 'KPI del kernel',
 };
 
 export function sourceTitle(source: QuerySource): string {

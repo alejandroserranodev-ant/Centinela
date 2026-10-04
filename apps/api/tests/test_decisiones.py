@@ -1,6 +1,6 @@
 import pytest
 
-from centinela_api.decisiones import ConflictoEstado, DecisionInvalida, aplicar
+from centinela_api.decisiones import CAMBIOS_YA_PEDIDOS, SOLO_INFORMA, ConflictoEstado, DecisionInvalida, aplicar
 from centinela_api.modelos import (
     Action,
     Alert,
@@ -10,9 +10,14 @@ from centinela_api.modelos import (
     DecisionApprove,
     DecisionEdit,
     DecisionReject,
+    DecisionRequestChanges,
     Figure,
     Sentence,
 )
+
+
+PROPONE = {"email_draft": "propose", "task": "propose", "purchase_order_draft": "propose", "price_change_draft": "propose"}
+INFORMA_TAREAS = {**PROPONE, "task": "inform"}
 
 
 def _alerta(status: AlertStatus = "proposed") -> Alert:
@@ -42,32 +47,65 @@ def _alerta(status: AlertStatus = "proposed") -> Alert:
 
 
 def test_aprobar_mueve_a_approved():
-    alerta, eventos = aplicar(_alerta(), DecisionApprove(action_id="accion_1"))
+    alerta, eventos = aplicar(_alerta(), DecisionApprove(action_id="accion_1"), PROPONE)
     assert alerta.status == "approved"
     assert eventos == [("decision", "Aprobada: Hacer algo")]
 
 
 def test_editar_aplica_parametros_a_la_accion_elegida():
-    alerta, _ = aplicar(_alerta(), DecisionEdit(action_id="accion_1", parameters={"precio": 1}))
+    alerta, _ = aplicar(_alerta(), DecisionEdit(action_id="accion_1", parameters={"precio": 1}), PROPONE)
     assert alerta.actions[0].parameters["precio"] == 1
 
 
 def test_rechazar_requiere_motivo():
     with pytest.raises(DecisionInvalida):
-        aplicar(_alerta(), DecisionReject(reason="   "))
+        aplicar(_alerta(), DecisionReject(reason="   "), PROPONE)
 
 
 def test_rechazar_mueve_a_rejected():
-    alerta, eventos = aplicar(_alerta(), DecisionReject(reason="no aplica"))
+    alerta, eventos = aplicar(_alerta(), DecisionReject(reason="no aplica"), PROPONE)
     assert alerta.status == "rejected"
     assert eventos == [("decision", "Rechazada. Motivo: no aplica")]
 
 
 def test_decision_sobre_alerta_que_no_espera_una():
     with pytest.raises(ConflictoEstado):
-        aplicar(_alerta(status="new"), DecisionReject(reason="motivo"))
+        aplicar(_alerta(status="new"), DecisionReject(reason="motivo"), PROPONE)
 
 
 def test_accion_desconocida_es_rechazada():
     with pytest.raises(DecisionInvalida):
-        aplicar(_alerta(), DecisionApprove(action_id="no_existe"))
+        aplicar(_alerta(), DecisionApprove(action_id="no_existe"), PROPONE)
+
+
+@pytest.mark.parametrize("decision", [DecisionApprove(action_id="accion_1"), DecisionEdit(action_id="accion_1", parameters={"precio": 1})])
+def test_una_accion_que_solo_informa_no_se_aprueba(decision):
+    with pytest.raises(DecisionInvalida, match=SOLO_INFORMA):
+        aplicar(_alerta(), decision, INFORMA_TAREAS)
+
+
+def test_una_accion_que_solo_informa_se_puede_rechazar():
+    alerta, _ = aplicar(_alerta(), DecisionReject(reason="no aplica"), INFORMA_TAREAS)
+    assert alerta.status == "rejected"
+
+
+def test_pedir_cambios_deja_la_alerta_propuesta_y_marca_la_solicitud():
+    alerta, eventos = aplicar(_alerta(), DecisionRequestChanges(reason=" Prefiero una llamada "), PROPONE)
+    assert alerta.status == "proposed" and alerta.changes_requested
+    assert eventos == [("decision", "Cambios solicitados. Motivo: Prefiero una llamada")]
+
+
+def test_pedir_cambios_requiere_motivo():
+    with pytest.raises(DecisionInvalida):
+        aplicar(_alerta(), DecisionRequestChanges(reason="  "), PROPONE)
+
+
+def test_pedir_cambios_una_segunda_vez_es_un_conflicto():
+    pedida = _alerta().model_copy(update={"changes_requested": True})
+    with pytest.raises(ConflictoEstado, match=CAMBIOS_YA_PEDIDOS):
+        aplicar(pedida, DecisionRequestChanges(reason="Otra vez"), PROPONE)
+
+
+def test_pedir_cambios_exige_una_alerta_propuesta():
+    with pytest.raises(ConflictoEstado):
+        aplicar(_alerta("approved"), DecisionRequestChanges(reason="Tarde"), PROPONE)

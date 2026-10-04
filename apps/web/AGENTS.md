@@ -11,17 +11,22 @@ and what each shows is
 | Path | Why it exists |
 |---|---|
 | `src/main.tsx` | mounts the app with the Spanish locale strings of Arena's components, the theme and the router, and imports the generated stylesheets |
-| `src/App.tsx` | the web's routes, each a screen inside the shell |
-| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
+| `src/App.tsx` | the web's routes: `/ingresar` alone, and every other screen inside the shell behind the session |
+| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`, and `Login` outside the shell), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
 | `src/shell/` | what wraps every route: the bar with the simulated day, the navigation, and the agents' current step |
-| `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog, the series chart |
+| `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog with the first rows the query returned, the series chart |
 | `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
+| `src/state/Session.tsx` | the person and token, `signIn`, `signOut`, and `RequireSession`, the guard of every route but `/ingresar` |
+| `src/api/session.ts` | the token's store and the callback a 401 calls, outside React so the fetch client needs none |
+| `src/roles.ts` | the Spanish label of each role |
 | `src/api/client.ts` | the one module the screens import the API from; it re-exports `src/api/http-client.ts` |
 | `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
+| `src/api/error-message.ts` | `messageOfError`, which turns an error response into the message of `ApiError`; `src/api/http-client.test.ts` tests it |
 | `src/api/sse.ts` | `readSse(body)`, which reads a server-sent event stream as `event` and parsed `data` pairs, the name from each event's `event:` line; `src/api/sse.test.ts` tests it with Node's test runner |
-| `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and the person every decision is sent as |
-| `src/api/types.ts` | the contract the client and the screens share, following `apps/api`'s Pydantic models |
-| `src/api/fixtures/` | the illustrative data the screens ran on before the fetch client; no module imports it |
+| `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and `authHeaders()` with the bearer token |
+| `src/api/types.ts` | the contract the client and the screens share: aliases over `src/api/schema.generated.ts`, plus the types the API has no model for |
+| `src/api/openapi.json` | the API's OpenAPI document, written by `python -m centinela_api.contrato` |
+| `src/api/schema.generated.ts` | the TypeScript types of that document, written by `npm run contract`; never edited |
 | `.env` | the `VITE_API_URL` Vite reads, versioned with the local API's address |
 | `src/format.ts` | every number and date as a person reads it: pesos, percentages, points, days and units in `es-CO`, dates in the time zone of Bogotá |
 | `src/actionParameters.ts` | the Spanish name of each key of an action's `parameters`, for the proposal, the edit dialog and the `bitácora` |
@@ -59,32 +64,45 @@ and what each shows is
   there. It reads the stylesheet `arena-to-prod` writes, which imports Arena's sheets by package
   name, so it is opened through `npm run dev` at `/design/identity.html`, never from `file://`.
 - **The screens import the API from `src/api/client.ts` alone**, which re-exports the fetch
-  client, so the client behind it changes without touching a screen. It exports `advanceDay`,
-  `listAlerts`, `getAlert`, `decide`, `chat` and `listBitacora` for the brief's minimal API, and
-  `getSimulationState`, `getInboxSummary`, `getSettings`, `saveSettings` and `getQuery` for what
-  the screens need beyond it. Each endpoint, its route and what it refuses are
-  [`../api/AGENTS.md`](../api/AGENTS.md), its endpoint table. A refusal reaches a screen as
-  `src/api/http-client.ts:ApiError(status, message)` with the API's status.
-- **Some functions answer inside the client**, because the API serves no endpoint for them:
-  `getSimulationState` reads the day from `GET /simulacion/dia-actual` and takes the person from
-  the client; `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
-  `saveSettings` refuses `execute` with 422 and stores nothing; `getQuery` refuses every id with
-  404, so "how I got here" and the query dialog show their error state.
-- **There is no login.** `src/api/config.ts:getDecisionHeaders()` sends every decision as
-  `DEFAULT_USER`, a `gerente`, its name percent-encoded in `X-User-Name` because a header is
-  ASCII-only.
-- **`src/api/types.ts` is the contract the screens read**: `apps/api`'s Pydantic models are the
-  source, and these types follow them field for field. Every number travels as a `Figure` with its
-  `queryId`, so the type itself asks each figure for its query. Where the types and the API
-  disagree is listed under the rules below.
+  client, so the client behind it changes without touching a screen. Which function serves which
+  endpoint, and what each refuses, is the endpoint table of [`../api/AGENTS.md`](../api/AGENTS.md).
+  A refusal reaches a screen as `src/api/http-client.ts:ApiError(status, message)`, with the API's
+  status and `detail`, which `src/api/error-message.ts:messageOfError(body, statusText)` reads: a string
+  `detail` as it comes, the first `msg` of a validation list, otherwise the body or the status
+  text. The SSE calls throw the same error before their stream starts, so a screen shows the API's
+  own Spanish, such as the 409 of a second day run. No answer at all is `ApiError` 0 with
+  `src/api/error-message.ts:OFFLINE`.
+- **`getInboxSummary` reads `GET /bandeja/resumen`**, so the three totals arrive as `Figure`s
+  whose `queryId` `getQuery` answers with the query over the alerts table.
+- **A person signs in before any screen.** `/ingresar` is the one route outside the shell; every
+  other route sits behind `src/state/Session.tsx:RequireSession()`, which sends a visitor with no
+  session there and back to the requested path after it. The token lives in `sessionStorage`, so
+  it dies with the tab, and every call sends it through `src/api/config.ts:authHeaders()`. A 401
+  clears the session through `src/api/session.ts:notifyUnauthorized(sent)` only when it answers
+  the token still in use, so a late answer to an older token never signs out a newer session. An
+  API that does not answer on load keeps the token and offers a retry instead.
+- **The screen decides no permission.** The bar shows the person's name and role on a desktop,
+  and "Salir" everywhere. An alert arrives with `canDecide` and `decidedBy`; when `canDecide` is
+  false the proposed actions show no Approve, Edit, Request changes or Reject, only "Decide:" and
+  the owner. A 403 the API still answers reaches the person as its message.
+- **`src/api/types.ts` is the contract the screens read**: it aliases the types that
+  `src/api/schema.generated.ts` generates from the OpenAPI document of `apps/api`, so the API's
+  Pydantic models are the source. After a change to a model, run `python -m centinela_api.contrato`
+  in `apps/api` to write `src/api/openapi.json`, then `npm run contract` here to write the types;
+  the root gate `check:contract` fails when they drift. Only what the API defines no model
+  for stays written by hand in the same file. Every number travels as a `Figure` with its
+  `queryId`, so the type itself asks each figure for its query. The one place the web's
+  `Decision` outgrows the API's is listed under the rules below.
+  The generator runs through `npx` with `openapi-typescript@7.13.0` and `typescript@5.9.3` pinned
+  in the `contract` script, and is no devDependency: it needs the TypeScript 5 compiler API, this
+  app is on TypeScript 7, and npm refuses the peer conflict. A cold `npx` cache needs the network.
 - **The agents' current step is on screen while they work.** `src/shell/CurrentStep.tsx:CurrentStep()`
   renders the `step` events of the day run, which `apps/api` streams by SSE
   ([`../api/AGENTS.md`](../api/AGENTS.md)).
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
-  including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
-  fixtures and of the settings the client returns. The words the data names keep their Spanish in code too: the agents (`vigia`,
-  `analista`, `estratega`, `ejecutor`), the metrics (`margen_pct`…), the `v_*` views and the
+  including `aria-label`s, hints and notices, is Spanish. The words the data names keep their Spanish in code too: the agents (`vigia`,
+  `analista`, `estratega`, `ejecutor`, `chat`), the metrics (`margen_pct`…), the `v_*` views and the
   `alertas` table, because a translation would make a second name for one thing.
 - **The contract is English except its routes.** Field names and values in
   `src/api/types.ts` are English (`status: 'proposed'`, `severity: 'critical'`), so the
@@ -97,25 +115,15 @@ and what each shows is
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
-- **Fixture files and ids are English** (`src/api/fixtures/alerts.json`, `alert-hogar-margin`,
-  `q-hogar-drop`); the line name stays as the data spells it. An id never reaches a manager's
-  screen.
-- **The fixtures in `src/api/fixtures/` are illustrative**, and no module imports them. They are
-  built from the brief's public example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
-  examples, never from the dataset, because figures read from `data/csv/` would name the seeded
-  scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
-  figure cites an example query against a real `v_*` view; the queries are not run.
 - **The screen computes no figure.** The inbox totals are `Figure`s the API computes
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
-  table, which is why `src/api/types.ts:QuerySource` also takes `alertas`. A sum taken on screen
-  would be a figure with no query behind it. Until the API serves the totals,
-  `src/api/http-client.ts:getInboxSummary()` takes those sums in the browser, under query ids no
-  query answers.
+  table, which is why `src/api/types.ts:QuerySource` is `kernel` or `alertas`, and a view's name
+  is never a source. A sum taken on screen would be a figure with no query behind it.
 - **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's
   rule `arenaToastDelay`, which `src/state/Simulation.tsx:useToasts()` applies with the shorter
-  interval.
+  interval. On a phone they sit above the bottom bar, clear of the clock.
 - **Each chart sits in a box that clips sideways**, the `chart` class of `src/app.css`.
   `ArenaLineChart` hides its accessible table in a one-pixel box, but a table lays out to its
   content anyway and would widen the page at phone width. Clipping the inline axis alone keeps the
@@ -123,20 +131,40 @@ and what each shows is
 - **The chat is a non-modal `ArenaSheet`, so it handles focus itself.** The sheet takes no focus
   and traps none, and Escape reaches it only from inside. Opening moves focus to the question
   field, and closing returns it to the control that opened the chat. On a desktop the shell gives
-  up the sheet's width at its inline end while the chat is open, so the alert stays readable
-  beside the answer. The sheet covers the end of the bar while it is open, because Arena places it
+  up the sheet's width at its inline end while the chat is open, and an inbox narrower than
+  Arena's `md` shows one column, as on a phone, so
+  the alert stays readable beside the answer. The sheet covers the end of the bar while it is open, because Arena places it
   above fixed navigation.
 - **Enter sends a question and Shift + Enter breaks the line.** `ArenaTextarea` exposes no key
-  events, so the form around it listens for them. The conversation lasts as long as the app stays
-  open, because the chat is mounted once in the shell.
+  events, so the form around it listens for them. The field stops at the API's 500 characters and
+  counts them. The conversation lasts as long as the app stays open, because the chat is mounted
+  once in the shell, but each question is answered alone: the API receives no history.
+- **The chat says why it did not answer.** A `ChatMessage` whose `outcome` is `refused`,
+  `out_of_scope` or `no_evidence` renders as an informative `ArenaAlert` with its own title, and
+  every answer lists, under it, the nodes of the tree its walk took, from the `step` events that
+  name a `node`. The suggestions follow the intents the chat classifies: why, what to do and the
+  cause on an anchored alert, a figure of the day without one, and one question outside its use.
 - **The chat's send button is `secondary`.** The sheet stands beside a view that already has its
   primary action, Approve in the detail, and one view shows one primary action.
 - **A Bitácora filter returns the reader to page 1.** `ArenaTable` returns to page 1 only when
   the page falls out of range, and it does not slice rows, so the screen keeps the page, slices
-  ten rows and resets the page whenever a criterion changes.
+  ten rows and resets the page whenever a criterion changes. A chat row asked from no alert stays
+  in the list, its alert cell an unlinked `src/logEvent.ts:withoutAlert(type)`, because a
+  question is a step of the log as much as a decision is.
 - **The settings screen has one save action for all its tabs.** A change in any tab is a draft
-  until "Guardar cambios", so no tab saves half a configuration. "Ejecuta" is disabled in every
-  autonomy group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md)).
+  until "Guardar cambios", so no tab saves half a configuration. Only a threshold that is one
+  number is an input; the others read as their rule. "Ejecuta" is disabled in every autonomy
+  group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md#the-settings)). A
+  person `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
+- **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
+  leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta", naming its
+  `mergedInto` by title with the action that opens it, and one with no cause of its own,
+  `src/alert.ts:explainedByRemaining(cause, merged)`, points its "Por qué" there. The alert that remains lists each merged one under
+  "Alertas con la misma causa", `src/screens/AlertDetail.tsx:AlertDetail({ id, alone })`.
+- **An `approved` alert with no `executedAction` shows its newest `result` row**,
+  `src/logEvent.ts:latestResult(events)`. At `ultimoDia` the clock offers no next day.
+- **An action type at `inform` shows no Aprobar or Editar**: `src/screens/ProposedActions.tsx:ProposedActions({ alert })`
+  reads the settings' autonomy and says the type only informs, because the API refuses its approval.
 
 ## Commands
 
@@ -162,8 +190,8 @@ a table view.
 2. Give it a Spanish route in `src/App.tsx`, inside the shell. A screen the navigation reaches
    also gets an entry in `src/shell/Shell.tsx:DESTINATIONS`.
 3. Read its data through a new function of `src/api/http-client.ts`, re-exported by
-   `src/api/client.ts`, with its shapes in `src/api/types.ts` following the endpoint's Pydantic
-   model. Every number is a `Figure` with a `queryId` the API answers. The endpoint behind the
+   `src/api/client.ts`, with its shapes in `src/api/types.ts` aliasing the generated type of the endpoint's
+   Pydantic model. Every number is a `Figure` with a `queryId` the API answers. The endpoint behind the
    function is a row in [`../api/AGENTS.md`](../api/AGENTS.md) before the function exists.
 4. Place each piece by who renders it: a piece only this screen renders stays in `src/screens/`
    beside it; a piece another screen or the shell also renders goes in `src/common/`; what wraps
@@ -175,7 +203,9 @@ a table view.
 - **A figure on screen carries its source.** Every number links, or expands, to the logged query
   behind it, through `src/common/SentenceWithFigures.tsx:LinkedFigure()` or a sentence whose
   figures `src/common/SentenceWithFigures.tsx:SentenceWithFigures()` links: "how I got here" is
-  the third level of every explanation. *No gate holds this.*
+  the third level of every explanation. An agent writes each figure as a placeholder, `{0}`, and
+  the sentence fills it with the figure as `src/format.ts:formatFigureInText(figure)` writes it
+  before linking it, or `src/format.ts:fillSentence(text, figures)` where no link fits. *No gate holds this.*
 - **Severity is a badge with its word**: `src/common/Badges.tsx:Severity()` pairs each tone with
   its Spanish label, so no screen tells severity by colour alone.
 - **Every amount and date goes through `src/format.ts`**: pesos as `COP` in `es-CO`, dates spelled
@@ -183,9 +213,7 @@ a table view.
   vocabulary reaches a manager's screen.
 - **A rejection and a request for changes go through `src/screens/ReasonDialog.tsx:ReasonDialog()`**,
   which sends nothing without a reason, and the reason travels in the `Decision`.
-- **What the client sends and reads matches the API.** *No gate holds this*, and one place
-  breaks it: `decide` sends a `request_changes` as a `reject` carrying the same reason, because
-  the API has no `request_changes`, so asking for another proposal closes the alert as rejected.
+- **What the client sends and reads matches the API.** *No gate holds this.*
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.
 - **Arena's rules hold in every source file**: tokens only, no class of ours on an Arena
   component, one primary action per view, danger as outline. `npm run arena:audit` holds the ones

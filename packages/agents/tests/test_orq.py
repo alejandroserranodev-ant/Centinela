@@ -25,6 +25,16 @@ def started(recorder, alert_id="A1", earlier=None, **options):
     return graph, state
 
 
+def test_orq_start_reports_each_agent_as_it_runs():
+    entered = []
+    graph = compiled(Recorder())
+
+    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY, on_step=lambda agent, node: entered.append(agent))
+
+    assert entered == ["vigia", "analista", "estratega"]
+    assert awaiting_decision(graph, "A1")
+
+
 def test_orq_a_tree_with_a_missing_no_is_refused_at_startup():
     data = base_data()
     node_of(data, "explicar.con_evidencia").pop("no")
@@ -96,6 +106,17 @@ def test_orq_a_larger_alert_absorbs_a_smaller_one_still_nueva():
     assert awaiting_decision(graph, "A1")
 
 
+def test_orq_three_alerts_of_one_cause_end_as_one_that_remains_and_two_unida():
+    named = iter(["C1", "B1"])
+    explained = {("analista", "explicar"): lambda state: {"cause": {"kind": "identified", "sentence": {"text": "x", "figures": []}, "evidence": []}, "same_cause_as": next(named)}}
+    graph = compiled(Recorder(), overrides=explained)
+    first = start_alert(graph, saldo_detection(), alert_id="B1", day=DAY, earlier_alerts={"C1": "nueva"})
+    second = start_alert(graph, saldo_detection(), alert_id="A1", day=DAY, earlier_alerts={"B1": "propuesta"})
+    assert first["merged_alerts"] == ["C1"] and ["C1", "unida"] in first["transitions"]
+    assert awaiting_decision(graph, "B1")
+    assert second["merged_into"] == "B1" and statuses(second) == ["nueva", "en análisis", "unida"]
+
+
 @pytest.mark.parametrize("named, earlier", [("R1", {"R1": "rechazada"}), ("A1", {}), ("X9", {})], ids=["rejected", "itself", "unknown"])
 def test_orq_a_same_cause_that_fails_both_checks_is_dropped_and_logged(named, earlier):
     recorder = Recorder()
@@ -161,7 +182,7 @@ def test_orq_a_tool_or_connection_error_gives_its_own_reason_not_the_schema_one(
         raise ConnectionError("pgvector")
 
     graph, state = started(Recorder(), overrides={("analista", "explicar"): broken})
-    assert state["cause"]["reason"] == "El análisis no terminó: falló una herramienta o la conexión."
+    assert state["cause"]["reason"] == "El análisis no terminó: no se pudo consultar la información necesaria."
     assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error"}]
 
 
@@ -184,7 +205,7 @@ def test_orq_every_metric_has_the_owner_of_its_manual_review():
     assert set(owners) == set(load_metrics(METRICAS).names)
     assert owners["margen_pct"] == "Comercial"
 
-def test_orq_a_failed_execution_leaves_the_alert_aprobada():
+def test_orq_a_failed_execution_leaves_the_alert_aprobada(caplog):
     def broken(state):
         raise RuntimeError("sandbox")
 
@@ -193,6 +214,7 @@ def test_orq_a_failed_execution_leaves_the_alert_aprobada():
     final = resume(graph, "A1", approve())
     assert final["fin"] == "fin.fallo_ejecucion"
     assert final["status"] == "aprobada"
+    assert any(record.levelname == "WARNING" and "A1" in record.getMessage() and "sandbox" in record.getMessage() for record in caplog.records)
 
 
 RETRASO = Kpi(entity=("cliente_id",), columns=frozenset({"cliente_id", "dias_sobre_habito"}), thresholds={"dias_sobre_habito": 0})

@@ -1,19 +1,17 @@
 import asyncio
+import datetime
 import logging
 import uuid
 from typing import Annotated
-from urllib.parse import unquote
 
 import psycopg
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
-
-from centinela_agents import query_registry
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, decisiones, simulacion
-from ..agentes import get_orchestrator
+from .. import bitacora, ciclo_vida, configuracion, consultas, decisiones, permisos, simulacion
+from ..agentes import converted_actions, detalle_de_consulta, get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
-from ..config import ROLES_CON_DECISION
+from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import (
     ActorAgent,
@@ -21,20 +19,24 @@ from ..modelos import (
     Alert,
     AlertEstadoEnum,
     Decision,
+    Persona,
+    Settings,
     DecisionApprove,
     DecisionEdit,
     DecisionReject,
+    DecisionRequestChanges,
     ExecutedAction,
 )
 
-router = APIRouter(tags=["alerts"])
+router = APIRouter(tags=["alerts"], dependencies=[Depends(persona_actual)])
 logger = logging.getLogger(__name__)
 
 
 @router.get("/alertas", response_model=list[Alert])
 async def listar(
     estado: Annotated[AlertEstadoEnum | None, Query(description="Filter by alert estado (Spanish name for status)")] = None,
-    conn: psycopg.Connection = Depends(obtener_conexion)
+    persona: Persona = Depends(persona_actual),
+    conn: psycopg.Connection = Depends(obtener_conexion),
 ) -> list[Alert]:
     """
     List all alerts, optionally filtered by estado.
@@ -46,49 +48,92 @@ async def listar(
         status = ESTADO_A_STATUS.get(estado)
         if status is None:
             raise HTTPException(422, f"estado desconocido: {estado}")
-    return alertas_repo.listar(conn, status)
+    return permisos.vistas(conn, persona, alertas_repo.listar(conn, status))
 
 
 @router.get("/alertas/{id}", response_model=Alert)
-async def obtener(id: str, conn: psycopg.Connection = Depends(obtener_conexion)) -> Alert:
+async def obtener(
+    id: str,
+    persona: Persona = Depends(persona_actual),
+    conn: psycopg.Connection = Depends(obtener_conexion),
+) -> Alert:
     alerta = alertas_repo.obtener(conn, id)
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
-    return alerta
+    return permisos.vista(conn, persona, alerta)
+
+
+EN_PAUSA = "El análisis de esta alerta ya no está en pausa: no puede reanudarse"
+EN_CURSO = "Esta alerta está procesando otra decisión: espera a que termine"
+NO_EJECUTADA = "La acción aprobada no se ejecutó"
+EJECUTOR = ActorAgent(agent="ejecutor")
+reanudando: set[str] = set()
+
+
+def _en_pausa(id: str) -> bool:
+    try:
+        return get_orchestrator().is_awaiting_decision(id)
+    except Exception as e:
+        logger.error(f"Orchestrator state unreadable for {id}: {e}", exc_info=True)
+        return False
 
 
 @router.post("/alertas/{id}/decision", response_model=Alert)
 async def decidir(
     id: str,
     decision: Decision,
-    x_user_name: str = Header(...),
-    x_user_role: str = Header(...),
+    persona: Persona = Depends(persona_actual),
     conn: psycopg.Connection = Depends(obtener_conexion),
 ) -> Alert:
-    if x_user_role not in ROLES_CON_DECISION:
-        raise HTTPException(403, "Este rol no puede decidir sobre una alerta")
     alerta = alertas_repo.obtener(conn, id)
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
-
+    if not permisos.puede_decidir(conn, persona, alerta):
+        raise HTTPException(403, permisos.negada(conn, persona, alerta))
+    if id in reanudando:
+        raise HTTPException(409, EN_CURSO)
+    reanudando.add(id)
     try:
-        nueva, eventos = decisiones.aplicar(alerta, decision)
+        return await _decidir(alerta, decision, persona, conn)
+    finally:
+        reanudando.discard(id)
+
+
+def _aplicar(alerta: Alert, decision: Decision, ajustes: Settings) -> tuple[Alert, list]:
+    try:
+        return decisiones.aplicar(alerta, decision, ajustes.autonomy)
     except decisiones.ConflictoEstado as e:
         raise HTTPException(409, str(e)) from e
     except decisiones.DecisionInvalida as e:
         raise HTTPException(422, str(e)) from e
 
-    actor = ActorPerson(name=unquote(x_user_name), role=x_user_role)
-    dia = simulacion.dia_actual(conn)
 
+def no_ejecutada(fin: str | None, dia: datetime.date) -> str:
+    if fin == "fin.ya_no_aplica":
+        return f"{NO_EJECUTADA}: el indicador ya no está fuera de su umbral el {dia.isoformat()}."
+    return f"{NO_EJECUTADA}: falló su preparación, así que queda para hacerla a mano."
+
+
+async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: psycopg.Connection) -> Alert:
+    id = alerta.id
+    ajustes = configuracion.leer(conn)
+    _aplicar(alerta, decision, ajustes)
+    en_pausa = await asyncio.to_thread(_en_pausa, id)
+    if not en_pausa and not isinstance(decision, DecisionReject):
+        raise HTTPException(409, EN_PAUSA)
+
+    actor = ActorPerson(name=persona.name, role=persona.role)
     with conn.transaction():
-        alertas_repo.guardar(conn, nueva)
+        dia = simulacion.dia_actual(conn)
+        nueva, eventos = _aplicar(alertas_repo.obtener(conn, id, bloquear=True), decision, ajustes)
+        nueva = alertas_repo.guardar(conn, nueva)
         for tipo, detalle in eventos:
             bitacora.registrar(conn, nueva.id, tipo, actor, detalle, dia)
 
     if isinstance(decision, (DecisionApprove, DecisionEdit)):
         try:
             orq = get_orchestrator()
+            orq.use_thresholds(configuracion.umbrales(ajustes))
             orch_decision: dict = {
                 "id": f"dec_{uuid.uuid4().hex[:8]}",
                 "kind": decision.kind,
@@ -96,7 +141,8 @@ async def decidir(
                 "simulated_day": dia.isoformat(),
             }
             if isinstance(decision, DecisionEdit):
-                orch_decision["parameters"] = decision.parameters
+                aprobada = next(a for a in nueva.actions if a.id == decision.action_id)
+                orch_decision["parameters"] = dict(aprobada.parameters)
 
             state = await asyncio.to_thread(orq.resume, id, orch_decision)
 
@@ -111,93 +157,96 @@ async def decidir(
                     ),
                 })
                 with conn.transaction():
-                    alertas_repo.guardar(conn, nueva)
-                    bitacora.registrar(
-                        conn, nueva.id, "result",
-                        ActorAgent(agent="ejecutor"),
-                        f"Acción ejecutada: {nueva.executed_action.result}",
-                        dia,
-                    )
+                    nueva = alertas_repo.guardar(conn, nueva)
+                    bitacora.registrar(conn, nueva.id, "result", EJECUTOR, f"Acción ejecutada: {nueva.executed_action.result}", dia)
+            else:
+                logger.warning("Approved action of %s was not executed: %s %s", id, state.get("fin"), state.get("failures"))
+                with conn.transaction():
+                    bitacora.registrar(conn, nueva.id, "result", EJECUTOR, no_ejecutada(state.get("fin"), dia), dia)
 
         except Exception as e:
             logger.error(f"Orchestrator resume failed for {id}: {e}", exc_info=True)
             with conn.transaction():
-                bitacora.registrar(
-                    conn, nueva.id, "result",
-                    ActorAgent(agent="ejecutor"),
-                    f"La acción aprobada no se ejecutó: {e}",
-                    dia,
-                )
+                bitacora.registrar(conn, nueva.id, "result", EJECUTOR, no_ejecutada(None, dia), dia)
 
     elif isinstance(decision, DecisionReject):
-        try:
-            orq = get_orchestrator()
-            await asyncio.to_thread(orq.resume, id, {
-                "id": f"dec_{uuid.uuid4().hex[:8]}",
-                "kind": "reject",
-                "reason": decision.reason,
-                "simulated_day": dia.isoformat(),
-            })
-        except Exception as e:
-            logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
+        if en_pausa:
+            try:
+                orq = get_orchestrator()
+                orq.use_thresholds(configuracion.umbrales(ajustes))
+                await asyncio.to_thread(orq.resume, id, {
+                    "id": f"dec_{uuid.uuid4().hex[:8]}",
+                    "kind": "reject",
+                    "reason": decision.reason,
+                    "simulated_day": dia.isoformat(),
+                })
+            except Exception as e:
+                logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
-    return nueva
+    elif isinstance(decision, DecisionRequestChanges):
+        nueva = await _reproponer(conn, nueva, decision.reason, ajustes, dia)
+
+    return permisos.vista(conn, persona, nueva)
 
 
-@router.get("/queries/{id}")
-async def obtener_query(id: str, conn: psycopg.Connection = Depends(obtener_conexion)):
-    """
-    Return query metadata + data rows for figure traceability ("Ver de dónde sale").
-    """
-    # Summary IDs are computed dynamically from the current alerts
-    if id in ("q-summary-risk", "q-summary-pending", "q-summary-recoverable"):
-        alerts = alertas_repo.listar(conn, "proposed")
-        if id == "q-summary-risk":
-            rows = [
-                {"id": a.id, "metric": a.metric, "title": a.title.text,
-                 "pesos_at_risk": a.pesos_at_risk.value}
-                for a in alerts
-            ]
-            desc = (
-                f"Suma de pesos en riesgo de {len(alerts)} alerta{'s' if len(alerts) != 1 else ''} "
-                "pendientes de decisión."
-            )
-            sql = "SELECT id, cuerpo->>'metric' AS metric, cuerpo->'title'->>'text' AS title, (cuerpo->'pesosAtRisk'->>'value')::numeric AS pesos_at_risk FROM api.alertas WHERE status = 'proposed'"
-        elif id == "q-summary-pending":
-            rows = [
-                {"id": a.id, "metric": a.metric, "status": a.status,
-                 "title": a.title.text}
-                for a in alerts
-            ]
-            desc = (
-                f"{len(alerts)} alerta{'s' if len(alerts) != 1 else ''} "
-                "esperan tu aprobación o rechazo."
-            )
-            sql = "SELECT id, cuerpo->>'metric' AS metric, status, cuerpo->'title'->>'text' AS title FROM api.alertas WHERE status = 'proposed'"
-        else:  # q-summary-recoverable
-            rows = [
-                {"id": a.id, "metric": a.metric, "title": a.title.text,
-                 "recoverable_per_month": a.recoverable_per_month.value}
-                for a in alerts
-                if a.recoverable_per_month
-            ]
-            desc = (
-                "Suma del potencial de recuperación mensual de las alertas pendientes, "
-                "si se aprueban todas las acciones propuestas."
-            )
-            sql = "SELECT id, cuerpo->>'metric' AS metric, cuerpo->'title'->>'text' AS title, (cuerpo->'recoverablePerMonth'->>'value')::numeric AS recoverable_per_month FROM api.alertas WHERE status = 'proposed' AND cuerpo->'recoverablePerMonth' IS NOT NULL"
-        return {"id": id, "source": "alertas", "sql": sql, "description": desc, "rows": rows}
+def _sin_propuesta(
+    conn: psycopg.Connection, orq, alerta: Alert, error: Exception, dia: datetime.date
+) -> Alert:
+    en_pausa = orq is not None and _en_pausa(alerta.id)
+    sin_consumir = en_pausa and not orq.get_state(alerta.id).get("proposal_returns")
+    detalle = (
+        f"No hubo nueva propuesta tras la solicitud de cambios; se conservan las acciones anteriores: {error}"
+        if en_pausa
+        else f"No hubo nueva propuesta tras la solicitud de cambios y el análisis ya no está en pausa: solo queda rechazarla: {error}"
+    )
+    with conn.transaction():
+        if sin_consumir:
+            actual = alertas_repo.obtener(conn, alerta.id, bloquear=True)
+            if actual is not None and actual.status == "proposed":
+                alerta = alertas_repo.guardar(conn, actual.model_copy(update={"changes_requested": False}))
+        bitacora.registrar(conn, alerta.id, "proposal", ActorAgent(agent="estratega"), detalle, dia)
+    return alerta
 
-    record = query_registry.get(id)
-    if record is None:
-        raise HTTPException(
-            404,
-            f"Consulta '{id}' no encontrada. Es posible que el servidor haya reiniciado.",
+
+async def _reproponer(
+    conn: psycopg.Connection, alerta: Alert, motivo: str, ajustes: Settings, dia: datetime.date
+) -> Alert:
+    estratega = ActorAgent(agent="estratega")
+    orq = None
+    try:
+        orq = get_orchestrator()
+        orq.use_thresholds(configuracion.umbrales(ajustes))
+        vistas = {q["queryId"] for q in orq.get_state(alerta.id).get("queries") or []}
+        state = await asyncio.to_thread(orq.resume, alerta.id, {
+            "id": f"dec_{uuid.uuid4().hex[:8]}",
+            "kind": "request_changes",
+            "reason": motivo.strip(),
+            "simulated_day": dia.isoformat(),
+        })
+        acciones = converted_actions(state)
+        if not acciones:
+            raise ValueError("Estratega no devolvió acciones")
+    except Exception as e:
+        logger.error(f"Orchestrator request_changes failed for {alerta.id}: {e}", exc_info=True)
+        return _sin_propuesta(conn, orq, alerta, e, dia)
+
+    nuevas = [q for q in state.get("queries") or [] if q.get("queryId") not in vistas]
+    with conn.transaction():
+        actual = alertas_repo.obtener(conn, alerta.id, bloquear=True)
+        if actual is None or actual.status != "proposed":
+            logger.warning("New proposal for %s dropped: the alert is %s", alerta.id, actual.status if actual else "gone")
+            return actual or alerta
+        nueva = alertas_repo.guardar(conn, actual.model_copy(update={"actions": acciones}))
+        bitacora.registrar(
+            conn, nueva.id, "proposal", estratega,
+            f"Nueva propuesta tras la solicitud de cambios: {len(acciones)} acción(es)",
+            dia,
         )
-    return {
-        "id": record.id,
-        "source": record.source,
-        "sql": record.sql,
-        "description": record.description,
-        "rows": record.rows,
-    }
+        consultas.registrar(conn, nuevas)
+        for query in nuevas:
+            bitacora.registrar(
+                conn, nueva.id, "evidence", ActorAgent(agent="analista"),
+                detalle_de_consulta(query),
+                dia, query["queryId"],
+            )
+    return nueva

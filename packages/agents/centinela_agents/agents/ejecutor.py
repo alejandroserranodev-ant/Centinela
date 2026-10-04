@@ -14,6 +14,7 @@ Model: LLM thinking OFF (only for email body, minimal reasoning)
 import logging
 from typing import Any
 
+from centinela_agents.failures import SchemaRefused
 from centinela_agents.llm_provider import (
     LLMProvider,
     LLMRequest,
@@ -89,12 +90,17 @@ def execute_action(
     if action_type == "email_draft":
         return _execute_email_draft(provider, action, parameters, email_tool)
     if action_type == "task":
-        return _execute_task(action_id, parameters, task_tool)
+        return _execute_task(action, parameters, task_tool)
     if action_type == "purchase_order_draft":
         return _execute_po_draft(action_id, parameters, po_tool)
     if action_type == "price_change_draft":
         return _execute_price_draft(action_id, parameters, price_tool)
     raise ValueError(f"Unknown action type: {action_type}")
+
+
+def _executed(action_id: str, action_type: str, result: str, parameters: dict[str, Any]) -> dict[str, Any]:
+    executed = ExecutedAction(actionId=action_id, type=action_type, result=result, parameters=parameters)
+    return {"executed_action": executed.model_dump()}
 
 
 def _execute_email_draft(
@@ -103,8 +109,6 @@ def _execute_email_draft(
     parameters: dict[str, Any],
     email_tool: Any,
 ) -> dict[str, Any]:
-    """Execute email_draft: the model writes the body over masked text, the tool keeps the draft."""
-    action_id = action.get("id")
     recipient = parameters.get("recipient")
     listed = "\n".join(f"- {name}: {value}" for name, value in parameters.items())
     prompt = mask_data(f"""action.title: {action.get("title")}
@@ -123,47 +127,27 @@ Escribe solo el cuerpo del correo, en español.""")
         )
     )
     body = response.text.strip()
+    if not body or "{" in body or "}" in body:
+        raise SchemaRefused("Ejecutor's email body is empty or carries a template or a placeholder")
     if email_tool:
         email_tool.execute(recipient=recipient, body=body)
-    executed = ExecutedAction(actionId=action_id, type="email_draft", result=body, parameters=parameters)
-    logger.info(f"Ejecutor: email draft created for {recipient}")
-    return {"executed_action": executed.model_dump()}
+    logger.info("Ejecutor: email draft created for %s", recipient)
+    header = f"Borrador de correo para {recipient} guardado" if recipient else "Borrador de correo guardado"
+    return _executed(action.get("id"), "email_draft", f"{header}: {body}", parameters)
 
 
 def _execute_task(
-    action_id: str,
+    action: dict[str, Any],
     parameters: dict[str, Any],
     task_tool: Any,
 ) -> dict[str, Any]:
-    """Execute task: code creates manual task."""
     owner = parameters.get("owner")
-    cliente_id = parameters.get("cliente_id")
-
-    logger.info(f"Ejecutor: creating task for {owner} on {cliente_id}")
-
+    title = action.get("title") or "Tarea manual"
+    logger.info("Ejecutor: creating task %s for %s", title, owner)
     if task_tool:
-        task_result = task_tool.execute(
-            owner=owner,
-            title=f"Revisar cliente {cliente_id}",
-            description=f"Acción manual requerida para {cliente_id}",
-        )
-        result_data = {
-            "task_id": task_result.task_id,
-            "owner": owner,
-        }
-    else:
-        result_data = {"owner": owner, "description": "Tarea manual"}
-
-    executed = ExecutedAction(
-        actionId=action_id,
-        type="task",
-        result=result_data,
-        parameters=parameters,
-    )
-
-    return {
-        "executed_action": executed.model_dump(),
-    }
+        task_tool.execute(owner=owner, title=title, description=action.get("description"), parameters=parameters)
+    result = f"Tarea «{title}» creada para {owner}." if owner else f"Tarea «{title}» creada, sin responsable asignado."
+    return _executed(action.get("id"), "task", result, parameters)
 
 
 def _execute_po_draft(
@@ -171,40 +155,19 @@ def _execute_po_draft(
     parameters: dict[str, Any],
     po_tool: Any,
 ) -> dict[str, Any]:
-    """Execute purchase_order_draft: code creates PO draft."""
     proveedor_id = parameters.get("proveedor_id")
     sku = parameters.get("sku")
     quantity = parameters.get("units")
     warehouse = parameters.get("warehouse")
-
-    logger.info(f"Ejecutor: creating PO for {proveedor_id} {sku} x{quantity}")
-
+    logger.info("Ejecutor: creating PO for %s %s x%s", proveedor_id, sku, quantity)
     if po_tool:
-        po_result = po_tool.execute(
-            proveedor_id=proveedor_id,
-            sku=sku,
-            quantity=quantity,
-            warehouse=warehouse,
-        )
-        result_data = {
-            "order_id": po_result.order_id,
-            "proveedor": proveedor_id,
-            "sku": sku,
-            "quantity": quantity,
-        }
-    else:
-        result_data = {"proveedor": proveedor_id, "sku": sku}
-
-    executed = ExecutedAction(
-        actionId=action_id,
-        type="purchase_order_draft",
-        result=result_data,
-        parameters=parameters,
-    )
-
-    return {
-        "executed_action": executed.model_dump(),
-    }
+        po_tool.execute(proveedor_id=proveedor_id, sku=sku, quantity=quantity, warehouse=warehouse)
+    words = [f"Borrador de orden de compra guardado: {quantity} unidades de {sku}"]
+    if proveedor_id:
+        words.append(f"al proveedor {proveedor_id}")
+    if warehouse:
+        words.append(f"para la bodega {warehouse}")
+    return _executed(action_id, "purchase_order_draft", " ".join(words) + ".", parameters)
 
 
 def _execute_price_draft(
@@ -212,33 +175,12 @@ def _execute_price_draft(
     parameters: dict[str, Any],
     price_tool: Any,
 ) -> dict[str, Any]:
-    """Execute price_change_draft: code creates price change draft."""
     sku = parameters.get("sku")
     linea = parameters.get("linea")
     price_increase_pct = parameters.get("price_increase_pct")
-
-    logger.info(f"Ejecutor: creating price change {sku or linea} +{price_increase_pct}%")
-
+    logger.info("Ejecutor: creating price change %s +%s%%", sku or linea, price_increase_pct)
     if price_tool:
-        price_result = price_tool.execute(
-            sku=sku,
-            linea=linea,
-            price_increase_pct=price_increase_pct,
-        )
-        result_data = {
-            "change_id": price_result.change_id,
-            "increase_pct": price_increase_pct,
-        }
-    else:
-        result_data = {"increase_pct": price_increase_pct}
-
-    executed = ExecutedAction(
-        actionId=action_id,
-        type="price_change_draft",
-        result=result_data,
-        parameters=parameters,
-    )
-
-    return {
-        "executed_action": executed.model_dump(),
-    }
+        price_tool.execute(sku=sku, linea=linea, price_increase_pct=price_increase_pct)
+    target = f"del producto {sku}" if sku else f"de la línea {linea}"
+    result = f"Borrador de cambio de precio {target} guardado: subir {price_increase_pct} %."
+    return _executed(action_id, "price_change_draft", result, parameters)

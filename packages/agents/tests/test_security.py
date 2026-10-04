@@ -40,6 +40,13 @@ class TestDataMasking:
 
         assert isinstance(masked, str)
 
+    def test_a_name_is_two_capitalized_words_and_its_placeholder_closes(self):
+        assert mask_data("Estimada Lucía García") == "{{MASKED_NAME_1}}"
+
+    def test_a_sentence_of_lowercase_words_is_not_a_name(self):
+        text = "action.title: Recordatorio de pago a C0496\nEscribe solo el cuerpo del correo, en español."
+        assert mask_data(text) == text
+
     def test_mask_credit_card(self):
         """Mask credit card numbers."""
         text = "Card: 4532-1234-5678-9010"

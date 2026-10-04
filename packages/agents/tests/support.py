@@ -6,7 +6,7 @@ from pathlib import Path
 from langgraph.checkpoint.memory import InMemorySaver
 
 from centinela_agents.catalog import Catalog, catalog_from_kernel
-from centinela_agents.graph import compile_tree
+from centinela_agents.graph import compile_chat, compile_tree
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import Tree
 from centinela_agents.validator import Grounds, load_registry
@@ -53,6 +53,8 @@ IDENTIFIED = {"kind": "identified", "sentence": {"text": "El cliente dejó de pa
 EMAIL = {"id": "act-email", "title": "Recordatorio de pago", "type": "email_draft", "impact": None, "parameters": {"recipient": "CLI-001", "vendedor_id": "VEN-01"}}
 MANUAL_TASK = {"id": "act-manual", "title": "Revisión manual de la alerta", "type": "task", "impact": None, "parameters": {"owner": "Analista de cartera"}}
 
+CHAT_FIGURE = {"value": 800000, "unit": "COP", "queryId": "q_saldo"}
+
 DEFAULT_LEAVES = {
     ("vigia", "titular"): lambda state: {"title": {"text": "Cartera vencida de CLI-001", "figures": []}},
     ("analista", "explicar"): lambda state: {"cause": IDENTIFIED, "same_cause_as": None},
@@ -60,6 +62,8 @@ DEFAULT_LEAVES = {
     ("estratega", "revision_manual"): lambda state: {"actions": [MANUAL_TASK]},
     ("ejecutor", "ejecutar"): lambda state: {"executed_action": {"actionId": state["action"]["id"], "result": "Borrador creado"}},
     ("ejecutor", "nota_manual"): lambda state: {"executed_action": {"actionId": state["action"]["id"], "result": "Tarea creada"}},
+    ("chat", "clasificar"): lambda state: {"chat": {**state["chat"], "intent": "dato", "kpi": "saldo_vencido", "entity": "CLI-001"}},
+    ("chat", "responder"): lambda state: {"chat": {**state["chat"], "figuras": [CHAT_FIGURE]}, "answer": {"text": "Debe {0}.", "figures": [CHAT_FIGURE], "enough_evidence": True, "assumptions": []}},
 }
 
 
@@ -114,3 +118,18 @@ def approve(action_id="act-email", decision_id="dec-1", day=DECISION_DAY):
 
 def statuses(state, alert_id="A1"):
     return [status for alert, status in state["transitions"] if alert == alert_id]
+
+
+def compiled_chat(recorder, *, overrides=None, tree=None):
+    return compile_chat(
+        tree or base_tree(),
+        leaves=leaves(recorder, overrides),
+        metrics=load_metrics(METRICAS),
+        catalog=KERNEL_CATALOG,
+        reader=reader_from({}),
+    )
+
+
+def question(text="¿Cuánto debe CLI-001?", *, sospechosa=False, alert=None, cause=None, actions=None):
+    chat = {"sospechosa": sospechosa, "alert_id": (alert or {}).get("id"), "intent": None, "kpi": None, "entity": None, "figuras": None}
+    return {"question": text, "day": DAY, "alert": alert, "cause": cause, "actions": actions, "chat": chat, "queries": []}

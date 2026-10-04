@@ -6,12 +6,12 @@ from typing import Any, Mapping
 from .catalog import Catalog, KernelCall, KpiReader
 from .metrics import Metrics
 from .predicate import is_kpi, kpi_column
-from .query_registry import register as _registry_register
 from .schema import Node
 
 MONEY = ("pesos_en_riesgo", "saldo", "ventas", "costo", "precio", "valor", "margen_bruto", "descuento_en_exceso", "exceso_semana_anterior", "cupo")
 COUNTS = ("existencia", "demanda", "unidades", "pedidos", "cantidad", "facturas", "veces_")
 MAX_RELATED_ROWS = 3
+SHOWN_ROWS = 20
 ALLOWED_NUMBERS = (r"\{\d+\}", r"\d{4}-\d{2}-\d{2}", r"\b[A-Z]{3}-POL-\d{3}\b", r"§\s?\d+")
 
 
@@ -45,8 +45,16 @@ def stray_digits(text: str, allowed: tuple[str, ...] = ()) -> bool:
     return re.search(r"\d", text) is not None
 
 
+def placeholders(text: str) -> set[int]:
+    return {int(index) for index in re.findall(r"\{(\d+)\}", text)}
+
+
+def fills(text: str, figures: int) -> bool:
+    return all(index < figures for index in placeholders(text))
+
+
 def cited(text: str, refs: list[str]) -> list[str]:
-    indexes = [int(index) for index in re.findall(r"\{(\d+)\}", text)]
+    indexes = placeholders(text)
     return refs[: max(indexes) + 1] if indexes else []
 
 
@@ -90,14 +98,7 @@ class Ledger:
             raise RuntimeError(f"the kernel refused {kpi} on {day}: {answer['rechazado']['guarda']}: {answer['rechazado']['detalle']}")
         qid = query_id(answer["consulta"], day)
         rows = list(answer["filas"])
-        self.queries[qid] = {"queryId": qid, "kpi": kpi, "dia": day, "consulta": answer["consulta"]}
-        _registry_register(
-            id=qid,
-            source=kpi,
-            sql=answer["consulta"],
-            description=f"KPI {kpi} — {day}. {len(rows)} registro(s).",
-            rows=[dict(r) for r in rows[:20]],
-        )
+        self.queries[qid] = {"queryId": qid, "kpi": kpi, "dia": day, "consulta": answer["consulta"], "filas": [dict(row) for row in rows[:SHOWN_ROWS]]}
         return qid, rows
 
     def add(self, kpi: str, row: Mapping[str, Any], qid: str, columns: tuple[str, ...] | None = None) -> list[Fact]:

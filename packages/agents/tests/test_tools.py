@@ -67,13 +67,13 @@ class TestBuscarPolitica:
         tool = BuscarPoliticaStub()
         assert "FIN-POL-004" in tool.policies
 
-    def test_search_returns_list(self):
-        """Search returns list of passages."""
+    def test_search_ranks_the_passages_that_share_words_with_the_query(self):
         tool = BuscarPoliticaStub()
-        results = tool.search("límite de crédito")
+        results = tool.search("límite de crédito", top_k=3)
 
-        assert isinstance(results, list)
-        assert results == []
+        assert 0 < len(results) <= 3
+        assert [r.relevance for r in results] == sorted((r.relevance for r in results), reverse=True)
+        assert all(r.relevance > 0 for r in results)
 
     def test_search_by_code(self):
         """Search by policy code."""
@@ -302,6 +302,12 @@ class TestToolRegistry:
         tools = registry.get_tools_for_agent("vigia")
 
         assert tools == {}
+
+    def test_get_tools_for_chat(self):
+        """The chat gets no tool: code reads the kernel, and no action is in its reach."""
+        registry = ToolRegistry(sql_vistas=SqlVistasStub(), calcular_impacto=CalcularImpactoStub())
+
+        assert registry.get_tools_for_agent("chat") == {}
 
     def test_get_tools_for_analista(self):
         """Analista gets sql_vistas and buscar_politica."""

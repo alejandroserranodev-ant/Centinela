@@ -17,7 +17,7 @@ is given. `revision_manual` is code, over the owners `skills/estratega/acciones.
 that map, the metrics, the KPI catalogue, the reader, a rejection classifier and the checkpointer to
 `centinela_agents/graph.py:Compiler`, and compiles the tree once.
 
-- `start(detection, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)` runs
+- `start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)` runs
   `centinela_agents/graph.py:start_alert(graph, detection)` until the graph pauses at the approval gate or ends.
 - `is_awaiting_decision(alert_id)` says whether it paused.
 - `resume(alert_id, decision)` runs `centinela_agents/graph.py:resume(graph, alert_id, decision)` with the person's decision.

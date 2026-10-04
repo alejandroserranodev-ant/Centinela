@@ -324,12 +324,12 @@ class ToolRegistry:
         Return tools available to a specific agent.
 
         Args:
-            agent: "vigia", "analista", "estratega", or "ejecutor"
+            agent: "vigia", "analista", "estratega", "ejecutor" or "chat"
 
         Returns:
             Dict of available tools for that agent
         """
-        if agent == "vigia":
+        if agent in ("vigia", "chat"):
             return {}
         elif agent == "analista":
             return {

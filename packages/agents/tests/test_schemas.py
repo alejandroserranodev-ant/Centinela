@@ -299,13 +299,12 @@ class TestExecutedAction:
         action = ExecutedAction(
             actionId="action_002",
             type="task",
-            result={"task_id": "TASK-999", "owner": "Jefe de cartera"},
+            result="Tarea «Llamar al cliente» creada para Jefe de cartera.",
             parameters={"owner": "Jefe de cartera"}
         )
 
         assert action.type == "task"
-        assert isinstance(action.result, dict)
-        assert action.result["task_id"] == "TASK-999"
+        assert action.result == "Tarea «Llamar al cliente» creada para Jefe de cartera."
 
     def test_executed_action_nota_manual(self):
         """Manual note action."""

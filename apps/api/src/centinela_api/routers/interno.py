@@ -1,4 +1,5 @@
 import datetime
+import hmac
 import uuid
 
 import psycopg
@@ -27,7 +28,7 @@ router = APIRouter(prefix="/interno", tags=["internal"])
 
 def validar_agente(x_agent_key: str = Header(...)) -> None:
     """Valida que la llamada venga de un agente autorizado."""
-    if x_agent_key != AGENT_SECRET_KEY:
+    if not hmac.compare_digest(x_agent_key.encode(), AGENT_SECRET_KEY.encode()):
         raise HTTPException(401, "Agente no autorizado")
 
 
@@ -228,6 +229,6 @@ def _registrar_costo(
         )
         dia = simulacion.dia_actual(conn)
         actor = ActorAgent(agent=costo.agent)
-        bitacora.registrar(conn, alert_id, "evidence", actor, detalle, dia)
+        bitacora.registrar_costo(conn, alert_id, actor, detalle, dia)
     except Exception as e:
         pass

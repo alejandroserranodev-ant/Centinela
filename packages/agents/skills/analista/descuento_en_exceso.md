@@ -18,5 +18,5 @@ seller's rows of `v_descuentos_fuera_politica` whose `fecha` falls in that week 
    una sola semana y no se concentra en el vendedor ni en sus clientes."
 4. If H2 holds, cite `COM-POL-002 §5`.
 5. Cite `tope_descuento_pct` and `aprobacion_especial` from the view, never a figure from the policy text.
-6. If the input lists an open `descuento_en_exceso` alert whose `entity` names the same
-   `vendedor_id` in the week before, set `same_cause_as` to its `id`. Otherwise, set none.
+6. Set no `same_cause_as`: the only open alerts this metric shares a cause with are of
+   `descuento_en_exceso` itself, which the contract refuses.

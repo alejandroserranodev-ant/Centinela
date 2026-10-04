@@ -2,7 +2,7 @@ import { useRef, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { Alert } from '../api/types';
 import { Confidence, Labels, Severity, Status } from '../common/Badges';
-import { formatDate, formatPesos } from '../format';
+import { fillSentence, formatDate, formatPesos } from '../format';
 
 interface Props {
   alerts: Alert[];
@@ -58,7 +58,7 @@ export function AlertList({ alerts, selected }: Props) {
                 {formatDate(alert.simulatedDate)}
               </time>
             </span>
-            <span className="alert-row__title">{alert.title.text}</span>
+            <span className="alert-row__title">{fillSentence(alert.title.text, alert.title.figures)}</span>
             {proposalLine(alert) ? <span className="alert-row__proposal">{proposalLine(alert)}</span> : null}
             <span className="alert-row__figures">
               <span>

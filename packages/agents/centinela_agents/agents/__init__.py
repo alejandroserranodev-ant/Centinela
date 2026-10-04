@@ -10,4 +10,5 @@ Agents:
 - estratega: Propose 1-3 actions (LLM thinking ON + tools)
 - ejecutor: Execute approved action (LLM thinking OFF for email body + code)
 - orquestador: Classify rejection reason target (LLM thinking OFF)
+- chat: Classify and answer one person's question, never act (LLM thinking OFF)
 """

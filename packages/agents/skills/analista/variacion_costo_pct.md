@@ -10,6 +10,5 @@ The entity is a `sku`. The symptom starts on the `fecha_vigencia` of the cost ro
 1. H1 is the main cause. Never count business days. Add to `assumptions`: "Días hábiles contados de lunes a viernes, sin festivos."
 2. If H2 holds, report it as contributing. Otherwise, report nothing more.
 3. If the input lists an open `margen_pct` alert whose `entity` is the entity's `linea`, set
-   `same_cause_as` to its `id`. Otherwise, if it lists an open `variacion_costo_pct` alert on a SKU of
-   H2, set `same_cause_as` to its `id`. Otherwise, set none.
+   `same_cause_as` to its `id`. Otherwise, set none.
 4. If H1 is refuted, answer `no_evidence` with `reason`: "El precio se revisó después del alza de costo."

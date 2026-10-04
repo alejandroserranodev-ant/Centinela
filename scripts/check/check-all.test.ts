@@ -13,6 +13,7 @@ test('the registry holds every gate, by literal value', () => {
     'check:docs',
     'check:generated',
     'check:routes',
+    'check:contract',
   ]);
 });
 

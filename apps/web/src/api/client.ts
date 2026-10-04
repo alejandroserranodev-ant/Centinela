@@ -1,4 +1,4 @@
-export { ApiError } from './http-client';
+export { ApiError, STATUS_ESTADO } from './http-client';
 export {
   advanceDay,
   chat,
@@ -7,8 +7,10 @@ export {
   getInboxSummary,
   getQuery,
   getSettings,
-  getSimulationState,
+  getSession,
+  getSimulatedDay,
   listAlerts,
   listBitacora,
+  login,
   saveSettings,
 } from './http-client';

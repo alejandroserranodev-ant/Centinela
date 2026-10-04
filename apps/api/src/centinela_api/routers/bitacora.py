@@ -2,10 +2,11 @@ import psycopg
 from fastapi import APIRouter, Depends, Query
 
 from .. import bitacora as bitacora_repo
+from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import LogEvent, LogEventType
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(persona_actual)])
 
 
 @router.get("/bitacora", response_model=list[LogEvent])

@@ -7,16 +7,20 @@ ESTADO_A_STATUS: dict[str, AlertStatus] = {
     "aprobada": "approved",
     "rechazada": "rejected",
     "ejecutada": "executed",
+    "unida": "merged",
 }
 
 TRANSICIONES: dict[AlertStatus, frozenset[AlertStatus]] = {
-    "new": frozenset({"analyzing"}),
-    "analyzing": frozenset({"proposed"}),
+    "new": frozenset({"analyzing", "merged"}),
+    "analyzing": frozenset({"proposed", "merged"}),
     "proposed": frozenset({"approved", "rejected"}),
     "approved": frozenset({"executed"}),
     "rejected": frozenset(),
     "executed": frozenset(),
+    "merged": frozenset(),
 }
+
+FINALES: frozenset[AlertStatus] = frozenset(estado for estado, siguientes in TRANSICIONES.items() if not siguientes)
 
 
 class TransicionInvalida(Exception):

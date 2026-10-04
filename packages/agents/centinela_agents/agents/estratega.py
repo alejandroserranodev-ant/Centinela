@@ -8,6 +8,7 @@ fills every parameter from the alert's KPI row and entity, and sets the impact t
 """
 
 import logging
+import re
 from typing import Any, Mapping
 
 from centinela_agents.evidence import Sources, merged_queries, stray_digits
@@ -21,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 PROPOSAL_TOKENS = 350
 MAX_ACTIONS = 3
-IMPACT_ASSUMPTION = "El impacto es la columna pesos_en_riesgo del KPI de la alerta, calculada en SQL por el kernel."
-NO_FORMULA = "Sin fórmula de impacto para esta acción."
+IMPACT_ASSUMPTION = "El impacto son los pesos en riesgo de la alerta, tal como los calcula su consulta."
+NO_FORMULA = "Esta acción no tiene un impacto en pesos calculado."
+POLICY = re.compile(r"^[A-Z]{3}-POL-\d{3}\b")
 PROPOSAL_SCHEMA = {
     "type": "object",
     "properties": {
@@ -61,6 +63,10 @@ def cause_text(cause: Mapping[str, Any]) -> str:
         return str(cause.get("reason") or "")
     sentence = cause.get("sentence")
     return sentence.get("text", "") if isinstance(sentence, Mapping) else str(sentence or "")
+
+
+def described(description: str, policy: str) -> str:
+    return f"{description} ({policy})" if POLICY.match(policy) else description
 
 
 def propose_actions(provider: LLMProvider, state: Mapping[str, Any], cause: Mapping[str, Any] | None, sources: Sources) -> dict[str, Any]:
@@ -121,7 +127,7 @@ sostiene con esta causa, devuelve actions vacío e insufficient_cause true."""
                 {
                     "id": f"act-{metric}-{action_row.ref}",
                     "title": item["title"],
-                    "description": f"{item['description']} ({action_row.policy})",
+                    "description": described(item["description"], action_row.policy),
                     "type": action_row.type,
                     "parameters": parameters_of(action_row, values),
                     "impact": impact if has_impact else None,

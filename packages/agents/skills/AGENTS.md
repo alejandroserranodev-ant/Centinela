@@ -1,14 +1,17 @@
 # packages/agents/skills: what each agent is told
 
 A skill is a Markdown file of orders for a model. Skills are grouped by agent, one directory each:
-`vigia/`, `analista/`, `estratega/`, `ejecutor/`, and `orquestador/` for the one step of the
-orchestrator that calls a model. What each agent may and may not do is
+`vigia/`, `analista/`, `estratega/`, `ejecutor/`, `chat/`, and `orquestador/` for the one step of
+the orchestrator that calls a model. What each agent may and may not do is
 [`../AGENTS.md`](../AGENTS.md); a skill turns that page into orders and never widens it. Code reads
 three things here: a leaf's `skill` must name a file under this directory,
 `estratega/acciones.md` is parsed, and each leaf of `../centinela_agents/agents/` loads its
 agent's contract as its model's system prompt, `../centinela_agents/skills.py:skill(agent, names)`;
-`Ejecutor` also loads `ejecutor/plantillas.md`. The leaf's user prompt carries only the alert and
-the facts its code read.
+`Ejecutor` also loads the orders of its one leaf, `ejecutor/plantillas.md` for an email body, never
+both leaves' orders, because a small model follows the other leaf's format; `ejecutor/nota_manual.md`
+holds a manual note's, which no running leaf asks a model for. The leaf's user prompt carries only the alert and
+the facts its code read; a leaf of `Chat` adds the person's question, marked as untrusted data, and
+both of its steps load `chat/contrato.md`.
 
 ## Decisions
 
@@ -41,7 +44,7 @@ the facts its code read.
   here, for the reason [`../../../evals/AGENTS.md`](../../../evals/AGENTS.md) gives.
 
 > **Decided, not built.** The metric files: `<metric>.md` is to be loaded for an alert of that
-> metric or a chat question anchored to one, once a leaf can run the view queries its hypotheses
+> metric, once a leaf can run the view queries its hypotheses
 > name. Of the table in `estratega/acciones.md`, only the rows of the alert's metric reach the
 > model, as refs in the user prompt, because the token cost of each alert is recorded and judged. A pending spec adds a file per decision for
 > `expandir` and `proponer_kpi`, loaded only when the walk reaches that decision's leaf.

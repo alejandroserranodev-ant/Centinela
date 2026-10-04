@@ -44,7 +44,7 @@ ol {
   text-transform: var(--tt-label);
 }
 
-.severity--critical { background: var(--color-error-fill); color: var(--color-error-content); } /* arena-audit allow: a filled danger surface, the loudest mark an alert wears */
+.severity--critical { background: var(--color-error-fill); color: var(--color-error-content); } 
 .severity--high { background: var(--color-warning); color: var(--color-warning-content); }
 .severity--medium { background: var(--color-info); color: var(--color-info-content); }
 .severity--low { background: var(--color-success); color: var(--color-success-content); }
@@ -107,6 +107,15 @@ ol {
 .shell--mobile .shell__body {
   grid-template-columns: minmax(0, 1fr);
   padding-bottom: calc(var(--layout-bar) + var(--pad-safe-bottom));
+}
+
+.shell--mobile .arena-toast-host__root {
+  inset-inline: var(--sp-4);
+  bottom: calc(var(--layout-bar) + var(--pad-safe-bottom) + var(--sp-3));
+}
+
+.shell--mobile .arena-toast__root {
+  width: auto;
 }
 
 .shell__rail {
@@ -393,7 +402,6 @@ ol {
   font-size: var(--fs-sm);
 }
 
-/* HowIGotHere inline list: cap height so many queries don't push page endlessly */
 .query-list {
   max-height: 60vh;
   overflow-y: auto;
@@ -419,6 +427,12 @@ ol {
 
 .chat__suggestions {
   align-items: start;
+}
+
+.chat__path ol {
+  margin: 0;
+  padding-inline-start: var(--sp-4);
+  font-size: var(--fs-sm);
 }
 
 .chat__conversation {
@@ -479,10 +493,35 @@ ol {
   color: var(--ink-heading);
 }
 
-/* ─── Contrast overrides ─── */
+.person {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--lh-snug);
+  text-align: end;
+}
 
-/* Secondary button: the library uses --edge-control (#dfe6e9) which is
-   nearly invisible against surface/dialog backgrounds. Use a stronger border. */
+.person__name {
+  font-size: var(--fs-sm);
+  color: var(--ink-heading);
+  white-space: nowrap;
+}
+
+.login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  box-sizing: border-box;
+}
+
+.session-wait {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding-inline: var(--sp-4);
+}
+
 .arena-button__root--variant-secondary {
   border-color: color-mix(in oklab, var(--color-base-content) 28%, transparent);
 }
@@ -490,14 +529,11 @@ ol {
   border-color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
 }
 
-/* Ghost icon button (dialog close ×, toolbar icons): strengthen the quiet border */
 .arena-icon-button__root--variant-ghost {
   border-color: color-mix(in oklab, var(--color-base-content) 22%, transparent);
   color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
 }
 
-/* Figure-link (clickable numbers → "Ver de dónde sale"):
-   make the dotted underline solid and more visible */
 .figure-link {
   text-decoration-style: solid;
   text-decoration-color: color-mix(in oklab, var(--color-primary) 60%, transparent);

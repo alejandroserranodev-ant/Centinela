@@ -7,15 +7,16 @@ import {
   ArenaSection,
   ArenaSkeleton,
   ArenaSpinner,
-  useArenaViewportBelow,
 } from '@dravensoft/arena-react';
-import { getAlert, getQuery } from '../api/client';
-import type { Alert, Evidence, MergedAlert, Query } from '../api/types';
+import { ApiError, getAlert, getQuery, listBitacora } from '../api/client';
+import type { Alert, Evidence, LogEvent, MergedAlert, Query } from '../api/types';
+import { latestResult } from '../logEvent';
+import { explainedByRemaining } from '../alert';
 import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
-import { formatDate } from '../format';
+import { fillSentence, formatDate } from '../format';
 import { HowIGotHere } from './HowIGotHere';
 import { ProposedActions } from './ProposedActions';
 
@@ -53,14 +54,54 @@ function Merged({ alert }: { alert: MergedAlert }) {
             <Proof key={e.queryId + e.claim.text} evidence={e} />
           ))}
         </ul>
-      ) : (
+      ) : explainedByRemaining(alert.cause, true) ? null : (
         <p>{alert.cause.reason}</p>
       )}
     </li>
   );
 }
 
-function Outcome({ alert }: { alert: Alert }) {
+function NotExecuted({ alert }: { alert: Alert }) {
+  const [result, setResult] = useState<LogEvent | null | undefined>(undefined);
+  useEffect(() => {
+    setResult(undefined);
+    listBitacora({ alertId: alert.id, type: 'result' }).then((events) => setResult(latestResult(events)), () => setResult(null));
+  }, [alert.id, alert.status]);
+  if (result) {
+    return (
+      <ArenaAlert tone="warning" title="Aprobada, sin ejecutar">
+        {result.detail}
+      </ArenaAlert>
+    );
+  }
+  return (
+    <ArenaAlert tone="success" title="Aprobada">
+      {result === undefined ? 'Revisando el resultado de la acción…' : 'La acción está en curso.'}
+    </ArenaAlert>
+  );
+}
+
+function Remaining({ id }: { id: string }) {
+  const [title, setTitle] = useState<string | null>(null);
+  useEffect(() => {
+    setTitle(null);
+    getAlert(id).then((a) => setTitle(fillSentence(a.title.text, a.title.figures)), () => setTitle(null));
+  }, [id]);
+  return title ? <>«{title}»</> : <>la alerta que queda</>;
+}
+
+function Outcome({ alert, onOpen }: { alert: Alert; onOpen: (id: string) => void }) {
+  if (alert.status === 'approved' && !alert.executedAction) {
+    return <NotExecuted alert={alert} />;
+  }
+  if (alert.status === 'merged' && alert.mergedInto) {
+    const into = alert.mergedInto;
+    return (
+      <ArenaAlert tone="info" title="Unida a otra alerta" actionLabel="Ver la alerta que queda" onAction={() => onOpen(into)}>
+        La misma causa explica las dos, así que se decide en <Remaining id={into} />. Esta no espera ninguna decisión.
+      </ArenaAlert>
+    );
+  }
   if (alert.status === 'rejected') {
     return (
       <ArenaAlert tone="info" title="Rechazaste esta propuesta">
@@ -79,23 +120,27 @@ function Outcome({ alert }: { alert: Alert }) {
   return null;
 }
 
-export function AlertDetail({ id }: { id: string }) {
+export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
   const navigate = useNavigate();
-  const mobile = useArenaViewportBelow('lg');
   const { version, openChat } = useSimulation();
   const [alert, setAlert] = useState<Alert | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<Error | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    setFailed(false);
-    getAlert(id).then(setAlert, () => setFailed(true));
-  }, [id, version]);
+    setFailure(null);
+    getAlert(id).then(setAlert, (e: unknown) => {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setFailure(e instanceof Error ? e : new Error('No se pudo cargar la alerta.'));
+      }
+    });
+  }, [id, version, attempt]);
 
   useEffect(() => {
     setAlert(null);
   }, [id]);
 
-  const back = mobile ? (
+  const back = alone ? (
     <div>
       <ArenaButton variant="ghost" size="sm" icon="ph-bold ph-arrow-left" onClick={() => navigate('/')}>
         Volver a la bandeja
@@ -103,7 +148,21 @@ export function AlertDetail({ id }: { id: string }) {
     </div>
   ) : null;
 
-  if (failed) {
+  if (failure && !(failure instanceof ApiError && failure.status === 404)) {
+    return (
+      <div className="arena-stack">
+        {back}
+        <ArenaErrorState
+          title="No pudimos cargar la alerta"
+          message={failure.message}
+          retryLabel="Reintentar"
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </div>
+    );
+  }
+
+  if (failure) {
     return (
       <div className="arena-stack">
         {back}
@@ -158,7 +217,7 @@ export function AlertDetail({ id }: { id: string }) {
         </div>
       </header>
 
-      <Outcome alert={alert} />
+      <Outcome alert={alert} onOpen={(into) => navigate(`/alertas/${into}`)} />
 
       {analyzing ? (
         <div className="arena-row analyzing">
@@ -179,6 +238,8 @@ export function AlertDetail({ id }: { id: string }) {
                   </p>
                 ) : null}
               </div>
+            ) : explainedByRemaining(alert.cause, alert.status === 'merged') ? (
+              <p>La causa está en la alerta que queda, que la explica con su evidencia.</p>
             ) : (
               <ArenaAlert tone="warning" icon="ph-bold ph-question" title="No encontramos evidencia suficiente para explicar la causa">
                 {alert.cause.reason} Preferimos decirlo antes que adivinar: las consultas revisadas están en "Cómo llegué aquí".
@@ -214,7 +275,7 @@ export function AlertDetail({ id }: { id: string }) {
             <ArenaSection
               title="Acciones propuestas"
               headingLevel="h3"
-              description={alert.actions.length > 1 ? 'Elige una, revísala y apruébala, edítala o rechaza la propuesta.' : undefined}
+              description={alert.canDecide && alert.actions.length > 1 ? 'Elige una, revísala y apruébala, edítala o rechaza la propuesta.' : undefined}
             >
               <ProposedActions key={alert.id} alert={alert} />
             </ArenaSection>

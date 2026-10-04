@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { arenaToastDelay, type ArenaToastEntry, type ArenaToastNotice, type ArenaToastQueue } from '@dravensoft/arena-react';
-import { advanceDay, getSimulationState } from '../api/client';
-import type { AgentStep, User } from '../api/types';
+import { advanceDay, ApiError, getSimulatedDay } from '../api/client';
+import type { AgentStep } from '../api/types';
 import { formatDate } from '../format';
 
 export interface ToastAction {
@@ -17,7 +17,7 @@ interface ChatState {
 
 interface Simulation {
   simulatedDay: string | null;
-  user: User | null;
+  atLastDay: boolean;
   version: number;
   advancing: boolean;
   step: AgentStep | null;
@@ -78,19 +78,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const toasts = useToasts();
   const actions = useRef(new Map<number, ToastAction>());
   const [simulatedDay, setSimulatedDay] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [lastDay, setLastDay] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [advancing, setAdvancing] = useState(false);
   const [step, setStep] = useState<AgentStep | null>(null);
   const [openQueryId, setOpenQueryId] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatState>({ open: false });
-
-  useEffect(() => {
-    getSimulationState().then((state) => {
-      setSimulatedDay(state.simulatedDay);
-      setUser(state.user);
-    });
-  }, []);
 
   const changed = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -106,6 +99,23 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   );
 
   const toastAction = useCallback((id: number) => actions.current.get(id), []);
+
+  useEffect(() => {
+    getSimulatedDay()
+      .then((day) => {
+        setSimulatedDay(day.dia);
+        setLastDay(day.ultimoDia);
+      })
+      .catch((e: unknown) => {
+        if (!(e instanceof ApiError && e.status === 401)) {
+          notify({
+            tone: 'danger',
+            title: 'No se pudo leer el día simulado',
+            message: e instanceof Error ? e.message : 'Revisa que la API esté en marcha y recarga la página.',
+          });
+        }
+      });
+  }, [notify]);
 
   const advance = useCallback(async () => {
     if (advancing) {
@@ -142,8 +152,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-    } catch {
-      notify({ tone: 'danger', title: 'No se pudo avanzar el día', message: 'Inténtalo de nuevo en unos segundos.' });
+    } catch (e: unknown) {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        notify({
+          tone: 'danger',
+          title: 'No se pudo avanzar el día',
+          message: e instanceof Error ? e.message : 'Inténtalo de nuevo en unos segundos.',
+        });
+      }
     } finally {
       setStep(null);
       setAdvancing(false);
@@ -153,7 +169,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Simulation>(
     () => ({
       simulatedDay,
-      user,
+      atLastDay: simulatedDay !== null && lastDay !== null && simulatedDay >= lastDay,
       version,
       advancing,
       step,
@@ -170,7 +186,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       closeChat: () => setChat({ open: false }),
       clearChatContext: () => setChat((c) => ({ open: c.open })),
     }),
-    [simulatedDay, user, version, advancing, step, advance, changed, toasts, notify, toastAction, openQueryId, chat],
+    [simulatedDay, lastDay, version, advancing, step, advance, changed, toasts, notify, toastAction, openQueryId, chat],
   );
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>;

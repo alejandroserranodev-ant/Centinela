@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArenaErrorState,
   ArenaPageHead,
   ArenaSelect,
   ArenaSkeleton,
@@ -10,10 +11,13 @@ import {
   ArenaTag,
   type ArenaTableColumn,
 } from '@dravensoft/arena-react';
-import { listAlerts, listBitacora } from '../api/client';
+import { ApiError, listAlerts, listBitacora } from '../api/client';
 import type { Actor, Agent, Alert, LogEvent, LogEventType } from '../api/types';
 import { useSimulation } from '../state/Simulation';
-import { formatShortDate, formatShortDateTime } from '../format';
+import { fillSentence, formatShortDate, formatShortDateTime } from '../format';
+import { SentenceWithFigures } from '../common/SentenceWithFigures';
+import { withoutAlert } from '../logEvent';
+import { roleName } from '../roles';
 
 const PAGE_SIZE = 10;
 
@@ -24,6 +28,10 @@ const EVENT: Record<LogEventType, string> = {
   decision: 'Decisión',
   action: 'Acción',
   result: 'Resultado',
+  question: 'Pregunta',
+  answer: 'Respuesta',
+  refusal: 'Pregunta rechazada',
+  configuracion: 'Configuración',
 };
 
 const STAGE: Record<Agent, string> = {
@@ -31,6 +39,7 @@ const STAGE: Record<Agent, string> = {
   analista: 'análisis',
   estratega: 'propuesta',
   ejecutor: 'ejecución',
+  chat: 'chat',
 };
 
 const COLUMNS: ArenaTableColumn[] = [
@@ -44,7 +53,7 @@ const COLUMNS: ArenaTableColumn[] = [
 ];
 
 function who(actor: Actor): string {
-  return actor.kind === 'agent' ? `Centinela · ${STAGE[actor.agent]}` : `${actor.name} (${actor.role})`;
+  return actor.kind === 'agent' ? `Centinela · ${STAGE[actor.agent]}` : `${actor.name} (${roleName(actor.role)})`;
 }
 
 function SourceButton({ queryId, open }: { queryId: string; open: (id: string) => void }) {
@@ -64,24 +73,32 @@ export function Bitacora() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [events, setEvents] = useState<LogEvent[] | null>(null);
 
-  useEffect(() => {
-    listAlerts().then(setAlerts);
-  }, [version]);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    listBitacora({ ...(alertId ? { alertId } : {}), ...(type ? { type } : {}) }).then(setEvents);
-  }, [alertId, type, version]);
+    listAlerts().then(setAlerts, () => setAlerts([]));
+  }, [version, attempt]);
 
-  const titles = new Map(alerts.map((a) => [a.id, a.title.text]));
+  useEffect(() => {
+    setFailure(null);
+    listBitacora({ ...(alertId ? { alertId } : {}), ...(type ? { type } : {}) }).then(setEvents, (e: unknown) => {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setFailure(e instanceof Error ? e.message : 'No se pudo cargar la bitácora.');
+      }
+    });
+  }, [alertId, type, version, attempt]);
+
+  const titles = new Map(alerts.map((a) => [a.id, fillSentence(a.title.text, a.title.figures)]));
   const visible = events?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) ?? [];
 
   return (
     <div className="arena-band page arena-stack arena-stack--section">
-      <ArenaPageHead title="Bitácora" subtitle="Cada detección, propuesta, decisión y resultado, del más reciente al más antiguo" />
+      <ArenaPageHead title="Bitácora" subtitle="Cada detección, propuesta, decisión, resultado y pregunta al chat, del más reciente al más antiguo" />
       <div className="filters">
         <ArenaSelect
           label="Alerta"
-          options={[{ value: '', label: 'Todas las alertas' }, ...alerts.map((a) => ({ value: a.id, label: a.title.text }))]}
+          options={[{ value: '', label: 'Todas las alertas' }, ...alerts.map((a) => ({ value: a.id, label: titles.get(a.id) ?? a.id }))]}
           value={alertId}
           onChange={(value) => {
             setAlertId(value);
@@ -98,7 +115,15 @@ export function Bitacora() {
           }}
         />
       </div>
-      {events === null ? (
+      {failure !== null && events === null ? (
+        <ArenaErrorState
+          headingLevel="h2"
+          title="No pudimos cargar la bitácora"
+          message={failure}
+          retryLabel="Reintentar"
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      ) : events === null ? (
         <ArenaSkeleton variant="text" lines={10} />
       ) : (
         <ArenaTable
@@ -112,14 +137,22 @@ export function Bitacora() {
             <ArenaTableRow key={e.id}>
               <ArenaTableCell>{formatShortDateTime(e.date)}</ArenaTableCell>
               <ArenaTableCell>{formatShortDate(e.simulatedDay)}</ArenaTableCell>
-              <ArenaTableCell href={`/alertas/${e.alertId}`} onNavigate={() => navigate(`/alertas/${e.alertId}`)}>
-                {titles.get(e.alertId) ?? e.alertId}
-              </ArenaTableCell>
+              {e.alertId ? (
+                <ArenaTableCell href={`/alertas/${e.alertId}`} onNavigate={() => navigate(`/alertas/${e.alertId}`)}>
+                  {titles.get(e.alertId) ?? e.alertId}
+                </ArenaTableCell>
+              ) : (
+                <ArenaTableCell>
+                  <span className="text-muted">{withoutAlert(e.type)}</span>
+                </ArenaTableCell>
+              )}
               <ArenaTableCell>
                 <ArenaTag>{EVENT[e.type]}</ArenaTag>
               </ArenaTableCell>
               <ArenaTableCell>{who(e.actor)}</ArenaTableCell>
-              <ArenaTableCell>{e.detail}</ArenaTableCell>
+              <ArenaTableCell>
+                <SentenceWithFigures text={e.detail} figures={e.figures ?? []} />
+              </ArenaTableCell>
               <ArenaTableCell>
                 {e.queryId ? <SourceButton queryId={e.queryId} open={openQuery} /> : <span className="text-muted">Sin cifras</span>}
               </ArenaTableCell>
