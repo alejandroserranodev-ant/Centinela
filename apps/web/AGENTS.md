@@ -180,9 +180,6 @@ a table view.
     the day run's step `agent_step` where the types say `step`. A day run
     therefore yields nothing: the simulated day on screen does not move, the inbox does not
     refresh and no notice appears until the page is reloaded; a chat answer never arrives.
-  - `chat` sends `alertId`, which the API's `ChatQuestion` forbids, so a question asked from an
-    alert is refused with 422; any other question reaches a chat stream that fails in the API
-    ([`../api/AGENTS.md`](../api/AGENTS.md)).
   - `decide` sends a `request_changes` as a `reject` carrying the same reason, because the API has
     no `request_changes`: asking for another proposal closes the alert as rejected.
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.

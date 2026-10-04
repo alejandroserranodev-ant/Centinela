@@ -70,12 +70,9 @@ minimal API section; its paths stay as the brief writes them. The web consumes t
 | POST | `/chat` | a question, answered by SSE `step` and `end` events | | `chat` |
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 
-**`/chat` fails on every call.** `src/centinela_api/routers/chat.py:chat(pregunta)` reads
-`pregunta.alert_id`, a field `ChatQuestion` does not declare, so the stream raises inside its
-first event. Besides that, the web's body carries `alertId`, which the model's `extra="forbid"`
-refuses with 422. Even when it runs, it answers a fixed "sin evidencia suficiente" and calls no
-agent. It costs the brief's chat, and is paid when the question carries its alert id and reaches
-`Analista`.
+**`/chat` calls no agent.** `src/centinela_api/routers/chat.py:chat(pregunta)` takes the question
+and the optional `alertId` it is asked from, and answers a fixed "sin evidencia suficiente". It
+costs the brief's chat, and is paid when the question reaches `Analista`.
 
 **The internal endpoints `/interno/*` have no caller.** `src/centinela_api/routers/interno.py`
 lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `PUT .../causa`
