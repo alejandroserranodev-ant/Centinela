@@ -76,6 +76,13 @@ def build_cause(answer: Mapping[str, Any], ledger, queries: list[str], allowed: 
     return cause.model_dump()
 
 
+def _system_prompt(metric: str) -> str:
+    try:
+        return skill("analista", "contrato", metric)
+    except FileNotFoundError:
+        return skill("analista", "contrato")
+
+
 def explain_cause(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) -> dict[str, Any]:
     metric, entity, day = subject(state)
     detection = state["detection"]
@@ -100,7 +107,7 @@ frase corta. Cita cada cifra por su ref (f1, f2...) en sentence_figures o en evi
 escribe en el texto el placeholder {{0}}, {{1}} en ese orden. Nunca escribas una cifra en el texto."""
     response = provider.generate_structured(
         LLMStructuredRequest(
-            system_prompt=skill("analista", "contrato"),
+            system_prompt=_system_prompt(metric),
             user_prompt=prompt,
             schema=CAUSE_SCHEMA,
             temperature=0.0,

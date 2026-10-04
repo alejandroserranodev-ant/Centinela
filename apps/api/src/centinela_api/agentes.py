@@ -13,6 +13,8 @@ import re
 from typing import Any
 
 from centinela_agents.action_tools import EmailDraftStub, PriceChangeDraftStub, PurchaseOrderDraftStub, TaskStub
+from centinela_agents.buscar_politica import BuscarPoliticaStub
+from centinela_agents.calcular_impacto import CalcularImpactoStub
 from centinela_agents.catalog import Catalog, KernelAccess, connect_kernel
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
@@ -86,6 +88,8 @@ def _load_tree() -> Tree:
 def _build_orchestrator() -> CentinelaOrchestrator:
     kernel = get_kernel()
     tools = ToolRegistry(
+        buscar_politica=BuscarPoliticaStub(),
+        calcular_impacto=CalcularImpactoStub(),
         email_draft=EmailDraftStub(),
         task=TaskStub(),
         purchase_order_draft=PurchaseOrderDraftStub(),
