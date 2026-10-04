@@ -36,7 +36,11 @@ def conn():
 @pytest.fixture
 def cliente(conn, monkeypatch):
     orquestador = MagicMock()
-    orquestador.start.return_value = {"status": "propuesta", "actions": []}
+    orquestador.start.side_effect = lambda detection, *, alert_id, day: {
+        "status": "propuesta",
+        "transitions": [[alert_id, "nueva"], [alert_id, "en análisis"], [alert_id, "propuesta"]],
+        "actions": [],
+    }
     monkeypatch.setattr(simulacion_router, "get_orchestrator", lambda: orquestador)
     monkeypatch.setattr(simulacion_router.alertas_repo, "guardar", MagicMock())
     monkeypatch.setattr(simulacion_router.bitacora, "registrar", MagicMock())

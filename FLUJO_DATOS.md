@@ -29,9 +29,12 @@ steps.
    with the model provider, an empty tool registry and an in-memory checkpointer. The router passes
    no earlier alerts and no rejection reasons.
 4. `apps/api/src/centinela_api/agentes.py:state_to_alert(alert_id, state, detection, day_str)`
-   turns the graph's state into the API's `Alert`. One transaction then stores it with
-   `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)`, in whatever status the graph
-   reached, and writes one `alert` row, actor `vigia`, with
+   turns the graph's state into the API's `Alert`.
+   `apps/api/src/centinela_api/ciclo_vida.py:recorrer(estados)` checks the statuses the graph took
+   it through, which `apps/api/src/centinela_api/agentes.py:status_path(alert_id, state)` reads
+   from its `transitions`: a path that does not start at `new` or skips a transition is refused,
+   and the alert is logged and skipped. One transaction then stores it with
+   `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)` and writes one `alert` row, actor `vigia`, with
    `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id)`.
 5. Another `step`, of `estratega`, reports the proposal, and the stream closes with `end`, which carries the
    simulated day and the ids of the new alerts. `apps/api/src/centinela_api/sse.py:flujo(eventos)`
@@ -52,7 +55,8 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
 3. The graph resumes with
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.resume(alert_id, decision)`,
    in a worker thread. On an approval or an edit, a state that carries an `executed_action` turns
-   the alert `executed`, and a `result` row with actor `ejecutor` is written. A rejection resumes
+   the alert `executed` through
+   `apps/api/src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)`, and a `result` row with actor `ejecutor` is written. A rejection resumes
    the graph and writes nothing more.
 4. A failed resume is logged and swallowed. That includes the state the in-memory checkpointer
    loses when the process restarts, so the alert stays `approved`.
@@ -64,8 +68,5 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
   entities again.
 - **The agents run in the API's process**, not behind the `/interno/*` endpoints. Nothing calls
   those endpoints.
-- **The lifecycle is not walked step by step on this path.** The day writes the graph's final
-  status directly. The resume writes `executed` without passing through the transition check of
-  [`apps/api/AGENTS.md`](./apps/api/AGENTS.md).
 - **The `bitácora` gets one row per alert from a day**, not the separate evidence and proposal
   rows the design lists.

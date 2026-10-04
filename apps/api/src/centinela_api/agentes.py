@@ -288,6 +288,15 @@ def _convert_action(action_data: dict) -> Action | None:
         return None
 
 
+def status_path(alert_id: str, state: dict) -> list[str]:
+    """The API statuses the graph took the alert through, in order."""
+    return [
+        _STATUS_MAP[status]
+        for alert, status in state.get("transitions") or []
+        if alert == alert_id and status in _STATUS_MAP
+    ]
+
+
 def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: str) -> Alert:
     """Convert a LangGraph alert state to an API Alert model."""
     metric = detection.metric

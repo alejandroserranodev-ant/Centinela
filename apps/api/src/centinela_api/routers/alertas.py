@@ -8,7 +8,7 @@ import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, decisiones, simulacion
+from .. import bitacora, ciclo_vida, decisiones, simulacion
 from ..agentes import get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..config import ROLES_CON_DECISION
@@ -100,6 +100,7 @@ async def decidir(
 
             ea = state.get("executed_action")
             if ea and isinstance(ea, dict):
+                ciclo_vida.transicionar(nueva.status, "executed")
                 nueva = nueva.model_copy(update={
                     "status": "executed",
                     "executed_action": ExecutedAction(

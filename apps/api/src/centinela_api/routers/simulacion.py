@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, simulacion
-from ..agentes import API_METRICS, get_context, get_orchestrator, state_to_alert
+from .. import bitacora, ciclo_vida, simulacion
+from ..agentes import API_METRICS, get_context, get_orchestrator, state_to_alert, status_path
 from ..db import obtener_conexion
 from ..modelos import ActorAgent, AgentStep, SimulatedDay
 from ..sse import flujo
@@ -66,6 +66,7 @@ async def avanzar(
                         day=day_str,
                     )
                     alerta = state_to_alert(alert_id, state, detection, day_str)
+                    ciclo_vida.recorrer(status_path(alert_id, state))
 
                     with conn.transaction():
                         alertas_repo.guardar(conn, alerta)

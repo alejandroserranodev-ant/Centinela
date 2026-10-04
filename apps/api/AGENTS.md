@@ -27,7 +27,7 @@ comes from the dataset. The sections marked below hold decisions the code does n
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
 | `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py`, `tests/test_chat.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py` and `tests/test_avanzar.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py`, `tests/test_chat.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py` and `tests/test_ciclo_orquestado.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -163,10 +163,13 @@ calls `start` without them.
 
 **`src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)` refuses a transition
 `TRANSICIONES` does not list**: `new` → `analyzing` → `proposed` → `approved` or `rejected`, and
-`approved` → `executed`. A person's decision and the internal routes call it. The two paths the
-orchestrator drives do not: `avanzar` stores whatever status the graph reached, with no `new` or
-`analyzing` written before it, and the resume after an approval sets `executed` directly. It costs
-a lifecycle the database does not prove, and is paid when both paths go through `transicionar()`.
+`approved` → `executed`. A person's decision and the internal routes call it, and so do the two
+paths the orchestrator drives. `avanzar` hands
+`src/centinela_api/ciclo_vida.py:recorrer(estados)` the statuses the graph took the alert through,
+read from its `transitions` by `src/centinela_api/agentes.py:status_path(alert_id, state)`, and
+stores no alert whose path does not start at `new` or skips a transition. The resume after an
+approval writes `executed` only after `transicionar` accepts it from `approved`. The database
+keeps the last status, not the path.
 
 > **Decided, not built.** The table below and the merge it carries. The graph's `unida` reaches
 > the API as `new`, because `state_to_alert` has no entry for it.
