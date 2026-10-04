@@ -43,27 +43,34 @@ function alertName(alert: Alert): string {
 
 type AmountKey = 'pesosAtRisk' | 'recoverablePerMonth';
 
+const AMOUNT_DESCRIPTION: Record<AmountKey, string> = {
+  pesosAtRisk: 'Suma de pesos en riesgo de las alertas por decidir',
+  recoverablePerMonth: 'Suma del importe recuperable al mes de las alertas por decidir',
+};
+
 function AlertsAmountDialog({
   open,
-  title,
   alerts,
   amountKey,
   onClose,
 }: {
   open: boolean;
-  title: string;
   alerts: Alert[] | null;
   amountKey: AmountKey;
   onClose: () => void;
 }) {
+  const { simulatedDay } = useSimulation();
   const rows = (alerts ?? [])
     .filter((a) => a[amountKey] != null)
     .sort((a, b) => (b[amountKey]?.value ?? 0) - (a[amountKey]?.value ?? 0));
 
+  const description = AMOUNT_DESCRIPTION[amountKey] + (simulatedDay ? `, ${formatDate(simulatedDay)}` : '');
+
   return (
     <ArenaDialog
       open={open}
-      title={title}
+      eyebrow="Cómo llegué aquí"
+      title="De dónde sale esta cifra"
       width="calc(var(--sp-1) * 140)"
       fillBelow="sm"
       onClose={onClose}
@@ -73,28 +80,32 @@ function AlertsAmountDialog({
         </ArenaButton>
       }
     >
-      {rows.length === 0 ? (
-        <p className="text-muted">No hay alertas con este importe actualmente.</p>
-      ) : (
-        <div className="query__table-wrap">
-          <table className="query__table">
-            <thead>
-              <tr>
-                <th scope="col">Alerta</th>
-                <th scope="col">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((alert) => (
-                <tr key={alert.id}>
-                  <td>{alertName(alert)}</td>
-                  <td className="arena-num">{formatPesos(alert[amountKey]?.value ?? 0)}</td>
+      <div className="arena-stack arena-stack--group query">
+        <p className="query__description">{description}</p>
+        {rows.length === 0 ? (
+          <p className="text-muted">No hay alertas con este importe actualmente.</p>
+        ) : (
+          <div className="query__table-wrap">
+            <table className="query__table">
+              <thead>
+                <tr>
+                  <th scope="col">Alerta</th>
+                  <th scope="col">Importe</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {rows.map((alert) => (
+                  <tr key={alert.id}>
+                    <td>{alertName(alert)}</td>
+                    <td className="arena-num">{formatPesos(alert[amountKey]?.value ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="text-muted query__source">Fuente: registro de alertas de Centinela</p>
+      </div>
     </ArenaDialog>
   );
 }
@@ -121,7 +132,6 @@ function MonetaryTotal({
       </button>
       <AlertsAmountDialog
         open={open}
-        title={label}
         alerts={alerts}
         amountKey={amountKey}
         onClose={() => setOpen(false)}
@@ -170,7 +180,6 @@ function CompactTotals({ summary, alerts }: { summary: InboxSummary; alerts: Ale
       </dl>
       <AlertsAmountDialog
         open={openDialog !== null}
-        title={openDialog === 'pesosAtRisk' ? 'En riesgo hoy' : 'Recuperable al mes'}
         alerts={alerts}
         amountKey={openDialog ?? 'pesosAtRisk'}
         onClose={() => setOpenDialog(null)}
