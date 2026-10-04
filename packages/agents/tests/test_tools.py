@@ -303,6 +303,12 @@ class TestToolRegistry:
 
         assert tools == {}
 
+    def test_get_tools_for_chat(self):
+        """The chat gets no tool: code reads the kernel, and no action is in its reach."""
+        registry = ToolRegistry(sql_vistas=SqlVistasStub(), calcular_impacto=CalcularImpactoStub())
+
+        assert registry.get_tools_for_agent("chat") == {}
+
     def test_get_tools_for_analista(self):
         """Analista gets sql_vistas and buscar_politica."""
         registry = ToolRegistry(

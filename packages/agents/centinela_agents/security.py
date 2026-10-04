@@ -114,6 +114,10 @@ def check_prompt_injection(
         "context_break": r"(?:===|```|---|=====)",
         "jailbreak": r"(?:disregard|bypass|disable|turn off|ignore)\s+(?:security|masking|rules|protection)",
         "order_embedding": r"(?:execute|run|perform|do)\s+(?:this|the following|cmd|command|code)",
+        "instruction_override_es": r"(?:ignora|olvida|omite|desobedece|sáltate|saltate)\s+(?:\w+\s+){0,3}?(?:instrucciones|reglas|órdenes|ordenes|restricciones|prompt)",
+        "role_change_es": r"(?:ahora eres|actúa como|actua como|finge ser|hazte pasar por)",
+        "prompt_leak": r"(?:muestra|revela|imprime|repite|dime|show|reveal|print|repeat)\s+(?:\w+\s+){0,3}?(?:prompt|system prompt|instrucciones|instructions)",
+        "sql_statement": r"\b(?:drop|delete|truncate|alter|insert|update|grant|revoke)\s+(?:table|from|into|database|schema|role|user)\b",
     }
 
     for pattern_name, pattern in dangerous_patterns.items():

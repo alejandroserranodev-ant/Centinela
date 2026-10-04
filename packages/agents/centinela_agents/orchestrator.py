@@ -34,13 +34,14 @@ from typing import Any, Mapping
 from langgraph.types import Command
 
 from .agents.analista import explain_cause
+from .agents.chat import answer, classify, closing, screen
 from .agents.ejecutor import execute_action
 from .agents.estratega import propose_actions
 from .agents.orquestador import classify_rejection
 from .agents.vigia import redact_title
 from .catalog import KernelCall
 from .evidence import Sources, call_from_reader
-from .graph import Compiler, awaiting_decision, manual_owners, manual_review, resume, start_alert, thread
+from .graph import Compiler, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
 from .llm_provider import LLMProvider
 from .metrics import Metrics
 from .schema import Tree, index
@@ -99,6 +100,9 @@ class CentinelaOrchestrator:
         self.tools = tools
         self.tree = tree
         self.metrics = metrics
+        self.catalog = catalog
+        self.reader = reader
+        self._chat_graph = None
 
         owners = dict(owners) if owners is not None else manual_owners(skill("estratega", "acciones"))
         sources = Sources(kernel or call_from_reader(reader), catalog, metrics, index(tree))
@@ -118,6 +122,8 @@ class CentinelaOrchestrator:
             ("ejecutor", "nota_manual"): lambda state: execute_action(
                 provider, state.get("action"), state.get("decision"), tools
             ),
+            ("chat", "clasificar"): lambda state: classify(provider, state, sources),
+            ("chat", "responder"): lambda state: answer(reasoning, state, sources),
         }
 
         self.compiler = Compiler(
@@ -251,3 +257,56 @@ class CentinelaOrchestrator:
             Complete alert state
         """
         return self.graph.get_state(thread(alert_id)).values
+
+    def ask(self, question: str, day: str, alert: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """
+        Answer one question from the subtree conversar; the walk never pauses and never acts.
+
+        Args:
+            question: the person's question, untrusted
+            day: Simulated day (YYYY-MM-DD)
+            alert: the anchored alert, its id, metric, entity, status, cause and actions, if any
+
+        Returns:
+            fin, the steps the walk took, the ChatAnswer, the queries it ran and the screen's result
+        """
+        if self._chat_graph is None:
+            self._chat_graph = compile_chat(self.tree, leaves=self.leaves, metrics=self.metrics, catalog=self.catalog, reader=self.reader)
+        anchored, cause, actions = None, None, None
+        if alert is not None:
+            known = self.graph.get_state(thread(alert["id"])).values or {}
+            detection = known.get("detection") or {}
+            anchored = {
+                "id": alert["id"],
+                "metric": alert.get("metric") or detection.get("metric"),
+                "entity": list(alert.get("entity") or detection.get("entity") or []),
+                "status": alert.get("status"),
+            }
+            cause = known.get("cause") or alert.get("cause")
+            actions = known.get("actions") or alert.get("actions")
+        screened = screen(question)
+        initial = {
+            "question": question,
+            "day": day,
+            "alert": anchored,
+            "cause": cause,
+            "actions": actions,
+            "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "figuras": None},
+            "queries": [],
+        }
+        state = self._chat_graph.invoke(initial)
+        nodes = index(self.tree)
+        steps = [
+            {"node": node_id, "branch": branch, "agent": nodes[node_id].hoja.agente if node_id in nodes and nodes[node_id].hoja else None}
+            for node_id, branch in state.get("camino") or []
+        ]
+        logger.info("Orchestrator.ask: %s after %s steps", state.get("fin"), len(steps))
+        return {
+            "fin": state.get("fin"),
+            "steps": steps,
+            "answer": closing(state),
+            "chat": state.get("chat"),
+            "queries": state.get("queries") or [],
+            "screen": screened,
+            "failures": state.get("failures") or [],
+        }

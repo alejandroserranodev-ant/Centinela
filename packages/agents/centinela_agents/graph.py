@@ -8,8 +8,8 @@ from langgraph.types import Command, interrupt
 from .catalog import Catalog, KpiReader
 from .failures import SchemaRefused, StepTimeout, TokenCapReached
 from .metrics import Metrics
-from .schema import ENDS, GATE, ROOT, Leaf, Node, Tree, reachable
-from .state import AlertState, approved_action
+from .schema import CHAT_ROOT, ENDS, GATE, ROOT, Leaf, Node, Tree, reachable
+from .state import AlertState, ChatState, approved_action
 from .walk import Context, Detection, state_holds
 
 LeafFunction = Callable[[Mapping[str, Any]], Mapping[str, Any]]
@@ -33,6 +33,7 @@ LEAF_OUTPUTS = {
     ("estratega", "revision_manual"): ("actions", "insufficient_cause"),
     ("ejecutor", "ejecutar"): ("executed_action",),
     ("ejecutor", "nota_manual"): ("executed_action",),
+    ("chat", "responder"): ("answer",),
 }
 
 
@@ -125,6 +126,10 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
         return {"actions": [manual_review(state["detection"]["metric"], ctx.owners)], "insufficient_cause": None}
     if leaf.agente == "ejecutor":
         return {"executed_action": None}
+    if key == ("chat", "clasificar"):
+        return {"chat": {**state["chat"], "intent": "fuera_de_alcance"}}
+    if key == ("chat", "responder"):
+        return {"chat": {**state["chat"], "figuras": None}, "answer": None}
     raise error
 
 
@@ -175,7 +180,7 @@ def classified(classify: Classifier, state: Mapping[str, Any]) -> str:
 
 def end_node(end_id: str, classify: Classifier):
     def run(state: Mapping[str, Any]) -> dict[str, Any]:
-        alert = state["alert_id"]
+        alert = state.get("alert_id")
         if end_id == "fin.unida":
             return {"fin": end_id, "merged_into": state["same_cause_as"], "status": "unida", "transitions": [[alert, "unida"]]}
         if end_id == "fin.ejecutada":
@@ -210,7 +215,13 @@ def compile_tree(
     rooted = reachable(ctx.nodes, [ROOT])
     entries = sorted(node.id for node in tree.nodos if node.id in rooted and node.hoja is not None and node.hoja.agente == "vigia")
     graph = StateGraph(AlertState)
-    for name in sorted(reachable(ctx.nodes, entries)):
+    add_walk(graph, reachable(ctx.nodes, entries), leaves, ctx, classify)
+    graph.add_conditional_edges(START, read_entry, entries)
+    return graph.compile(checkpointer=checkpointer)
+
+
+def add_walk(graph: StateGraph, names: set[str], leaves: Mapping[tuple[str, str], LeafFunction], ctx: Context, classify: Classifier) -> None:
+    for name in sorted(names):
         node = ctx.nodes.get(name)
         if node is None:
             graph.add_node(name, end_node(name, classify))
@@ -224,8 +235,14 @@ def compile_tree(
         else:
             graph.add_node(name, predicate_node(node, ctx))
             graph.add_conditional_edges(name, read_next, sorted({node.si, node.no}))
-    graph.add_conditional_edges(START, read_entry, entries)
-    return graph.compile(checkpointer=checkpointer)
+
+
+def compile_chat(tree: Tree, *, leaves: Mapping[tuple[str, str], LeafFunction], metrics: Metrics, catalog: Catalog, reader: KpiReader):
+    ctx = Context.of(tree, metrics, catalog, reader)
+    graph = StateGraph(ChatState)
+    add_walk(graph, reachable(ctx.nodes, [CHAT_ROOT]), leaves, ctx, lambda state: "ninguno")
+    graph.add_edge(START, CHAT_ROOT)
+    return graph.compile()
 
 
 class Compiler:
