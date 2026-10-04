@@ -54,7 +54,7 @@ quiet day.
 
 ## Signing in
 
-Each profile of `CENTINELA_USUARIOS`, in the root `.env`, signs in with `Andina2026!`:
+Each profile of `CENTINELA_USUARIOS`, in the root `.env`, signs in with the demo password `HackathonByPass`:
 
 | Email | Role · area |
 |---|---|
@@ -64,3 +64,11 @@ Each profile of `CENTINELA_USUARIOS`, in the root `.env`, signs in with `Andina2
 | compras@andina.test | `lider_proceso` · `Compras` |
 | analista@andina.test | `analista` |
 | auditoria@andina.test | `auditor` |
+
+The password is shared and public on purpose, because the `.env` is versioned and the team signs in during the hackathon. To change it, hash the new one and replace the `clave` of every profile in `CENTINELA_USUARIOS`, or of only the profiles that should differ:
+
+```
+echo NuevaClave | python -m centinela_api.auth hash
+```
+
+For a private password, put the whole `CENTINELA_USUARIOS` in `.env.local`, which is not versioned and wins over `.env`.

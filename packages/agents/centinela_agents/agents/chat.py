@@ -41,6 +41,10 @@ OUT_OF_SCOPE = "Solo respondo sobre los datos de la operación, sus alertas y el
 NO_EVIDENCE = "Los datos del día no responden esa pregunta."
 NO_POLICY = "Todavía no consulto las políticas desde el chat."
 FAILED = "No pude responder: falló el modelo o la conexión. Vuelve a preguntar en un momento."
+ROLES = ("gerente", "lider_proceso", "analista", "auditor")
+TECHNICAL = ("analista", "auditor")
+SENTENCES = {"gerente": 2, "lider_proceso": 3, "analista": 3, "auditor": 3}
+READ_ONLY = "Auditoría solo consulta: no aprueba, rechaza ni ejecuta. Pregunta por los datos, las alertas o el árbol de decisión."
 ARBOL = Path(__file__).resolve().parents[2] / "arbol"
 REFS = {"type": "array", "items": {"type": "string"}}
 ANSWER_SCHEMA = {
@@ -176,6 +180,7 @@ class Facts:
 
 def kpi_facts(facts: Facts, ledger, state: Mapping[str, Any], sources: Sources) -> None:
     chat = state["chat"]
+    technical = state.get("role") in (None, *TECHNICAL)
     kpi, entity, day = chat["kpi"], chat.get("entity"), state["day"]
     qid, rows = ledger.consult(kpi, day)
     spec = sources.catalog.kpis[kpi]
@@ -197,6 +202,8 @@ def kpi_facts(facts: Facts, ledger, state: Mapping[str, Any], sources: Sources) 
         label = ", ".join(str(row.get(column)) for column in spec.entity)
         for node_id, branch in path:
             steps += 1
+            if not technical:
+                continue
             ground = sources.nodes[node_id].fundamento
             facts.lines.append(f"p{steps}: regla {node_id} de {label} tomó {branch}, fundada en {ground}: {registry().get(ground, '')}")
         verdict = "está en alerta" if target == "hoja.vigia.titular" else "no cruza ningún umbral"
@@ -227,10 +234,10 @@ def no_answer(chat: Mapping[str, Any]) -> dict[str, Any]:
     return {"chat": {**chat, "figuras": None}, "answer": reply}
 
 
-def written(parsed: Mapping[str, Any], facts: Facts, allowed: tuple[str, ...]) -> tuple[list[str], list[dict[str, Any]]]:
+def written(parsed: Mapping[str, Any], facts: Facts, allowed: tuple[str, ...], limit: int = MAX_SENTENCES) -> tuple[list[str], list[dict[str, Any]]]:
     texts: list[str] = []
     figures: list[dict[str, Any]] = []
-    for item in (parsed.get("sentences") or [])[:MAX_SENTENCES]:
+    for item in (parsed.get("sentences") or [])[:limit]:
         text = str(item.get("text") or "").strip()
         refs = cited(text, list(item.get("figures") or []))
         if not refs or placeholders(text) != set(range(len(refs))) or stray_digits(text, allowed) or any(ref not in facts.figures for ref in refs):
@@ -253,8 +260,9 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
     if not facts.figures:
         return {**no_answer(chat), "queries": queries}
     metric, entity = anchor(state)
+    role = state.get("role")
     system, user = (
-        SecurePrompt(skill("chat", "contrato"))
+        SecurePrompt(skill("chat", "contrato", *([f"rol_{role}"] if role in ROLES else [])))
         .add_data(f"simulated_day: {state['day']}\nalerta: {metric or 'ninguna'} {entity or ''}\nevidencia:\n" + "\n".join(facts.lines))
         .add_instruction("Paso responder: devuelve el JSON del esquema. Cita cada cifra por su ref y escribe {0}, {1} en el texto.")
         .add_untrusted_content(masked(state["question"]))
@@ -268,7 +276,7 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
     anchor_parts = [str(part) for part in (state.get("alert") or {}).get("entity") or []]
     names = [*anchor_parts, *facts.names]
     allowed = tuple(part for part in (state["day"], *names, *(name.lower() for name in names)) if part)
-    texts, figures = written(parsed, facts, allowed)
+    texts, figures = written(parsed, facts, allowed, SENTENCES.get(role, MAX_SENTENCES))
     if not texts:
         return {**no_answer(chat), "queries": queries, "costs": [cost]}
     assumptions = [masked(str(text)) for text in parsed.get("assumptions") or [] if not stray_digits(str(text), allowed)]
@@ -285,6 +293,8 @@ def closing(state: Mapping[str, Any]) -> dict[str, Any]:
     if end == "fin.chat_rechazada":
         return ChatAnswer(text=REFUSAL, enough_evidence=False).model_dump()
     if end == "fin.chat_fuera_de_alcance":
+        if state.get("role") == "auditor" and (state.get("chat") or {}).get("intent") == "accion":
+            return ChatAnswer(text=READ_ONLY, enough_evidence=False).model_dump()
         return ChatAnswer(text=OUT_OF_SCOPE, enough_evidence=False).model_dump()
     if (state.get("chat") or {}).get("intent") == "politica":
         return ChatAnswer(text=NO_POLICY, enough_evidence=False).model_dump()

@@ -269,7 +269,7 @@ class CentinelaOrchestrator:
         """
         return self.graph.get_state(thread(alert_id)).values
 
-    def ask(self, question: str, day: str, alert: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    def ask(self, question: str, day: str, alert: Mapping[str, Any] | None = None, role: str | None = None) -> dict[str, Any]:
         """
         Answer one question from the subtree conversar; the walk never pauses and never acts.
 
@@ -277,6 +277,7 @@ class CentinelaOrchestrator:
             question: the person's question, untrusted
             day: Simulated day (YYYY-MM-DD)
             alert: the anchored alert, its id, metric, entity, status, cause and actions, if any
+            role: the signed-in person's role; it only changes how the answer is written, never its facts
 
         Returns:
             fin, the steps the walk took, the ChatAnswer, the queries it ran and the screen's result
@@ -300,6 +301,7 @@ class CentinelaOrchestrator:
             "question": question,
             "day": day,
             "alert": anchored,
+            "role": role,
             "cause": cause,
             "actions": actions,
             "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "figuras": None},

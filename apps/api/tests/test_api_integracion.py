@@ -29,7 +29,7 @@ except psycopg.OperationalError:
     pytest.skip("DSN_ADMIN reaches no database", allow_module_level=True)
 
 ID_ALERTA = "alerta_prueba_skeleton"
-CLAVE_DEMO = "Andina2026!"
+CLAVE_DEMO = "HackathonByPass"
 NOMBRE_GERENTE = "Mariana Restrepo"
 
 
@@ -307,7 +307,7 @@ CONSULTA_CHAT = {"queryId": "q_prueba_chat", "kpi": "saldo_vencido", "dia": "202
 
 
 class _OrquestadorDelChat:
-    def ask(self, question, day, alert=None):
+    def ask(self, question, day, alert=None, role=None):
         figura = {"value": 45, "unit": "days", "queryId": CONSULTA_CHAT["queryId"]}
         return {
             "fin": "fin.chat_respondida",

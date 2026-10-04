@@ -48,9 +48,11 @@ class Orquestador:
     def __init__(self, respuesta):
         self.respuesta = respuesta
         self.preguntas = []
+        self.roles = []
 
-    def ask(self, question, day, alert=None):
+    def ask(self, question, day, alert=None, role=None):
         self.preguntas.append((question, day, alert))
+        self.roles.append(role)
         return self.respuesta
 
 
@@ -162,7 +164,7 @@ def test_una_pregunta_vacia_o_larga_es_422(monkeypatch, mundo, pregunta):
 
 def test_un_fallo_del_orquestador_responde_sin_evidencia(monkeypatch, mundo):
     class Roto:
-        def ask(self, question, day, alert=None):
+        def ask(self, question, day, alert=None, role=None):
             raise RuntimeError("sin modelo")
 
     monkeypatch.setattr(chat_router, "get_orchestrator", lambda: Roto())
@@ -179,3 +181,9 @@ def test_un_fallo_del_modelo_no_se_registra_como_rechazo(monkeypatch, mundo):
     assert mensaje["outcome"] == "no_evidence"
     tipo, detalle = mundo["bitacora"][-1][1], mundo["bitacora"][-1][3]
     assert tipo == "answer" and detalle.endswith("El asistente no pudo terminar su respuesta.")
+
+
+def test_el_rol_de_la_sesion_llega_al_orquestador(monkeypatch, mundo):
+    orq = orquestador(monkeypatch, RECHAZADA)
+    TestClient(app).post("/chat", json={"question": "¿Cuánto?"})
+    assert orq.roles == ["gerente"]
