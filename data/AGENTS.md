@@ -18,7 +18,7 @@ the kit delivers the dataset free to use for the challenge.
 |---|---|
 | `csv/` | the official evaluation dataset, one UTF-8 CSV per table. Row counts: `wc -l csv/*.csv` |
 | `csv/ref_*.csv` | the thresholds the policies state (discount cap per segment, minimum margin per line), as tables the views join |
-| `sql/01_esquema.sql` | the tables, in schema `centinela` |
+| `sql/01_esquema.sql` | the tables, in schema `centinela`, and the role `tools_reader` the rules below hold as a debt |
 | `sql/02_carga.sql` | loads `csv/` with `\copy`, by paths relative to this directory |
 | `sql/03_capa_semantica.sql` | the semantic layer as the kit delivers it: `centinela.fecha_corte()` and the `v_*` metric views |
 | `sql/04_vistas_causa.sql` | the cause views: read-only `v_*` views over the CSVs no kit view exposes (supplier costs, list prices, purchase orders, minimum margins), so `Analista` can prove a cause without reading a raw table |
@@ -59,6 +59,15 @@ the kit delivers the dataset free to use for the challenge.
   compose's, because the database holds only the synthetic dataset. Write access belongs to the
   API's own tables, never to this schema. `packages/tools/tests/test_roles.py` holds this against
   the scratch database of [`../packages/tools/AGENTS.md`](../packages/tools/AGENTS.md).
+- **`sql/01_esquema.sql` also creates `tools_reader`, which reads what the grants above
+  withhold, and no code uses it.** The kit file is no longer as delivered: its last lines create a
+  login role with the literal password `tools_reader_password`, grant it `SELECT` on every table of
+  schema `centinela`, and set the default privileges so it reads every later view too. It reads the
+  raw tables and the columns `kernel/fuentes.yaml` excludes, such as a customer's `nombre`;
+  `packages/tools/tests/test_roles.py` does not test it; and its `CREATE ROLE` fails on a second
+  database of the same cluster, which `psql` reports and passes. No code connects as it, which
+  `grep -rn --include='*.py' --include='*.ts' 'tools_reader\|DSN_READ_ONLY' packages apps`
+  confirms. It is paid when the role leaves the file and the file is again as delivered.
 - **`csv/` is the official dataset and is never overwritten.** A generated dataset goes to
   `generator/csv/`, or to the directory `SALIDA` names, and `SALIDA` never names `csv/`, which the
   kit writes and no generator in this tree does. Every generator is in
@@ -110,7 +119,12 @@ The views are listed by `grep -o 'VIEW v_[a-z_]*' sql/0[34]_*.sql`.
 `centinela.fecha_corte()` returns the last day of the dataset (the maximum of
 `inventario_diario.fecha`). For the demo, Centinela must live any day: the clock advances one day
 at a time, the simulated day replaces `fecha_corte()`, and every query filters
-`fecha <= <simulated day>`. Who owns the clock is [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md).
+`fecha <= <simulated day>`. [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md) owns the clock: it
+keeps the day in its table `api.simulacion` and seeds it, on the first read, from `fecha_corte()`
+(`apps/api/src/centinela_api/simulacion.py:dia_actual(conn)`), so the first advance already passes
+the dataset's last day. The day it advances reaches no view and no KPI, because the reader the
+API hands the orchestrator returns fixed demo rows whatever the day
+(`apps/api/src/centinela_api/agentes.py:_demo_reader(metric, day)`).
 
 **The three paragraphs below describe the views**, and bind every reader of one: an agent through
 the SQL tool, and anyone who reads a view to check a figure. The paragraph after them is the
