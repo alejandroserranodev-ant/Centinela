@@ -151,6 +151,8 @@ async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: ps
                 orch_decision["parameters"] = dict(aprobada.parameters)
 
             state = await asyncio.to_thread(orq.resume, id, orch_decision)
+            with conn.transaction():
+                bitacora.registrar_prompts(conn, id, state.get("resumed_prompts") or [], dia)
 
             ea = state.get("executed_action")
             if ea and isinstance(ea, dict):
@@ -180,12 +182,14 @@ async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: ps
             try:
                 orq = get_orchestrator()
                 orq.use_thresholds(configuracion.umbrales(ajustes))
-                await asyncio.to_thread(orq.resume, id, {
+                state = await asyncio.to_thread(orq.resume, id, {
                     "id": f"dec_{uuid.uuid4().hex[:8]}",
                     "kind": "reject",
                     "reason": decision.reason,
                     "simulated_day": dia.isoformat(),
                 })
+                with conn.transaction():
+                    bitacora.registrar_prompts(conn, id, state.get("resumed_prompts") or [], dia)
             except Exception as e:
                 logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
@@ -229,6 +233,8 @@ async def _reproponer(
             "reason": motivo.strip(),
             "simulated_day": dia.isoformat(),
         })
+        with conn.transaction():
+            bitacora.registrar_prompts(conn, alerta.id, state.get("resumed_prompts") or [], dia)
         acciones = converted_actions(state)
         if not acciones:
             raise ValueError("Estratega no devolvió acciones")

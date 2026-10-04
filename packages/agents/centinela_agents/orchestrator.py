@@ -267,7 +267,9 @@ class CentinelaOrchestrator:
         )
 
         try:
+            before = len(self.graph.get_state(thread(alert_id)).values.get("prompts") or [])
             state = resume(self.graph, alert_id, decision, tracer=self.tracer)
+            state = {**state, "resumed_prompts": list(state.get("prompts") or [])[before:]}
 
             if awaiting_decision(self.graph, alert_id):
                 logger.info(f"Alert {alert_id} awaits next decision")

@@ -83,6 +83,29 @@ def test_el_costo_de_la_alerta_se_guarda(monkeypatch, guardadas):
     simulacion_router.alertas_repo.fijar_costo.assert_any_call(ANY, "alerta_a", costo)
 
 
+PROMPT = {"agent": "vigia", "system": "contrato", "user": "detection.entity: CLIENTE_QWERTY"}
+
+
+def test_la_bitacora_guarda_el_prompt_enmascarado_y_la_alerta_su_entidad_original(monkeypatch, guardadas):
+    registrar_prompts = MagicMock()
+    monkeypatch.setattr(simulacion_router.bitacora, "registrar_prompts", registrar_prompts)
+    dia_con(monkeypatch, corrida("alerta_a", deteccion(), "nueva", "en análisis", "propuesta", prompts=[PROMPT]))
+    TestClient(app).post("/simulacion/avanzar")
+    registrar_prompts.assert_called_once_with(ANY, "alerta_a", [PROMPT], DIA)
+    simulacion_router.alertas_repo.fijar_entidad.assert_any_call(ANY, "alerta_a", ("CLI-001",))
+
+
+def test_el_resume_guarda_solo_los_prompts_que_agrega(monkeypatch, guardadas):
+    registrar_prompts = MagicMock()
+    monkeypatch.setattr(alertas_router.bitacora, "registrar_prompts", registrar_prompts)
+    nuevo = {"agent": "ejecutor", "system": "contrato", "user": "recipient: CLIENTE_QWERTY"}
+    orquestador = MagicMock()
+    orquestador.resume.return_value = {"prompts": [PROMPT, nuevo], "resumed_prompts": [nuevo], "executed_action": {"actionId": "accion_1", "result": "Tarea creada"}}
+    monkeypatch.setattr(alertas_router, "get_orchestrator", lambda: orquestador)
+    TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "approve", "actionId": "accion_1"})
+    registrar_prompts.assert_called_once_with(ANY, "alerta_1", [nuevo], DIA)
+
+
 def test_el_resume_no_escribe_ejecutada_si_el_ciclo_la_rechaza(monkeypatch, guardadas):
     orquestador = MagicMock()
     orquestador.resume.return_value = {"executed_action": {"actionId": "accion_1", "result": "Tarea creada"}}

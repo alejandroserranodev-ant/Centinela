@@ -1,6 +1,6 @@
 # POST /chat against a fake orchestrator and a fake connection: the router reads the day and the
 # anchored alert, streams one step per node the walk of conversar took, and writes the question,
-# the queries, the answer or the refusal, and the cost to the bitácora.
+# the queries, the answer or the refusal, the cost and each masked prompt to the bitácora.
 import contextlib
 import datetime
 import json
@@ -76,6 +76,7 @@ def mundo(monkeypatch):
     monkeypatch.setattr(chat_router.alertas_repo, "obtener", lambda conn, id: alerta() if id == "alerta_1" else None)
     monkeypatch.setattr(chat_router.bitacora, "registrar", lambda conn, alerta_id, tipo, actor, detalle, dia, query_id=None, figures=(): escritos["bitacora"].append((alerta_id, tipo, actor.model_dump(by_alias=True), detalle, query_id, [f.model_dump(by_alias=True) for f in figures])))
     monkeypatch.setattr(chat_router.bitacora, "registrar_costo", lambda conn, alerta_id, actor, detalle, dia: escritos["bitacora"].append((alerta_id, "costo", actor.model_dump(by_alias=True), detalle, None, [])))
+    monkeypatch.setattr(chat_router.bitacora, "registrar_prompts", lambda conn, alerta_id, prompts, dia: escritos["bitacora"].extend((alerta_id, "prompt", prompt["agent"], prompt["user"], None, []) for prompt in prompts))
     monkeypatch.setattr(chat_router.consultas, "registrar", lambda conn, consultas: escritos["consultas"].extend(consultas))
     app.dependency_overrides[obtener_conexion] = lambda: Conexion()
     app.dependency_overrides[persona_actual] = lambda: Persona(email="gerente@andina.test", name="Ana Gómez", role="gerente")
@@ -179,3 +180,13 @@ def test_un_fallo_del_modelo_no_se_registra_como_rechazo(monkeypatch, mundo):
     assert mensaje["outcome"] == "no_evidence"
     tipo, detalle = mundo["bitacora"][-1][1], mundo["bitacora"][-1][3]
     assert tipo == "answer" and detalle.endswith("El asistente no pudo terminar su respuesta.")
+
+
+def test_la_bitacora_guarda_el_prompt_enmascarado_de_cada_paso(monkeypatch, mundo):
+    prompt = {"agent": "chat", "system": "contrato", "user": "¿Cuánta mora tiene CLIENTE_QWERTY?"}
+    orquestador(monkeypatch, {**RESPONDIDA, "prompts": [prompt]})
+    TestClient(app).post("/chat", json={"question": "¿Cuánta mora tiene CLI-001?"})
+
+    tipos = [tipo for _, tipo, *_ in mundo["bitacora"]]
+    assert tipos == ["question", "evidence", "answer", "costo", "prompt"]
+    assert mundo["bitacora"][-1][3] == "¿Cuánta mora tiene CLIENTE_QWERTY?"

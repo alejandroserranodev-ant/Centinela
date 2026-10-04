@@ -3,7 +3,7 @@ import datetime
 import psycopg
 from psycopg.types.json import Jsonb
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from .modelos import Actor, Figure, LogEvent, LogEventType
 
@@ -45,10 +45,22 @@ def registrar_costo(conn: psycopg.Connection, alerta_id: str | None, actor: Acto
     )
 
 
+def registrar_prompts(conn: psycopg.Connection, alerta_id: str | None, prompts: Sequence[Mapping[str, str]], dia_simulado: datetime.date) -> None:
+    for prompt in prompts:
+        conn.execute(
+            "INSERT INTO api.bitacora (alerta_id, tipo, actor, detalle, dia_simulado) VALUES (%s, 'prompt', %s, %s, %s)",
+            (alerta_id, Jsonb({"kind": "agent", "agent": prompt["agent"]}), detalle_de_prompt(prompt), dia_simulado),
+        )
+
+
+def detalle_de_prompt(prompt: Mapping[str, str]) -> str:
+    return f"{prompt['agent']}\n--- system\n{prompt['system']}\n--- user\n{prompt['user']}"
+
+
 def listar(
     conn: psycopg.Connection, alerta_id: str | None, tipo: LogEventType | None
 ) -> list[LogEvent]:
-    condiciones = ["tipo <> 'costo'"]
+    condiciones = ["tipo NOT IN ('costo', 'prompt')"]
     parametros: list[str] = []
     if alerta_id is not None:
         condiciones.append("alerta_id = %s")

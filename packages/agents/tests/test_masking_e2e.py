@@ -138,7 +138,7 @@ def test_an_approval_resumed_with_no_day_run_masks_the_ejecutor_prompt():
     state = orq.resume(run.alert_id, approve(action["id"]))
     ejecutor = provider.requests[before:]
     assert ejecutor and in_clear(texts(ejecutor)) == []
-    assert any(prompt["agent"] == "ejecutor" for prompt in state["prompts"])
+    assert [prompt["agent"] for prompt in state["resumed_prompts"]] == ["ejecutor"]
     assert state["executed_action"]["result"].endswith(f"Le escribimos sobre la cuenta {action['parameters']['recipient']}.")
 
 
