@@ -9,6 +9,7 @@ from langgraph.types import Command, interrupt
 
 from .catalog import Catalog, KpiReader
 from .failures import SchemaRefused, StepTimeout, TokenCapReached
+from .metered import metering, spent
 from .metrics import Metrics
 from .schema import CHAT_ROOT, ENDS, GATE, ROOT, Leaf, Node, Tree, reachable
 from .state import AlertState, ChatState, approved_action
@@ -93,7 +94,7 @@ def effects(node_id: str, branch: str, state: Mapping[str, Any]) -> dict[str, An
 
 
 def failure_kind(error: Exception) -> str:
-    if isinstance(error, StepTimeout):
+    if isinstance(error, (StepTimeout, TimeoutError)):
         return "timeout"
     if isinstance(error, TokenCapReached):
         return "token_cap"
@@ -142,7 +143,7 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
     raise error
 
 
-def leaf_node(node: Node, function: LeafFunction, ctx: Context):
+def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int | None = None):
     leaf = node.hoja
 
     def run(state: Mapping[str, Any]) -> dict[str, Any]:
@@ -153,12 +154,14 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context):
             else state
         )
         cleared = {key: None for key in LEAF_OUTPUTS.get((leaf.agente, leaf.decision), ())}
-        try:
-            update, failures = {**cleared, **function(given)}, []
-        except Exception as error:
-            logger.warning("Leaf %s failed for %s: %s", node.id, state.get("alert_id") or "chat", error, exc_info=error)
-            update, failures = {**cleared, **fallback(leaf, state, error, ctx)}, [{"step": node.id, "kind": failure_kind(error)}]
-        return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures})
+        with metering(leaf.agente, spent(state.get("cost")), token_cap) as meter:
+            try:
+                update, failures = {**cleared, **function(given)}, []
+            except Exception as error:
+                logger.warning("Leaf %s failed for %s: %s", node.id, state.get("alert_id") or "chat", error, exc_info=error)
+                update = {**cleared, **fallback(leaf, state, error, ctx)}
+                failures = [{"step": node.id, "kind": failure_kind(error), "attempts": meter.attempts}]
+        return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures, "cost": meter.cost()})
 
     return run
 
@@ -221,17 +224,18 @@ def compile_tree(
     classify: Classifier,
     checkpointer: Any,
     owners: Mapping[str, str] | None = None,
+    token_cap: int | None = None,
 ):
     ctx = Context.of(tree, metrics, catalog, reader, owners)
     rooted = reachable(ctx.nodes, [ROOT])
     entries = sorted(node.id for node in tree.nodos if node.id in rooted and node.hoja is not None and node.hoja.agente == "vigia")
     graph = StateGraph(AlertState)
-    add_walk(graph, reachable(ctx.nodes, entries), leaves, ctx, classify)
+    add_walk(graph, reachable(ctx.nodes, entries), leaves, ctx, classify, token_cap)
     graph.add_conditional_edges(START, read_entry, entries)
     return graph.compile(checkpointer=checkpointer)
 
 
-def add_walk(graph: StateGraph, names: set[str], leaves: Mapping[tuple[str, str], LeafFunction], ctx: Context, classify: Classifier) -> None:
+def add_walk(graph: StateGraph, names: set[str], leaves: Mapping[tuple[str, str], LeafFunction], ctx: Context, classify: Classifier, token_cap: int | None = None) -> None:
     for name in sorted(names):
         node = ctx.nodes.get(name)
         if node is None:
@@ -241,24 +245,24 @@ def add_walk(graph: StateGraph, names: set[str], leaves: Mapping[tuple[str, str]
             function = leaves.get((node.hoja.agente, node.hoja.decision))
             if function is None:
                 raise MissingLeaf(f"{name} needs a function for {node.hoja.agente}/{node.hoja.decision}")
-            graph.add_node(name, leaf_node(node, function, ctx))
+            graph.add_node(name, leaf_node(node, function, ctx, token_cap))
             graph.add_edge(name, node.sigue)
         else:
             graph.add_node(name, predicate_node(node, ctx))
             graph.add_conditional_edges(name, read_next, sorted({node.si, node.no}))
 
 
-def compile_chat(tree: Tree, *, leaves: Mapping[tuple[str, str], LeafFunction], metrics: Metrics, catalog: Catalog, reader: KpiReader):
+def compile_chat(tree: Tree, *, leaves: Mapping[tuple[str, str], LeafFunction], metrics: Metrics, catalog: Catalog, reader: KpiReader, token_cap: int | None = None):
     ctx = Context.of(tree, metrics, catalog, reader)
     graph = StateGraph(ChatState)
-    add_walk(graph, reachable(ctx.nodes, [CHAT_ROOT]), leaves, ctx, lambda state: "ninguno")
+    add_walk(graph, reachable(ctx.nodes, [CHAT_ROOT]), leaves, ctx, lambda state: "ninguno", token_cap)
     graph.add_edge(START, CHAT_ROOT)
     return graph.compile()
 
 
 class Compiler:
-    def __init__(self, *, leaves, metrics: Metrics, catalog: Catalog, reader: KpiReader, classify: Classifier, checkpointer: Any, owners: Mapping[str, str] | None = None):
-        self._dependencies = {"leaves": leaves, "metrics": metrics, "catalog": catalog, "reader": reader, "classify": classify, "checkpointer": checkpointer, "owners": owners}
+    def __init__(self, *, leaves, metrics: Metrics, catalog: Catalog, reader: KpiReader, classify: Classifier, checkpointer: Any, owners: Mapping[str, str] | None = None, token_cap: int | None = None):
+        self._dependencies = {"leaves": leaves, "metrics": metrics, "catalog": catalog, "reader": reader, "classify": classify, "checkpointer": checkpointer, "owners": owners, "token_cap": token_cap}
         self._graphs: dict[tuple[int, str], Any] = {}
 
     def graph(self, tree: Tree):

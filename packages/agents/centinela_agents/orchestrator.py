@@ -44,6 +44,7 @@ from .catalog import KernelCall
 from .evidence import Sources, call_from_reader
 from .graph import Compiler, StepListener, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
 from .llm_provider import LLMProvider
+from .metered import MeteredProvider
 from .metrics import Metrics
 from .schema import Tree, index
 from .skills import skill
@@ -51,6 +52,7 @@ from .tools import ToolRegistry
 from .walk import Context, Detection
 
 logger = logging.getLogger(__name__)
+TOKEN_CAP = 50_000
 
 
 def rejection_target(provider: LLMProvider, state: Mapping[str, Any]) -> str:
@@ -81,6 +83,7 @@ class CentinelaOrchestrator:
         owners: Mapping[str, str] | None = None,
         kernel: KernelCall | None = None,
         reasoning_provider: LLMProvider | None = None,
+        token_cap: int | None = TOKEN_CAP,
     ):
         """
         Initialize orchestrator.
@@ -96,8 +99,12 @@ class CentinelaOrchestrator:
             owners: Manual review owners by metric, read from acciones.md when absent
             kernel: the kernel's call; the leaves consult kpi_consultar through it
             reasoning_provider: the provider of Analista and Estratega, when it differs
+            token_cap: the tokens one alert may spend across its model calls
         """
+        provider = MeteredProvider(provider)
+        reasoning_provider = MeteredProvider(reasoning_provider) if reasoning_provider is not None else None
         self.provider = provider
+        self.token_cap = token_cap
         self.tools = tools
         self.tree = tree
         self._thresholds = {name: dict(values) for name, values in metrics.thresholds.items()}
@@ -136,6 +143,7 @@ class CentinelaOrchestrator:
             classify=lambda state: rejection_target(provider, state),
             checkpointer=checkpointer,
             owners=owners,
+            token_cap=token_cap,
         )
 
         self.graph = self.compiler.graph(tree)
@@ -282,7 +290,7 @@ class CentinelaOrchestrator:
             fin, the steps the walk took, the ChatAnswer, the queries it ran and the screen's result
         """
         if self._chat_graph is None:
-            self._chat_graph = compile_chat(self.tree, leaves=self.leaves, metrics=self.metrics, catalog=self.catalog, reader=self.reader)
+            self._chat_graph = compile_chat(self.tree, leaves=self.leaves, metrics=self.metrics, catalog=self.catalog, reader=self.reader, token_cap=self.token_cap)
         anchored, cause, actions = None, None, None
         if alert is not None:
             known = self.graph.get_state(thread(alert["id"])).values or {}

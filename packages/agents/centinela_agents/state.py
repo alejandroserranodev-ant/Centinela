@@ -1,6 +1,8 @@
 import operator
 from typing import Annotated, Any, Mapping, TypedDict
 
+from .metered import add_costs
+
 DERIVED_FIELDS = frozenset({"estado.detection.vigente", "estado.action.type", "estado.same_cause_as.status"})
 STATE_FIELDS = DERIVED_FIELDS | frozenset(
     {
@@ -52,6 +54,7 @@ class AlertState(TypedDict, total=False):
     transitions: Annotated[list, operator.add]
     failures: Annotated[list, operator.add]
     events: Annotated[list, operator.add]
+    cost: Annotated[dict, add_costs]
 
 
 class ChatState(TypedDict, total=False):
@@ -68,6 +71,7 @@ class ChatState(TypedDict, total=False):
     camino: Annotated[list, operator.add]
     failures: Annotated[list, operator.add]
     costs: Annotated[list, operator.add]
+    cost: Annotated[dict, add_costs]
 
 
 def subject(state: Mapping[str, Any]) -> tuple[str, str, str]:

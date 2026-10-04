@@ -171,7 +171,7 @@ def test_orq_a_model_call_past_its_timeout_takes_the_fallback_and_still_reaches_
     graph, state = started(recorder, overrides={("analista", "explicar"): timeout})
     assert state["cause"]["kind"] == "no_evidence"
     assert state["cause"]["reason"] == REASONS["timeout"]
-    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "timeout"}]
+    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "timeout", "attempts": 0}]
     assert recorder.count("estratega", "revision_manual") == 1
     assert statuses(state)[-1] == "propuesta"
 
@@ -183,7 +183,7 @@ def test_orq_a_tool_or_connection_error_gives_its_own_reason_not_the_schema_one(
 
     graph, state = started(Recorder(), overrides={("analista", "explicar"): broken})
     assert state["cause"]["reason"] == "El análisis no terminó: no se pudo consultar la información necesaria."
-    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error"}]
+    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error", "attempts": 0}]
 
 
 def test_orq_a_failed_manual_review_still_proposes_its_task_to_its_owner():
@@ -196,7 +196,7 @@ def test_orq_a_failed_manual_review_still_proposes_its_task_to_its_owner():
     owners = manual_owners((SKILLS / "estratega" / "acciones.md").read_text(encoding="utf-8"))
     graph, state = started(Recorder(), overrides={("analista", "explicar"): timeout, ("estratega", "revision_manual"): broken}, owners=owners)
     assert state["actions"] == [{"id": "act-revision-manual", "title": "Revisión manual de la alerta", "type": "task", "impact": None, "parameters": {"owner": "Analista de cartera"}}]
-    assert {"step": "hoja.estratega.revision_manual", "kind": "error"} in state["failures"]
+    assert {"step": "hoja.estratega.revision_manual", "kind": "error", "attempts": 0} in state["failures"]
     assert awaiting_decision(graph, "A1")
 
 
