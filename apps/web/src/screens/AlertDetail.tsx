@@ -16,9 +16,10 @@ import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
-import { fillSentence, formatDate } from '../format';
+import { fillSentence, formatAlertTime, formatDate } from '../format';
 import { HowIGotHere } from './HowIGotHere';
 import { ProposedActions } from './ProposedActions';
+import { AgentPhasesModal } from './AgentPhasesModal';
 
 function Proof({ evidence }: { evidence: Evidence }) {
   const [source, setSource] = useState<Query | null>(null);
@@ -126,6 +127,7 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
   const [alert, setAlert] = useState<Alert | null>(null);
   const [failure, setFailure] = useState<Error | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [phasesModalOpen, setPhasesModalOpen] = useState(false);
 
   useEffect(() => {
     setFailure(null);
@@ -188,13 +190,15 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
     <article className="arena-stack arena-stack--section detail" aria-labelledby="alert-title">
       {back}
       <header className="arena-stack arena-stack--group">
-        <div className="arena-row detail__badges">
-          <Severity level={alert.severity} />
-          <Labels labels={alert.labels} />
-          <Status status={alert.status} />
-          <Confidence level={alert.confidence.level} />
-          <time className="text-muted" dateTime={alert.simulatedDate}>
-            Detectada el {formatDate(alert.simulatedDate)}
+        <div className="detail__header-top">
+          <div className="arena-row detail__badges">
+            <Severity level={alert.severity} />
+            <Labels labels={alert.labels} />
+            <Status status={alert.status} />
+            <Confidence level={alert.confidence.level} />
+          </div>
+          <time className="text-muted detail__datetime" dateTime={alert.simulatedDate}>
+            {formatDate(alert.simulatedDate)} · {formatAlertTime(alert.simulatedDate)}
           </time>
         </div>
         <h2 id="alert-title" className="detail__title">
@@ -210,9 +214,12 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
             </span>
           ) : null}
         </p>
-        <div>
+        <div className="arena-row">
           <ArenaButton variant="ghost" size="sm" icon="ph-bold ph-chat-circle-text" onClick={() => openChat(alert.id)}>
             Preguntar sobre esta alerta
+          </ArenaButton>
+          <ArenaButton variant="secondary" size="sm" icon="ph-bold ph-flow-arrow" onClick={() => setPhasesModalOpen(true)}>
+            Ver fases de análisis
           </ArenaButton>
         </div>
       </header>
@@ -284,6 +291,8 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
           <HowIGotHere alert={alert} />
         </>
       )}
+
+      {alert && <AgentPhasesModal alert={alert} open={phasesModalOpen} onClose={() => setPhasesModalOpen(false)} />}
     </article>
   );
 }

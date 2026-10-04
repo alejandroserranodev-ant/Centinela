@@ -236,6 +236,14 @@ class CentinelaOrchestrator:
         """
         return awaiting_decision(self.graph_of(alert_id), alert_id)
 
+    def has_no_graph_state(self, alert_id: str) -> bool:
+        """
+        Returns True when InMemorySaver has no state for this alert — e.g. after an API
+        restart.  In that case the alert may still be proposed in the DB, so the decision
+        should be allowed to proceed; orq.resume() will either recover or fail gracefully.
+        """
+        return not bool(self.graph.get_state(thread(alert_id)).values)
+
     def resume(
         self,
         alert_id: str,

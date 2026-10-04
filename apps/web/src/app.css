@@ -273,6 +273,19 @@ ol {
   font-size: var(--fs-sm);
 }
 
+.detail__header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.detail__datetime {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
 .detail__badges {
   flex-wrap: wrap;
 }

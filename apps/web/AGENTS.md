@@ -12,7 +12,7 @@ and what each shows is
 |---|---|
 | `src/main.tsx` | mounts the app with the Spanish locale strings of Arena's components, the theme and the router, and imports the generated stylesheets |
 | `src/App.tsx` | the web's routes: `/ingresar` alone, and every other screen inside the shell behind the session |
-| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`, and `Login` outside the shell), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
+| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`, and `Login` outside the shell), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here", the dialog of the phases each agent took, and the dialogs that edit, reject or request changes |
 | `src/shell/` | what wraps every route: the bar with the simulated day, the navigation, and the agents' current step |
 | `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog with the first rows the query returned, the series chart |
 | `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
