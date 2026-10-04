@@ -5,7 +5,10 @@ A skill is a Markdown file of orders for a model. Skills are grouped by agent, o
 orchestrator that calls a model. What each agent may and may not do is
 [`../AGENTS.md`](../AGENTS.md); a skill turns that page into orders and never widens it. Code reads
 two things here: a leaf's `skill` must name a file under this directory, and
-`estratega/acciones.md` is parsed. No code loads a skill into a model.
+`estratega/acciones.md` is parsed. No code loads a skill into a model: each leaf of
+`../centinela_agents/agents/` prompts its model with orders written inline in its code, which
+restate the contracts here in part and diverge from them in part. Its cost is two sources for what
+an agent is told, and a change to a skill that reaches no model.
 
 ## Decisions
 

@@ -2,14 +2,19 @@
 
 This level holds the reasoning: the orchestrator and `Vigía`, `Analista`, `Estratega` and
 `Ejecutor`. What runs: the validator of the decision tree, the walk of `detectar`, the catalogue and
-reader the kernel hands the tree, and the compiler of the tree to a LangGraph graph that pauses for
-a person's decision, all held by `uv run pytest` with stub leaves and no model. What is decided,
-not built: every model call and its Ollama setup, the retry and the token cap, the day run, its
-de-duplication and its order, cost, Langfuse traces, `AgentStep` emission, log events beyond
-`same_cause_dropped`, the chat route and self-expansion. Each section that states one opens with the
-marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
+reader the kernel hands the tree, the compiler of the tree to a LangGraph graph that pauses for a
+person's decision, and the model leaves `centinela_agents/orchestrator.py:CentinelaOrchestrator`
+hands that compiler, each calling the provider
+`centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` returns.
+`apps/api` builds that orchestrator in its own process. `uv run pytest` holds the tree and the
+graph with stub leaves, and the leaves with a mocked provider. What is decided, not built: the
+leaves' use of real tools and of their skills, the retry and the token cap, the day run, its
+de-duplication and its order, cost in the state, Langfuse traces, `AgentStep` emission, log events
+beyond `same_cause_dropped`, the chat route and self-expansion. Each section that states one opens
+with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
 instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
-each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md).
+each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md); how a provider
+is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 
 ## Why each file exists
 
@@ -26,8 +31,17 @@ each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md)
 | `centinela_agents/walk.py` | the walk of `detectar`, and the check that a detection still breaks |
 | `centinela_agents/graph.py` | the compiler to the LangGraph graph, the interrupt, the resume, the fallbacks |
 | `centinela_agents/failures.py` | the exceptions that name a leaf's failure |
+| `centinela_agents/llm_provider.py`, `centinela_agents/ollama_provider.py`, `centinela_agents/openai_provider.py`, `centinela_agents/provider_factory.py` | the provider interface, its two implementations, and the choice between them by environment ([`PHASE_1_SETUP.md`](./PHASE_1_SETUP.md)) |
+| `centinela_agents/schema.py` | also the output models of the leaves: `Cause`, `Action`, `ExecutedAction`, `Decision` ([`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md)) |
+| `centinela_agents/tools.py`, `centinela_agents/sql_vistas.py`, `centinela_agents/buscar_politica.py`, `centinela_agents/calcular_impacto.py`, `centinela_agents/action_tools.py` | the tool interfaces a leaf receives, their registry, and stubs that return empty or zero results ([`PHASE_3_SETUP.md`](./PHASE_3_SETUP.md)) |
+| `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
+| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start` and `resume` ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
+| `centinela_agents/security.py` | masking, secret detection and a prompt builder by trust level, which no leaf calls ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
+| `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
+| `centinela_agents/output_validator.py`, `centinela_agents/orchestrator_v2.py` | checks of a leaf's output, and an orchestrator that adds them and the counters ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
 | `skills/` | what each agent is told ([`skills/AGENTS.md`](./skills/AGENTS.md)) |
-| `tests/` | the validator's planted violations, the walk of `detectar`, and the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model |
+| `tests/` | the validator's planted violations, the walk of `detectar`, the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model, and the unit tests of each module above, `tests/test_evals.py` among them ([`PHASE_8_SETUP.md`](./PHASE_8_SETUP.md)) |
+| `PHASE_1_SETUP.md` … `PHASE_9_SETUP.md` | one page per subsystem above, the detail this page links |
 | `pyproject.toml`, `uv.lock` | the package, with `packages/tools` for the tests, which validate the base against the catalogue the kernel serves; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
 
 ## Commands
@@ -38,7 +52,14 @@ development machine has no `ensurepip` and uv builds the environment without it:
 | Command | What it does |
 |---|---|
 | `uv sync` | installs the package and its dependencies into `.venv` |
-| `uv run pytest` | validates the base tree and runs the routing cases on the compiled graph, with stub leaves and no model |
+| `uv run pytest` | validates the base tree, runs the routing cases on the compiled graph with stub leaves, and the unit tests of the leaves with a mocked provider; no model is called |
+
+> **Limit.** `centinela_agents/openai_provider.py` imports `openai`, which `pyproject.toml` does not declare, so
+> `uv run pytest` stops collecting at `tests/test_providers.py`, and `centinela_agents/provider_factory.py`, which
+> imports it, fails in an environment built by `uv sync` alone. With the package supplied,
+> `uv run --with openai --with requests pytest` collects every test, and some unit tests of the
+> leaves, the providers, `centinela_agents/security.py`, `centinela_agents/output_validator.py` and the tool stubs fail; that command
+> lists them.
 
 ## Decisions
 
@@ -57,9 +78,30 @@ development machine has no `ensurepip` and uv builds the environment without it:
 
 ## Models
 
-> **Decided, not built.** No code calls a model: every leaf is a function the host hands to
-> `centinela_agents/graph.py:compile_tree(tree, *, leaves, metrics, catalog, reader, classify, checkpointer, owners)`,
-> and the tests hand it stubs.
+**A leaf calls a model through `centinela_agents/llm_provider.py:LLMProvider`**, with
+`generate_text(request)` for free text and `generate_structured(request)` for an output its JSON
+schema fixes. `centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)`
+chooses the implementation from `LLM_PROVIDER` (`ollama` by default, or `openai`; `anthropic`
+raises) and the model from `LLM_MODEL`, which has no default. Both are read when `apps/api` first
+builds the orchestrator; the variables and the files they come from are
+[`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md). Each leaf is a function of its provider, so a
+test hands it a mock.
+
+- **`OllamaProvider` passes the output's schema in Ollama's `format` parameter**, because a small
+  model fills a schema more reliably than it writes free text, and a schema with no field for an
+  action is an agent that cannot propose one. `OpenAIProvider` asks only for a JSON object and
+  validates nothing against the schema.
+- **The two tiers the brief asks for are one model in two modes**: thinking on where an agent
+  reasons (`Analista`, `Estratega`), thinking off where a step classifies, routes or words a finding
+  (`Vigía`'s title, `Ejecutor`, the classifier).
+
+> **Limit.** `OpenAIProvider` sends the prompt, and the data in it, to OpenAI's servers, against
+> the decision below that no data leaves the machine; nothing refuses `LLM_PROVIDER=openai`. Its
+> cost is every alert's figures and entity names leaving the machine, unmasked, because no leaf
+> calls `centinela_agents/security.py`. `OllamaProvider` sends `thinking` where Ollama reads `think`, so thinking on
+> never reaches the model.
+
+> **Decided, not built.** The model the team runs.
 
 - **Every model runs locally through Ollama**, because the team requires that no data leaves the
   machine and the brief accepts open models through Ollama. One family, Qwen3, and one model loaded
@@ -72,13 +114,6 @@ development machine has no `ensurepip` and uv builds the environment without it:
   | 16 GB or more | `qwen3:8b`, the team's default |
   | a GPU with 24 GB or more | `qwen3:14b` or `qwen3:30b-a3b` |
 
-- **The two tiers the brief asks for are one model in two modes**: thinking on (`think: true`)
-  where an agent reasons, thinking off where a step classifies, routes or words a finding, decided
-  per step, not per agent.
-- **Every model call passes the JSON schema of its output in Ollama's `format` parameter**, because
-  a small model fills a schema more reliably than it writes free text, and a schema with no field
-  for an action is an agent that cannot propose one.
-
 ## The universe
 
 **An agent knows `data/csv/` and `data/policies/`, reached through the kernel's KPIs and the `v_*`
@@ -89,7 +124,15 @@ each topic gets, is the table of
 
 ## What a leaf may use
 
-> **Decided, not built**, except what names its code: no agent's model runs.
+> **Decided, not built**, except what names its code. Each leaf of `centinela_agents/agents/`
+> calls its model with a prompt written inline, loads no skill, and calls none of the tools it
+> receives. `centinela_agents/tools.py:ToolRegistry.get_tools_for_agent(agent)` hands each agent
+> the share the table below gives it, and `apps/api` builds the registry empty.
+
+> **Limit.** `centinela_agents/tools.py` and its stubs re-declare in this package the tools
+> [`packages/tools`](../tools/AGENTS.md) owns, and nothing here imports `centinela_tools`. Its cost
+> is two definitions of each tool, and a leaf wired to the stub instead of the kernel's
+> `kpi_consultar`: its figures come from no query.
 
 **Each agent answers one question, and no agent answers another's.** Which agent acts next is a
 branch of the tree; what an agent may use once a leaf calls it is this section, because a tool is a
@@ -141,7 +184,8 @@ agent its share.
 ### `Estratega` proposes
 
 - **Leaves:** `proponer`, and `revision_manual`, which is code and calls no model: the host
-  supplies its function, which proposes one `task` for a manual review whose `owner` is the one
+  supplies its function (`centinela_agents/orchestrator.py` supplies `proponer`'s model leaf instead, so a manual
+  review calls the model), which proposes one `task` for a manual review whose `owner` is the one
   [`skills/estratega/acciones.md`](./skills/estratega/acciones.md) names for the metric. When that
   function fails, `centinela_agents/graph.py:manual_review(metric, ctx)` proposes the same task, so
   the alert still reaches the gate. The tree reaches it on `no_evidence`, on a second insufficient
@@ -161,7 +205,9 @@ agent its share.
 - **Tools:** none for its model. The leaf calls the action tool in code, a draft or a sandbox
   effect; the model writes the body of an approved `email_draft` and the text of a manual note.
 - **Ceiling: no discretion.** It passes the approved `parameters` unchanged, keyed by alert and
-  action so a second run has no effect.
+  action so a second run has no effect. *Decided, not built:* the stubs of
+  `centinela_agents/action_tools.py` name each draft with a random id, so a second run makes a
+  second draft.
 - **Never:** chooses between actions, recomputes, adds a recipient, runs without a recorded decision.
 
 ## The orchestrator
@@ -209,6 +255,11 @@ orchestrator's own write, and the gate `aprobar.decision` is where the graph pau
 
 `centinela_agents/state.py:AlertState` declares it. Every leaf but `Ejecutor`'s receives the whole
 state; *Read by* is what each is meant to use of it.
+
+> **Limit.** `centinela_agents/agents/vigia.py:redact_title(provider, detection)` and
+> `centinela_agents/agents/analista.py:explain_cause(provider, alert, tools)` read `metric`, `entity` and `cifra` at the top of the state, where it
+> holds them under `detection`, so each prompts its model with no metric and no entity. Every
+> leaf also returns an `error` key the state does not declare.
 
 | Field | Written by | Read by |
 |---|---|---|
@@ -262,7 +313,11 @@ that calls a model, with [`skills/orquestador/contrato.md`](./skills/orquestador
 host hands it to `compile_tree` as `classify`; its target is one of
 `centinela_agents/graph.py:REJECTION_TARGETS`, and decides who reads the reason on the next run of
 the same metric: `causa` to `Analista`, `propuesta` to `Estratega`, `ambos` to both, and `ninguno`
-to no agent, the reason staying in the `bitácora`. `apps/api` keeps the reason with its target, metric and entity,
+to no agent, the reason staying in the `bitácora`. `centinela_agents/orchestrator.py` hands it
+`centinela_agents/agents/orquestador.py:classify_rejection(provider, reason, cause, actions)` with
+two arguments where it takes four, and the function returns a mapping where `classify` returns a
+target, so `centinela_agents/graph.py:classified(classify, state)` answers `ninguno` for every
+rejection and no agent reads a reason. `apps/api` keeps the reason with its target, metric and entity,
 and hands it in split into `cause_rejections` and `proposal_rejections`, so each agent learns only
 from its own mistakes.
 
@@ -293,6 +348,9 @@ has not reached.
 > **Decided, not built.** The state has no `cost`, no trace is opened, no `AgentStep` is emitted,
 > and the only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.
+> `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
+> and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; only
+> `centinela_agents/orchestrator_v2.py` uses them, and nothing imports `centinela_agents/orchestrator_v2.py`.
 
 - **After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
   call to the alert's `cost`, under the agent that made it.** A chat answer carries its own cost.
@@ -313,7 +371,8 @@ has not reached.
 calls the resume, keeps the rejection reasons, validates and persists each transition the
 orchestrator proposes, stores the checkpoint, persists cost, streams `AgentStep` and owns the
 `bitácora`: its page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action and
-masking personal data are `packages/tools`'.
+masking personal data are `packages/tools`'; `centinela_agents/security.py` masks in this package
+instead, and no leaf calls it.
 
 ## Coverage: every metric has one owner per step
 
@@ -337,7 +396,9 @@ orchestrator; a policy passage that gives orders is reported, never obeyed, by `
   takes, so a change of route is a change to `arbol/base.yaml`. *The validator refuses an invalid
   base at startup, and `uv run pytest` holds the routes.*
 - **The model never produces a number.** Every figure in an explanation or a proposal comes from a
-  tool call, and the call travels with the figure as evidence. *No gate holds this.*
+  tool call, and the call travels with the figure as evidence. *No gate holds this*, and the leaves
+  break it: the schemas of `centinela_agents/agents/analista.py` and `centinela_agents/agents/estratega.py` ask the model for each figure's
+  `value` and `queryId` and for each action's `impact`, and no tool call backs them.
 - **An agent is given only the tools its section of "What a leaf may use" names.** No model is
   given an action tool: the leaf `ejecutar` calls it in code. *No gate holds this.*
 - **One cause, one alert**, ranked by pesos at risk. *`uv run pytest` holds the merge.*

@@ -4,7 +4,8 @@ The decision tree is every route an alert can take, written as data: atomic rule
 one entry of a registry, whose leaves are the decisions of an agent. This page decides how a node,
 a leaf and an end are written, what the validator refuses, and where each kind of change lands.
 What runs: the base below is parsed, validated, walked in `detectar` and compiled to the LangGraph
-graph, and `uv run pytest` holds all four. What is decided, not built: a client's own version of
+graph, and `uv run pytest` holds all four. The leaves the compiled graph calls are the model
+functions `centinela_agents/orchestrator.py:CentinelaOrchestrator` hands it. What is decided, not built: a client's own version of
 the tree, its growth by self-expansion, and the caps on that growth; each section that states one
 opens with the marker. How the compiled graph runs an alert is [`../AGENTS.md`](../AGENTS.md).
 
@@ -44,8 +45,8 @@ does not measure, such as a price in force, comes from a `v_*` view.
 | Stage | Who decides | Consults the kernel for |
 |---|---|---|
 | `detectar` | `Vigía`, in code | the KPI a threshold compares: `centinela_agents/walk.py:detect(ctx, day)` |
-| `explicar` | `Analista` | testing each hypothesis, with base, approved and descriptive KPIs. *Decided, not built*, and the skill names no kernel tool |
-| `proponer` | `Estratega` | the figures an impact is computed from, through `calcular_impacto`. *Decided, not built* |
+| `explicar` | `Analista` | testing each hypothesis, with base, approved and descriptive KPIs. *Partly built*: a model leaf answers, and consults no KPI; the skill names no kernel tool |
+| `proponer` | `Estratega` | the figures an impact is computed from, through `calcular_impacto`. *Partly built*: a model leaf answers, and its model writes the impact without calling `calcular_impacto` |
 | `aprobar` | a person | nothing; the gate reads the recorded decision |
 | `ejecutar` | `Ejecutor` | that the KPI which justified the action still breaks its threshold, in code, at [`ejecutar.vigente`](#the-node-ejecutarvigente). `Ejecutor`'s model consults nothing |
 | `cerrar` | `apps/api` | nothing: it is the set of ends, which `apps/api` closes |
@@ -265,7 +266,8 @@ and its node in `centinela_agents/graph.py:BOUND_NODES`; the node is L1, so it i
 **An agent decision.** `centinela_agents/schema.py:AGENT_DECISIONS`; the outputs it clears in
 `centinela_agents/graph.py:LEAF_OUTPUTS`; the value it falls back to in
 `centinela_agents/graph.py:fallback(leaf, state, error, ctx)`; its leaf in `base.yaml`; the
-function the host hands `compile_tree` for it, and its stub in `tests/support.py:DEFAULT_LEAVES`,
+function the host hands `compile_tree` for it, in the `leaves` of
+`centinela_agents/orchestrator.py:CentinelaOrchestrator`, and its stub in `tests/support.py:DEFAULT_LEAVES`,
 because a leaf with no function is refused at compile; and its skill.
 
 **An action type.** The type in the `en` list of `ejecutar.automatizable`, an L1 node, so a pull
