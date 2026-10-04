@@ -1,5 +1,9 @@
+from collections.abc import Mapping
+
 from . import ciclo_vida
-from .modelos import Alert, Decision, DecisionApprove, DecisionEdit, LogEventType
+from .modelos import Alert, AutonomyLevel, Decision, DecisionApprove, DecisionEdit, LogEventType
+
+SOLO_INFORMA = "Este tipo de acción solo informa: no se aprueba desde Centinela"
 
 
 class ConflictoEstado(Exception):
@@ -10,7 +14,9 @@ class DecisionInvalida(Exception):
     pass
 
 
-def aplicar(alerta: Alert, decision: Decision) -> tuple[Alert, list[tuple[LogEventType, str]]]:
+def aplicar(
+    alerta: Alert, decision: Decision, autonomia: Mapping[str, AutonomyLevel]
+) -> tuple[Alert, list[tuple[LogEventType, str]]]:
     if alerta.status != "proposed":
         raise ConflictoEstado("Esta alerta ya no espera una decisión")
 
@@ -25,6 +31,8 @@ def aplicar(alerta: Alert, decision: Decision) -> tuple[Alert, list[tuple[LogEve
     accion = next((a for a in alerta.actions if a.id == decision.action_id), None)
     if accion is None:
         raise DecisionInvalida("La acción elegida no pertenece a esta alerta")
+    if autonomia.get(accion.type) == "inform":
+        raise DecisionInvalida(SOLO_INFORMA)
 
     acciones = list(alerta.actions)
     if isinstance(decision, DecisionEdit):

@@ -13,6 +13,7 @@ import psycopg
 import pytest
 import requests
 from fastapi.testclient import TestClient
+from psycopg.types.json import Jsonb
 
 from centinela_api import alertas as alertas_repo
 from centinela_api.db import conectar
@@ -250,3 +251,39 @@ def test_una_pregunta_sin_alerta_queda_en_la_bitacora_y_su_consulta_se_abre(monk
             conn.execute("DELETE FROM api.bitacora WHERE alerta_id IS NULL AND (detalle = %s OR detalle LIKE %s OR query_id = %s)", (marca, "fin.chat_respondida: CLI-001 tiene {0} de mora.", "q_prueba_chat"))
             conn.execute("DELETE FROM api.consultas WHERE query_id = %s", ("q_prueba_chat",))
             conn.commit()
+
+
+@pytest.fixture
+def configuracion_previa():
+    with conectar() as conn:
+        fila = conn.execute("SELECT cuerpo, guardado_por, actualizado_en FROM api.configuracion").fetchone()
+        ultima = conn.execute("SELECT coalesce(max(id), 0) FROM api.bitacora").fetchone()[0]
+    try:
+        yield
+    finally:
+        with conectar() as conn:
+            conn.execute("DELETE FROM api.bitacora WHERE id > %s AND tipo = 'configuracion'", (ultima,))
+            conn.execute("DELETE FROM api.configuracion")
+            if fila is not None:
+                conn.execute(
+                    "INSERT INTO api.configuracion (cuerpo, guardado_por, actualizado_en) VALUES (%s, %s, %s)",
+                    (Jsonb(fila[0]), Jsonb(fila[1]), fila[2]),
+                )
+
+
+def test_la_configuracion_guardada_se_lee_de_vuelta(configuracion_previa):
+    cliente = TestClient(app, headers=_cabeceras("analista@andina.test"))
+    ajustes = cliente.get("/configuracion").json()
+    margen = next(m for m in ajustes["metrics"] if m["metric"] == "margen_pct")
+    caida = next(u for u in margen["thresholds"] if u["key"] == "caida_pts")
+    caida["value"] = caida["value"] + 1
+    margen["watched"] = not margen["watched"]
+    ajustes["autonomy"]["task"] = "inform"
+
+    guardada = cliente.put("/configuracion", json=ajustes)
+    assert guardada.status_code == 200
+    assert cliente.get("/configuracion").json() == guardada.json() == ajustes
+
+    registro = cliente.get("/bitacora", params={"type": "configuracion"}).json()[0]
+    assert registro["actor"]["role"] == "analista"
+    assert "Umbral caida_pts de margen_pct" in registro["detail"]

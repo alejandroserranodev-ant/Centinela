@@ -81,7 +81,9 @@ the kit delivers the dataset free to use for the challenge.
   `{ por: <c>, valores: {...} }` for one that varies by a dimension. A node names the metric in its
   `umbral` and supplies the operator, so a condition of `umbral_alerta` with two parts is two
   nodes. Both forms say the same thing, because the kit's text stays as delivered and a tree needs
-  a value it can compare; a change to one is a change to both. *No gate holds this.*
+  a value it can compare; a change to one is a change to both. A number of `umbrales` is the
+  default the API's saved settings may replace for a day run
+  ([`../apps/api/AGENTS.md`](../apps/api/AGENTS.md#the-settings)). *No gate holds this.*
 - **The knowledge of every agent is `csv/` and `policies/`, and nothing else.** A new view reads
   only tables `sql/01_esquema.sql` creates and adds no table, column or row; no policy is added.
   What the data cannot answer is listed in

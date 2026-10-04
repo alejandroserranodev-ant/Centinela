@@ -1,40 +1,55 @@
-from centinela_agents.graph import manual_owners
-from centinela_agents.skills import skill
+import psycopg
 
-from . import auth
-from .modelos import Alert, Persona
+from . import configuracion
+from .modelos import Alert, Persona, Settings
 
-GERENCIA = "Gerencia"
-
-
-def responsable(metric: str) -> str | None:
-    return manual_owners(skill("estratega", "acciones")).get(metric)
+GERENCIA = configuracion.GERENCIA
 
 
-def area_que_decide(metric: str) -> str | None:
-    area = responsable(metric)
-    lideres = {p.area for p in auth.PERFILES.values() if p.rol == "lider_proceso" and p.area}
-    return area if area in lideres else None
+def _dueno(ajustes: Settings, metric: str) -> str | None:
+    return next((m.owner for m in ajustes.metrics if m.metric == metric), None)
 
 
-def puede_decidir(persona: Persona, alerta: Alert) -> bool:
+def _area(ajustes: Settings, metric: str) -> str | None:
+    area = _dueno(ajustes, metric)
+    return area if area in configuracion.areas() else None
+
+
+def _decide(persona: Persona, area: str | None) -> bool:
     if persona.role == "gerente":
         return True
-    area = area_que_decide(alerta.metric)
     return persona.role == "lider_proceso" and area is not None and persona.area == area
+
+
+def responsable(conn: psycopg.Connection, metric: str) -> str | None:
+    return _dueno(configuracion.leer(conn), metric)
+
+
+def area_que_decide(conn: psycopg.Connection, metric: str) -> str | None:
+    return _area(configuracion.leer(conn), metric)
+
+
+def puede_decidir(conn: psycopg.Connection, persona: Persona, alerta: Alert) -> bool:
+    return _decide(persona, area_que_decide(conn, alerta.metric))
 
 
 def puede_configurar(persona: Persona) -> bool:
     return persona.role in ("analista", "gerente")
 
 
-def negada(alerta: Alert) -> str:
-    area = area_que_decide(alerta.metric)
+def negada(conn: psycopg.Connection, alerta: Alert) -> str:
+    area = area_que_decide(conn, alerta.metric)
     return f"Esta alerta la decide {area}" if area else "Esta alerta la decide la gerencia"
 
 
-def vista(persona: Persona, alerta: Alert) -> Alert:
-    return alerta.model_copy(update={
-        "decided_by": area_que_decide(alerta.metric) or GERENCIA,
-        "can_decide": puede_decidir(persona, alerta),
-    })
+def _vista(persona: Persona, alerta: Alert, area: str | None) -> Alert:
+    return alerta.model_copy(update={"decided_by": area or GERENCIA, "can_decide": _decide(persona, area)})
+
+
+def vistas(conn: psycopg.Connection, persona: Persona, alertas: list[Alert]) -> list[Alert]:
+    ajustes = configuracion.leer(conn)
+    return [_vista(persona, alerta, _area(ajustes, alerta.metric)) for alerta in alertas]
+
+
+def vista(conn: psycopg.Connection, persona: Persona, alerta: Alert) -> Alert:
+    return vistas(conn, persona, [alerta])[0]

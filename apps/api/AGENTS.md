@@ -13,16 +13,17 @@ implement.
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas`, `api.configuracion` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
 | `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
-| `src/centinela_api/permisos.py` | who owns a metric, who may decide an alert and who may configure, and `vista(persona, alerta)`, the alert as the person signed in reads it |
+| `src/centinela_api/permisos.py` | who owns a metric, who may decide an alert and who may configure, and `vista(conn, persona, alerta)`, the alert as the person signed in reads it |
+| `src/centinela_api/configuracion.py` | the settings: their seed, how a stored row merges with it, the checks of a save, and what the day run reads from them |
 | `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
 | `src/centinela_api/modelos.py` | the Pydantic models, the HTTP contract's source; their conventions are [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md) |
 | `src/centinela_api/contrato.py` | `esquema()`, the OpenAPI document plus the payloads of the event streams, and `exportar(destino)`, which `python -m centinela_api.contrato` runs to write `../web/src/api/openapi.json` |
 | `src/centinela_api/ciclo_vida.py` | the lifecycle's transitions and the Spanish names it accepts at the edge |
-| `src/centinela_api/decisiones.py` | `aplicar(alerta, decision)`, the pure check of a person's decision |
+| `src/centinela_api/decisiones.py` | `aplicar(alerta, decision, autonomia)`, the pure check of a person's decision |
 | `src/centinela_api/alertas.py` | reads and upserts `api.alertas` |
 | `src/centinela_api/bitacora.py` | appends to and lists `api.bitacora` |
 | `src/centinela_api/consultas.py` | records and reads `api.consultas`, the kernel call behind each `queryId` an agent cited |
@@ -30,8 +31,8 @@ implement.
 | `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
-| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py` and `tests/test_permisos.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `configuracion`, `interno` |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py`, `tests/test_permisos.py` and `tests/test_configuracion.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -81,6 +82,8 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
 | GET | `/consultas/{queryId}` | the kernel call behind a figure, as `Query` | 404 for an unknown query | `getQuery` |
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
+| GET | `/configuracion` | the `Settings`: watched metrics, their thresholds and owners, autonomy per action type | | `getSettings` |
+| PUT | `/configuracion` | saves the `Settings` whole and returns them as stored | 403 unless analista or gerente; 422 for a failed check | `saveSettings` |
 
 **`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, quien, conn)`
 reads the simulated day and the anchored alert, logs the question under the person signed in, and
@@ -102,14 +105,12 @@ lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `P
 transition (409). The agents run in this process, so they cost a second write path to keep
 consistent with the first, paid when they are wired or removed.
 
-> **Decided, not built.** These rows; each path is chosen with the code, in Spanish like the
+> **Decided, not built.** This row; its path is chosen with the code, in Spanish like the
 > brief's.
 
 | Method | Path | Serves | Refuses | Web function |
 |---|---|---|---|---|
 | GET | undecided | the inbox totals | | `getInboxSummary` |
-| GET | undecided | the watched KPIs, thresholds, owners and autonomy per action type | | `getSettings` |
-| undecided | undecided | saves the settings whole | 422 when any action type's autonomy is `execute` | `saveSettings` |
 
 **The KPI catalogue's endpoints**, which list the base and approved KPIs and let the administrator
 decide a proposed KPI or retire one, are decided by the pending work on a new KPI's lifecycle, and
@@ -132,7 +133,7 @@ become rows here when it is planned.
 **`src/centinela_api/agentes.py` builds the orchestrator once, lazily**, in
 `get_orchestrator()`: `CentinelaOrchestrator` from `packages/agents`, with the provider of
 `get_provider()` and `get_reasoning_provider()`, the tree `packages/agents/arbol/base.yaml`, the
-thresholds of `data/metricas.yaml`, the kernel `get_kernel()` connects through
+thresholds of `data/metricas.yaml`, which the saved settings replace, the kernel `get_kernel()` connects through
 `packages/agents/centinela_agents/catalog.py:connect_kernel(env)`, a `ToolRegistry` of the four action stubs and an
 `InMemorySaver`. The routers call
 `start`, `resume` and `ask` through `asyncio.to_thread`, because the graph runs synchronously and the
@@ -143,8 +144,8 @@ transport and its secret, and is the answer to whether the agents run here or as
   only in this process: after a restart its decision is recorded but the resume finds no state, a
   `result` row of `ejecutor` records that the approved action did not run, and the alert stays
   `approved`.
-- **A day raises the alerts `src/centinela_api/agentes.py:prioritized(detections, known)` keeps**:
-  the detections of `API_METRICS` whose alert does not exist, the most `pesos_en_riesgo` first, at
+- **A day raises the alerts `src/centinela_api/agentes.py:prioritized(detections, known, watched)` keeps**:
+  the detections of the watched metrics of `API_METRICS` whose alert does not exist, the most `pesos_en_riesgo` first, at
   most `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. An alert's id is
   `src/centinela_api/agentes.py:alert_id_of(detection)`, a hash of metric and entity, so one alert
   per metric and entity holds by the primary key. Why the cap and the order is
@@ -156,6 +157,31 @@ transport and its secret, and is the answer to whether the agents run here or as
   row, because nothing in the tree defines it.
 - **Only the metrics `API_METRICS` names become alerts**, because the `Alert` model's `Metric`
   accepts no other.
+
+## The settings
+
+**The settings live in the single row of `api.configuracion`**, which
+`src/centinela_api/configuracion.py:leer(conn)` merges with
+`src/centinela_api/configuracion.py:semilla()` and never writes. The seed is the metrics of
+`API_METRICS` in `data/metricas.yaml`, all watched, each threshold of its `umbrales`, the owner
+"The owner of a manual review" in `packages/agents/skills/estratega/acciones.md` names, and
+`propose` for every action type. `owners` are the areas of the `lider_proceso` profiles, so an
+owner none of them leads, such as `vendedor_id`, seeds as none and leaves the metric to the
+`gerente`. A metric the row lacks reads its seed, a stored threshold whose key left the file is
+dropped, and only a threshold that is one number is editable; the others always read the file.
+
+**`src/centinela_api/configuracion.py:guardar(conn, nuevo, persona)` refuses with 422** an
+`execute` autonomy, a changed non-editable threshold, a negative or non-finite value, an owner
+outside `owners` and a list of metrics that differs, then writes the row and a `configuracion` row
+of the `bitácora` naming each change.
+
+**Settings take effect on the next day run and the next decision.** `avanzar` reads them once,
+drops the unwatched metrics and detects on `src/centinela_api/agentes.py:with_thresholds(ctx, thresholds)`.
+`avanzar` and the decision route hand the same thresholds to
+`packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.use_thresholds(thresholds)`
+before `start` or `resume`, so the re-check before `Ejecutor` reads them too. The orchestrator is
+never rebuilt, because its `InMemorySaver` holds the paused alerts. An owner decides as described
+under decisions and roles, and an action type at `inform` cannot be approved.
 
 ## The clock
 
@@ -251,18 +277,20 @@ expires, and nothing throttles `/auth/login`. Full enterprise authentication, re
 is out of scope ([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md)).
 
 **Who decides is checked before the decision.**
-`src/centinela_api/permisos.py:puede_decidir(persona, alerta)` lets the `gerente` decide every
+`src/centinela_api/permisos.py:puede_decidir(conn, persona, alerta)` lets the `gerente` decide every
 alert, and a `lider_proceso` the alerts whose metric its `area` owns, as
-`src/centinela_api/permisos.py:area_que_decide(metric)` reads the owner from "The owner of a manual
-review" in `packages/agents/skills/estratega/acciones.md`. An owner no `lider_proceso` profile
-holds, such as `vendedor_id`, leaves the alert to the `gerente`, because no one else could act on
-it. Anyone else gets 403 "Esta alerta la decide" and the area, or "la gerencia": the request is
-valid, the person may not make it. `src/centinela_api/permisos.py:vista(persona, alerta)` adds
+`src/centinela_api/permisos.py:area_que_decide(conn, metric)` reads the owner from the settings. A
+metric with no owner, or one no `lider_proceso` profile holds, leaves the alert to the `gerente`,
+because no one else could act on it. Anyone else gets 403 "Esta alerta la decide" and the area, or "la gerencia": the request is
+valid, the person may not make it. `src/centinela_api/permisos.py:vista(conn, persona, alerta)` adds
 `decidedBy`, the area or `Gerencia`, and the person's `canDecide` to every alert returned, so the
 screen decides no permission; `src/centinela_api/alertas.py:guardar(conn, alerta)` strips both,
-because they belong to the request. Then `src/centinela_api/decisiones.py:aplicar(alerta, decision)`
+because they belong to the request. Then `src/centinela_api/decisiones.py:aplicar(alerta, decision, autonomia)`
 requires the alert in `proposed` (409), a rejection to carry a reason (422), and an approval or an
-edit to name one of the alert's actions (422). The decision and its `bitácora` row, whose actor is
+edit to name one of the alert's actions (422) whose type the settings do not set to `inform`
+(422 "Este tipo de acción solo informa"). "Ejecuta" is refused for every action type, with 422 on
+saving the settings, because the challenge keeps every action at `Propone`
+([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its responsible AI section). The decision and its `bitácora` row, whose actor is
 the person's name and role, commit in one transaction before the orchestrator resumes, so no action
 runs without a recorded decision; an approval or an edit then resumes into `Ejecutor`, and a
 rejection resumes to close the graph.
@@ -276,9 +304,6 @@ rejection resumes to close the graph.
   and a rejection says why, and both close the alert. The alert stays `propuesta` while
   `Estratega` proposes again, and the reason joins the rejection reasons `Estratega` reads. The
   `Decision` union has no such kind.
-- **"Ejecuta" is refused for every action type**, with 422 on saving the settings, because the
-  challenge keeps every action at `Propone` ([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md),
-  its responsible AI section).
 
 **Personal data reaches the models unmasked.** `src/centinela_api/masking.py:mask_dict_for_model(data)`
 replaces client and vendor ids and names with a hash-suffixed placeholder, the same for the same
@@ -314,6 +339,7 @@ time, and the alert it belongs to, which a chat question asked from no alert lea
 | `evidence`, from the chat | `/chat`, one row per query the chat ran and one per model step's cost |
 | `answer` | `/chat`, the end and the text of an answer, with its first figure's `queryId` |
 | `refusal` | `/chat`, a question the screen flagged, one outside the chat's use, or one asking to act |
+| `configuracion` | `PUT /configuracion`, the person who saved and each change, with no alert |
 
 On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
 and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL

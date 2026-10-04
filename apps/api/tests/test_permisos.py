@@ -1,12 +1,12 @@
 # Who decides an alert: the gerente any alert, a lider_proceso the alerts whose metric its area
-# owns in packages/agents/skills/estratega/acciones.md, and no one else; checked pure and through
-# POST /alertas/{id}/decision with a mocked connection.
+# owns in the stored settings, seeded from packages/agents/skills/estratega/acciones.md, and no one
+# else; checked pure and through POST /alertas/{id}/decision with a mocked connection.
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from centinela_api import db, permisos
+from centinela_api import configuracion, db, permisos
 from centinela_api.auth import persona_actual
 from centinela_api.main import app
 from centinela_api.modelos import Alert, CauseNoEvidence, Confidence, Figure, Persona, Sentence
@@ -17,6 +17,24 @@ CARTERA = Persona(email="cartera@andina.test", name="Lucía", role="lider_proces
 COMERCIAL = Persona(email="comercial@andina.test", name="Andrés", role="lider_proceso", area="Comercial")
 ANALISTA = Persona(email="analista@andina.test", name="Camila", role="analista")
 AUDITOR = Persona(email="auditoria@andina.test", name="Jorge", role="auditor")
+
+
+def sin_guardar() -> MagicMock:
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.return_value = None
+    return conn
+
+
+def guardada(**duenos: str | None) -> MagicMock:
+    cuerpo = configuracion.semilla().model_dump(mode="json", by_alias=True)
+    for metrica in cuerpo["metrics"]:
+        metrica["owner"] = duenos.get(metrica["metric"], metrica["owner"])
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.return_value = (cuerpo,)
+    return conn
+
+
+SEMILLA = sin_guardar()
 
 
 def alerta(metric: str) -> Alert:
@@ -34,27 +52,34 @@ def alerta(metric: str) -> Alert:
     )
 
 
-def test_el_responsable_sale_de_la_tabla_de_estratega():
-    assert permisos.responsable("saldo_vencido") == "Analista de cartera"
-    assert permisos.responsable("margen_pct") == "Comercial"
-    assert permisos.responsable("no_existe") is None
+def test_sin_configuracion_guardada_el_responsable_sale_de_la_tabla_de_estratega():
+    assert permisos.responsable(SEMILLA, "saldo_vencido") == "Analista de cartera"
+    assert permisos.responsable(SEMILLA, "margen_pct") == "Comercial"
+    assert permisos.responsable(SEMILLA, "no_existe") is None
+
+
+def test_el_responsable_guardado_decide():
+    conn = guardada(margen_pct="Analista de cartera")
+    assert permisos.responsable(conn, "margen_pct") == "Analista de cartera"
+    assert permisos.puede_decidir(conn, CARTERA, alerta("margen_pct"))
+    assert not permisos.puede_decidir(conn, COMERCIAL, alerta("margen_pct"))
 
 
 @pytest.mark.parametrize("metric", ["margen_pct", "saldo_vencido", "cobertura_dias", "descuento_en_exceso"])
 def test_la_gerente_decide_cualquier_alerta(metric):
-    assert permisos.puede_decidir(GERENTE, alerta(metric))
+    assert permisos.puede_decidir(SEMILLA, GERENTE, alerta(metric))
 
 
 def test_un_lider_decide_solo_las_alertas_de_su_area():
-    assert permisos.puede_decidir(CARTERA, alerta("saldo_vencido"))
-    assert permisos.puede_decidir(CARTERA, alerta("dias_pago_prom"))
-    assert not permisos.puede_decidir(CARTERA, alerta("margen_pct"))
-    assert permisos.puede_decidir(COMERCIAL, alerta("margen_pct"))
+    assert permisos.puede_decidir(SEMILLA, CARTERA, alerta("saldo_vencido"))
+    assert permisos.puede_decidir(SEMILLA, CARTERA, alerta("dias_pago_prom"))
+    assert not permisos.puede_decidir(SEMILLA, CARTERA, alerta("margen_pct"))
+    assert permisos.puede_decidir(SEMILLA, COMERCIAL, alerta("margen_pct"))
 
 
 @pytest.mark.parametrize("persona", [ANALISTA, AUDITOR])
 def test_analista_y_auditor_no_deciden(persona):
-    assert not permisos.puede_decidir(persona, alerta("saldo_vencido"))
+    assert not permisos.puede_decidir(SEMILLA, persona, alerta("saldo_vencido"))
 
 
 def test_configuran_la_analista_y_la_gerente():
@@ -63,9 +88,9 @@ def test_configuran_la_analista_y_la_gerente():
 
 
 def test_la_vista_dice_quien_decide_y_si_esta_persona_puede():
-    vista = permisos.vista(CARTERA, alerta("margen_pct"))
+    vista = permisos.vista(SEMILLA, CARTERA, alerta("margen_pct"))
     assert (vista.decided_by, vista.can_decide) == ("Comercial", False)
-    assert permisos.vista(CARTERA, alerta("saldo_vencido")).can_decide
+    assert permisos.vista(SEMILLA, CARTERA, alerta("saldo_vencido")).can_decide
 
 
 @pytest.fixture
@@ -77,7 +102,7 @@ def decidir(monkeypatch):
     monkeypatch.setattr(alertas_router, "get_orchestrator", MagicMock)
 
     def conexion():
-        yield MagicMock()
+        yield sin_guardar()
 
     app.dependency_overrides[db.obtener_conexion] = conexion
 
@@ -109,15 +134,15 @@ def test_la_gerente_decide_y_la_respuesta_lo_dice(decidir):
 
 @pytest.mark.parametrize("metric", ["veces_intervalo_habitual", "descuento_en_exceso"])
 def test_un_dueno_que_ningun_lider_tiene_lo_decide_la_gerencia(metric):
-    assert permisos.responsable(metric) in ("vendedor_id", "Control Comercial")
-    vista = permisos.vista(COMERCIAL, alerta(metric))
+    assert permisos.responsable(SEMILLA, metric) is None
+    vista = permisos.vista(SEMILLA, COMERCIAL, alerta(metric))
     assert (vista.decided_by, vista.can_decide) == ("Gerencia", False)
-    assert permisos.negada(alerta(metric)) == "Esta alerta la decide la gerencia"
-    assert permisos.vista(GERENTE, alerta(metric)).can_decide
+    assert permisos.negada(SEMILLA, alerta(metric)) == "Esta alerta la decide la gerencia"
+    assert permisos.vista(SEMILLA, GERENTE, alerta(metric)).can_decide
 
 
-def test_una_metrica_sin_area_la_decide_la_gerencia(monkeypatch):
-    monkeypatch.setattr(permisos, "responsable", lambda metric: None)
-    assert permisos.negada(alerta("margen_pct")) == "Esta alerta la decide la gerencia"
-    assert permisos.vista(CARTERA, alerta("margen_pct")).decided_by == "Gerencia"
-    assert not permisos.puede_decidir(CARTERA, alerta("margen_pct"))
+def test_una_metrica_sin_area_la_decide_la_gerencia():
+    conn = guardada(margen_pct=None)
+    assert permisos.negada(conn, alerta("margen_pct")) == "Esta alerta la decide la gerencia"
+    assert permisos.vista(conn, COMERCIAL, alerta("margen_pct")).decided_by == "Gerencia"
+    assert not permisos.puede_decidir(conn, COMERCIAL, alerta("margen_pct"))

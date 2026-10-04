@@ -7,8 +7,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, consultas, simulacion
-from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path
+from .. import bitacora, ciclo_vida, configuracion, consultas, simulacion
+from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path, with_thresholds
 from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import ActorAgent, AdvanceEnd, AgentStep, SimulatedDay
@@ -62,11 +62,14 @@ async def avanzar(
         new_alert_ids: list[str] = []
 
         try:
-            ctx = get_context()
             with conn.transaction():
+                ajustes = configuracion.leer(conn)
                 known = alertas_repo.ids(conn)
-            detections = prioritized(detect(ctx, day_str), known)
+            umbrales = configuracion.umbrales(ajustes)
+            ctx = with_thresholds(get_context(), umbrales)
+            detections = prioritized(detect(ctx, day_str), known, configuracion.vigiladas(ajustes))
             orq = get_orchestrator()
+            orq.use_thresholds(umbrales)
 
             for detection in detections:
                 alert_id = alert_id_of(detection)

@@ -41,7 +41,7 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/schema.py` | also the output models of the leaves: `Cause`, `Action`, `ExecutedAction`, `Decision` ([`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md)) |
 | `centinela_agents/tools.py`, `centinela_agents/sql_vistas.py`, `centinela_agents/buscar_politica.py`, `centinela_agents/calcular_impacto.py`, `centinela_agents/action_tools.py` | the tool interfaces, their registry, the action stubs `Ejecutor` drafts with, and stubs of three tools no leaf calls ([`PHASE_3_SETUP.md`](./PHASE_3_SETUP.md)) |
 | `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, `centinela_agents/agents/chat.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
-| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `resume` and `ask` ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
+| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `resume`, `ask` and `use_thresholds`, which swaps the thresholds the compiled graph reads and keeps the paused alerts ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
 | `centinela_agents/security.py` | masking, secret detection, the screen of a prompt injection and a prompt builder by trust level; `Ejecutor` masks an email's prompt with it, and `Chat` screens and wraps a question with it ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
 | `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
 | `centinela_agents/output_validator.py` | checks of a leaf's output that only the tests run ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
@@ -67,7 +67,7 @@ development machine has no `ensurepip` and uv builds the environment without it:
   person. The pause is the interrupt at the gate `aprobar.decision`, which every path to `Ejecutor`
   passes.
 - **`Vigía` detects with rules, not with a model.** Its triggers are the thresholds of
-  `data/metricas.yaml`, applied by the nodes of `detectar`. z-score and trend are descriptive
+  `data/metricas.yaml`, or the numbers its caller swaps in, applied by the nodes of `detectar`. z-score and trend are descriptive
   evidence and never trigger, because no document states a threshold for them.
 - **The kernel reaches the tree through three inputs**: the catalogue of KPI columns the validator
   checks each `lee` against, `centinela_agents/catalog.py:catalog_from_kernel(answer)` over the

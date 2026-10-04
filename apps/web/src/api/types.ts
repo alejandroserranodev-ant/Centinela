@@ -30,6 +30,10 @@ export type ChatQuestion = Schemas['ChatQuestion'];
 export type Query = Schemas['Query'];
 export type Persona = Schemas['Persona'];
 export type Session = Schemas['Sesion'];
+export type Settings = Schemas['Settings'];
+export type WatchedMetric = Schemas['WatchedMetric'];
+export type Threshold = Schemas['Threshold'];
+export type AutonomyLevel = Settings['autonomy'][string];
 
 export type QuerySource = SemanticView | Query['source'];
 export type AdvanceEnd = Schemas['AdvanceEnd'];
@@ -73,28 +77,4 @@ export interface InboxSummary {
   moneyAtRisk: Figure;
   pendingDecisions: Figure;
   recoverablePerMonth: Figure;
-}
-
-export type AutonomyLevel = 'inform' | 'propose' | 'execute';
-
-export interface Threshold {
-  value: number;
-  label: string;
-}
-
-export interface WatchedMetric {
-  metric: Metric;
-  name: string;
-  description: string;
-  view: SemanticView;
-  rule: string;
-  threshold: Threshold;
-  watched: boolean;
-  owner: string;
-}
-
-export interface Settings {
-  metrics: WatchedMetric[];
-  owners: string[];
-  autonomy: Record<ActionType, AutonomyLevel>;
 }

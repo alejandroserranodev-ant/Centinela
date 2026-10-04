@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArenaButton, ArenaCard, ArenaKeyValue, ArenaRadio, ArenaRadioGroup } from '@dravensoft/arena-react';
-import { ApiError, decide } from '../api/client';
-import type { Action, ActionType, Alert, Decision } from '../api/types';
+import { ApiError, decide, getSettings } from '../api/client';
+import type { Action, ActionType, Alert, AutonomyLevel, Decision } from '../api/types';
 import { Confidence } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { useSimulation } from '../state/Simulation';
@@ -33,7 +33,16 @@ export function ProposedActions({ alert }: { alert: Alert }) {
   const [editing, setEditing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [autonomy, setAutonomy] = useState<Partial<Record<ActionType, AutonomyLevel>>>({});
   const chosen = alert.actions.find((a) => a.id === chosenId) ?? alert.actions[0];
+  const informOnly = autonomy[chosen.type] === 'inform';
+
+  useEffect(() => {
+    getSettings().then(
+      (settings) => setAutonomy(settings.autonomy),
+      () => setAutonomy({}),
+    );
+  }, []);
 
   const send = async (decision: Decision) => {
     try {
@@ -74,7 +83,7 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       notify({
         tone: 'danger',
         title: 'No se pudo aprobar',
-        message: e instanceof ApiError && e.status === 403 ? e.message : 'Inténtalo de nuevo en unos segundos.',
+        message: e instanceof ApiError && (e.status === 403 || e.status === 422) ? e.message : 'Inténtalo de nuevo en unos segundos.',
       });
     } finally {
       setApproving(false);
@@ -127,12 +136,16 @@ export function ProposedActions({ alert }: { alert: Alert }) {
       {alert.canDecide ? (
         <>
           <div className="arena-row arena-row--component decision">
-            <ArenaButton variant="primary" icon="ph-bold ph-check" loading={approving} onClick={approve}>
-              Aprobar
-            </ArenaButton>
-            <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
-              Editar
-            </ArenaButton>
+            {informOnly ? null : (
+              <>
+                <ArenaButton variant="primary" icon="ph-bold ph-check" loading={approving} onClick={approve}>
+                  Aprobar
+                </ArenaButton>
+                <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
+                  Editar
+                </ArenaButton>
+              </>
+            )}
             {alert.changesRequested ? null : (
               <ArenaButton variant="secondary" icon="ph-bold ph-arrow-counter-clockwise" onClick={() => setRequesting(true)}>
                 Solicitar cambios
@@ -142,6 +155,7 @@ export function ProposedActions({ alert }: { alert: Alert }) {
               Rechazar
             </ArenaButton>
           </div>
+          {informOnly ? <p className="text-muted">Este tipo de acción solo informa: no se aprueba desde Centinela.</p> : null}
           <p className="text-muted">
             Aprobar deja un borrador o una tarea: nada se envía ni se publica hasta que una persona lo haga.
           </p>

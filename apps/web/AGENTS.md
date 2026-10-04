@@ -72,10 +72,9 @@ and what each shows is
   `detail` as it comes, the first `msg` of a validation list, otherwise the body or the status
   text. The SSE calls throw the same error before their stream starts, so a screen shows the API's
   own Spanish, such as the 409 of a second day run.
-- **Some functions answer inside the client**, because the API serves no endpoint for them:
-  `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
-  `saveSettings` refuses `execute` with 422 and stores nothing. `getQuery` gets 404 for a total's
-  id, so the query dialog of a total shows its error state.
+- **`getInboxSummary` answers inside the client**, because the API serves no endpoint for it: it
+  sums the alerts in `proposed`. `getQuery` gets 404 for a total's id, so the query dialog of a
+  total shows its error state.
 - **A person signs in before any screen.** `/ingresar` is the one route outside the shell; every
   other route sits behind `src/state/Session.tsx:RequireSession()`, which sends a visitor with no
   session there and back to the requested path after it. The token lives in `sessionStorage`, so
@@ -104,7 +103,7 @@ and what each shows is
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
   including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
-  fixtures and of the settings the client returns. The words the data names keep their Spanish in code too: the agents (`vigia`,
+  fixtures. The words the data names keep their Spanish in code too: the agents (`vigia`,
   `analista`, `estratega`, `ejecutor`, `chat`), the metrics (`margen_pct`…), the `v_*` views and the
   `alertas` table, because a translation would make a second name for one thing.
 - **The contract is English except its routes.** Field names and values in
@@ -165,8 +164,12 @@ and what each shows is
   in the list, its alert cell an unlinked "Chat, sin alerta", because a question is a step of the
   log as much as a decision is.
 - **The settings screen has one save action for all its tabs.** A change in any tab is a draft
-  until "Guardar cambios", so no tab saves half a configuration. "Ejecuta" is disabled in every
-  autonomy group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md)).
+  until "Guardar cambios", so no tab saves half a configuration. Only a threshold that is one
+  number is an input; the others read as their rule. "Ejecuta" is disabled in every autonomy
+  group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md#the-settings)). A
+  person `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
+- **An action type at `inform` shows no Aprobar or Editar**: `src/screens/ProposedActions.tsx:ProposedActions({ alert })`
+  reads the settings' autonomy and says the type only informs, because the API refuses its approval.
 
 ## Commands
 

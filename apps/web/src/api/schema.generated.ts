@@ -131,6 +131,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Leer */
+        get: operations["leer_configuracion_get"];
+        /** Guardar */
+        put: operations["guardar_configuracion_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/consultas/{query_id}": {
         parameters: {
             query?: never;
@@ -1020,10 +1038,10 @@ export interface components {
             simulatedDay: string;
             /**
              * Type
-             * @description Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal
+             * @description Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion
              * @enum {string}
              */
-            type: "alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal";
+            type: "alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion";
         };
         /**
          * MergedAlert
@@ -1174,6 +1192,29 @@ export interface components {
             token: string;
         };
         /**
+         * Settings
+         * @description What Centinela watches, who decides each metric and how far each action type goes.
+         */
+        Settings: {
+            /**
+             * Autonomy
+             * @description Per action type: inform, propose, or execute, which the pilot refuses
+             */
+            autonomy: {
+                [key: string]: "inform" | "propose" | "execute";
+            };
+            /**
+             * Metrics
+             * @description The API's metrics, in the order of data/metricas.yaml
+             */
+            metrics: components["schemas"]["WatchedMetric"][];
+            /**
+             * Owners
+             * @description The areas that can own a metric: those a lider_proceso profile leads
+             */
+            owners: string[];
+        };
+        /**
          * SimulatedDay
          * @description Current simulated day in ISO 8601 format.
          */
@@ -1184,6 +1225,37 @@ export interface components {
              * @example 2026-10-03
              */
             dia: string;
+        };
+        /**
+         * Threshold
+         * @description One entry of a metric's umbrales in data/metricas.yaml.
+         */
+        Threshold: {
+            /**
+             * Editable
+             * @description Whether a person may change it: only a threshold that is one number
+             */
+            editable: boolean;
+            /**
+             * Key
+             * @description The threshold's key, the KPI column it compares, e.g. caida_pts
+             */
+            key: string;
+            /**
+             * Label
+             * @description What the threshold measures, as a person reads it
+             */
+            label: string;
+            /**
+             * Rule
+             * @description The threshold as data/metricas.yaml states it, in Spanish
+             */
+            rule: string;
+            /**
+             * Value
+             * @description The value in force when the threshold is one number; null when it is read from a column or by class
+             */
+            value: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1197,6 +1269,58 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WatchedMetric
+         * @description A metric of the API, whether Centinela watches it, its thresholds and who owns it.
+         */
+        WatchedMetric: {
+            /**
+             * Description
+             * @description What the metric measures, its descripcion
+             */
+            description: string;
+            /**
+             * Metric
+             * @description The metric
+             * @enum {string}
+             */
+            metric: "margen_pct" | "saldo_vencido" | "dias_pago_prom" | "cobertura_dias" | "descuento_en_exceso" | "veces_intervalo_habitual";
+            /**
+             * Name
+             * @description Short name, the etiqueta of data/metricas.yaml
+             */
+            name: string;
+            /**
+             * Owner
+             * @description The area whose process leader decides its alerts; null when only the gerente does
+             */
+            owner: string | null;
+            /**
+             * Rule
+             * @description When it alerts, its umbral_alerta
+             */
+            rule: string;
+            /**
+             * Source
+             * @description Where its thresholds come from, its fuente_umbral
+             */
+            source: string;
+            /**
+             * Thresholds
+             * @description Its thresholds, one per entry of its umbrales
+             */
+            thresholds: components["schemas"]["Threshold"][];
+            /**
+             * View
+             * @description The semantic view it is read from
+             */
+            view: string;
+            /**
+             * Watched
+             * @description Whether the day run raises alerts of this metric
+             */
+            watched: boolean;
         };
     };
     responses: never;
@@ -1381,7 +1505,7 @@ export interface operations {
                 /** @description Filter by alert ID (UUID-like identifier) */
                 alertId?: string | null;
                 /** @description Filter by event type */
-                type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal") | null;
+                type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion") | null;
             };
             header?: {
                 authorization?: string | null;
@@ -1433,6 +1557,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leer_configuracion_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guardar_configuracion_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Settings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
                 };
             };
             /** @description Validation Error */

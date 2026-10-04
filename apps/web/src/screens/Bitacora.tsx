@@ -28,6 +28,7 @@ const EVENT: Record<LogEventType, string> = {
   question: 'Pregunta',
   answer: 'Respuesta',
   refusal: 'Pregunta rechazada',
+  configuracion: 'Configuración',
 };
 
 const STAGE: Record<Agent, string> = {

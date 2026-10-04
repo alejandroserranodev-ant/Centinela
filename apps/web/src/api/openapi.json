@@ -1358,7 +1358,7 @@
             "type": "string"
           },
           "type": {
-            "description": "Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal",
+            "description": "Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion",
             "enum": [
               "alert",
               "evidence",
@@ -1368,7 +1368,8 @@
               "result",
               "question",
               "answer",
-              "refusal"
+              "refusal",
+              "configuracion"
             ],
             "title": "Type",
             "type": "string"
@@ -1632,6 +1633,56 @@
         "title": "Sesion",
         "type": "object"
       },
+      "Settings": {
+        "additionalProperties": false,
+        "description": "What Centinela watches, who decides each metric and how far each action type goes.",
+        "properties": {
+          "autonomy": {
+            "additionalProperties": {
+              "enum": [
+                "inform",
+                "propose",
+                "execute"
+              ],
+              "type": "string"
+            },
+            "description": "Per action type: inform, propose, or execute, which the pilot refuses",
+            "propertyNames": {
+              "enum": [
+                "email_draft",
+                "task",
+                "purchase_order_draft",
+                "price_change_draft"
+              ]
+            },
+            "title": "Autonomy",
+            "type": "object"
+          },
+          "metrics": {
+            "description": "The API's metrics, in the order of data/metricas.yaml",
+            "items": {
+              "$ref": "#/components/schemas/WatchedMetric"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "owners": {
+            "description": "The areas that can own a metric: those a lider_proceso profile leads",
+            "items": {
+              "type": "string"
+            },
+            "title": "Owners",
+            "type": "array"
+          }
+        },
+        "required": [
+          "metrics",
+          "owners",
+          "autonomy"
+        ],
+        "title": "Settings",
+        "type": "object"
+      },
       "SimulatedDay": {
         "additionalProperties": false,
         "description": "Current simulated day in ISO 8601 format.",
@@ -1647,6 +1698,53 @@
           "dia"
         ],
         "title": "SimulatedDay",
+        "type": "object"
+      },
+      "Threshold": {
+        "additionalProperties": false,
+        "description": "One entry of a metric's umbrales in data/metricas.yaml.",
+        "properties": {
+          "editable": {
+            "description": "Whether a person may change it: only a threshold that is one number",
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "The threshold's key, the KPI column it compares, e.g. caida_pts",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "description": "What the threshold measures, as a person reads it",
+            "title": "Label",
+            "type": "string"
+          },
+          "rule": {
+            "description": "The threshold as data/metricas.yaml states it, in Spanish",
+            "title": "Rule",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The value in force when the threshold is one number; null when it is read from a column or by class",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "label",
+          "editable",
+          "rule"
+        ],
+        "title": "Threshold",
         "type": "object"
       },
       "ValidationError": {
@@ -1687,6 +1785,88 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WatchedMetric": {
+        "additionalProperties": false,
+        "description": "A metric of the API, whether Centinela watches it, its thresholds and who owns it.",
+        "properties": {
+          "description": {
+            "description": "What the metric measures, its descripcion",
+            "title": "Description",
+            "type": "string"
+          },
+          "metric": {
+            "description": "The metric",
+            "enum": [
+              "margen_pct",
+              "saldo_vencido",
+              "dias_pago_prom",
+              "cobertura_dias",
+              "descuento_en_exceso",
+              "veces_intervalo_habitual"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "name": {
+            "description": "Short name, the etiqueta of data/metricas.yaml",
+            "title": "Name",
+            "type": "string"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The area whose process leader decides its alerts; null when only the gerente does",
+            "title": "Owner"
+          },
+          "rule": {
+            "description": "When it alerts, its umbral_alerta",
+            "title": "Rule",
+            "type": "string"
+          },
+          "source": {
+            "description": "Where its thresholds come from, its fuente_umbral",
+            "title": "Source",
+            "type": "string"
+          },
+          "thresholds": {
+            "description": "Its thresholds, one per entry of its umbrales",
+            "items": {
+              "$ref": "#/components/schemas/Threshold"
+            },
+            "title": "Thresholds",
+            "type": "array"
+          },
+          "view": {
+            "description": "The semantic view it is read from",
+            "title": "View",
+            "type": "string"
+          },
+          "watched": {
+            "description": "Whether the day run raises alerts of this metric",
+            "title": "Watched",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "metric",
+          "name",
+          "description",
+          "view",
+          "rule",
+          "source",
+          "thresholds",
+          "watched",
+          "owner"
+        ],
+        "title": "WatchedMetric",
         "type": "object"
       }
     }
@@ -2044,7 +2224,8 @@
                     "result",
                     "question",
                     "answer",
-                    "refusal"
+                    "refusal",
+                    "configuracion"
                   ],
                   "type": "string"
                 },
@@ -2154,6 +2335,112 @@
           }
         },
         "summary": "Chat"
+      }
+    },
+    "/configuracion": {
+      "get": {
+        "operationId": "leer_configuracion_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leer",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "guardar_configuracion_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guardar",
+        "tags": [
+          "settings"
+        ]
       }
     },
     "/consultas/{query_id}": {

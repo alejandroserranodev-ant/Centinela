@@ -10,6 +10,8 @@ import hashlib
 import logging
 import os
 import re
+from collections.abc import Collection, Mapping
+from dataclasses import replace
 from typing import Any
 
 from centinela_agents.action_tools import EmailDraftStub, PriceChangeDraftStub, PurchaseOrderDraftStub, TaskStub
@@ -41,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 _ROOT = config.RAIZ
 _ARBOL = _ROOT / "packages" / "agents" / "arbol" / "base.yaml"
-_METRICAS = _ROOT / "data" / "metricas.yaml"
+METRICAS = _ROOT / "data" / "metricas.yaml"
 
 API_METRICS = frozenset({
     "margen_pct", "saldo_vencido", "dias_pago_prom",
@@ -75,8 +77,13 @@ def get_context() -> Context:
     global _context
     if _context is None:
         kernel = get_kernel()
-        _context = Context.of(_load_tree(), load_metrics(_METRICAS), kernel.catalog, kernel.reader)
+        _context = Context.of(_load_tree(), load_metrics(METRICAS), kernel.catalog, kernel.reader)
     return _context
+
+
+def with_thresholds(ctx: Context, thresholds: Mapping[str, Mapping[str, Any]]) -> Context:
+    """The context with these metrics' thresholds in place of data/metricas.yaml's, the rest untouched."""
+    return replace(ctx, metrics=replace(ctx.metrics, thresholds={**ctx.metrics.thresholds, **thresholds}))
 
 
 def _load_tree() -> Tree:
@@ -95,7 +102,7 @@ def _build_orchestrator() -> CentinelaOrchestrator:
         provider=get_provider(),
         tools=tools,
         tree=_load_tree(),
-        metrics=load_metrics(_METRICAS),
+        metrics=load_metrics(METRICAS),
         catalog=kernel.catalog,
         reader=kernel.reader,
         checkpointer=InMemorySaver(),
@@ -115,9 +122,9 @@ def pesos_of(detection: Detection) -> float:
     return float(value) if isinstance(value, (int, float)) else 0.0
 
 
-def prioritized(detections: list[Detection], known: set[str]) -> list[Detection]:
-    """The day's new detections of the API's metrics, the most pesos at risk first, at most CENTINELA_ALERTAS_POR_DIA."""
-    fresh = [d for d in detections if d.metric in API_METRICS and alert_id_of(d) not in known]
+def prioritized(detections: list[Detection], known: set[str], watched: Collection[str]) -> list[Detection]:
+    """The day's new detections of the API's watched metrics, the most pesos at risk first, at most CENTINELA_ALERTAS_POR_DIA."""
+    fresh = [d for d in detections if d.metric in API_METRICS and d.metric in watched and alert_id_of(d) not in known]
     return sorted(fresh, key=pesos_of, reverse=True)[: int(os.environ.get(ALERTS_PER_DAY, "3"))]
 
 

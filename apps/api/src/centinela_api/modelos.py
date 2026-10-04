@@ -19,9 +19,10 @@ Metric = Literal[
 FigureUnit = Literal["COP", "points", "percent", "days", "units"]
 ActionType = Literal["email_draft", "task", "purchase_order_draft", "price_change_draft"]
 Agent = Literal["vigia", "analista", "estratega", "ejecutor", "chat"]
-LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result", "question", "answer", "refusal"]
+LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result", "question", "answer", "refusal", "configuracion"]
 ChatOutcome = Literal["answered", "no_evidence", "out_of_scope", "refused"]
 Role = Literal["gerente", "lider_proceso", "analista", "auditor"]
+AutonomyLevel = Literal["inform", "propose", "execute"]
 
 
 class AlertEstadoEnum(str, Enum):
@@ -175,7 +176,7 @@ class LogEvent(Esquema):
     date: str = Field(..., description="UTC timestamp of event (ISO 8601)")
     simulated_day: str = Field(..., description="Simulated date when event occurred")
     alert_id: str | None = Field(None, description="Alert ID, null for a chat question asked from no alert")
-    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal")
+    type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion")
     actor: Actor = Field(..., description="Who/what performed the action (agent or person)")
     detail: str = Field(..., description="Human-readable description or JSON cost data")
     query_id: str | None = Field(None, description="SQL query ID if relevant to this event")
@@ -301,3 +302,32 @@ class Sesion(Esquema):
     """A signed session token and the person it belongs to."""
     token: str = Field(..., description="Bearer token, valid for eight hours")
     persona: Persona = Field(..., description="The person signed in")
+
+
+class Threshold(Esquema):
+    """One entry of a metric's umbrales in data/metricas.yaml."""
+    key: str = Field(..., description="The threshold's key, the KPI column it compares, e.g. caida_pts")
+    value: float | None = Field(..., description="The value in force when the threshold is one number; null when it is read from a column or by class")
+    label: str = Field(..., description="What the threshold measures, as a person reads it")
+    editable: bool = Field(..., description="Whether a person may change it: only a threshold that is one number")
+    rule: str = Field(..., description="The threshold as data/metricas.yaml states it, in Spanish")
+
+
+class WatchedMetric(Esquema):
+    """A metric of the API, whether Centinela watches it, its thresholds and who owns it."""
+    metric: Metric = Field(..., description="The metric")
+    name: str = Field(..., description="Short name, the etiqueta of data/metricas.yaml")
+    description: str = Field(..., description="What the metric measures, its descripcion")
+    view: str = Field(..., description="The semantic view it is read from")
+    rule: str = Field(..., description="When it alerts, its umbral_alerta")
+    source: str = Field(..., description="Where its thresholds come from, its fuente_umbral")
+    thresholds: list[Threshold] = Field(..., description="Its thresholds, one per entry of its umbrales")
+    watched: bool = Field(..., description="Whether the day run raises alerts of this metric")
+    owner: str | None = Field(..., description="The area whose process leader decides its alerts; null when only the gerente does")
+
+
+class Settings(Esquema):
+    """What Centinela watches, who decides each metric and how far each action type goes."""
+    metrics: list[WatchedMetric] = Field(..., description="The API's metrics, in the order of data/metricas.yaml")
+    owners: list[str] = Field(..., description="The areas that can own a metric: those a lider_proceso profile leads")
+    autonomy: dict[ActionType, AutonomyLevel] = Field(..., description="Per action type: inform, propose, or execute, which the pilot refuses")

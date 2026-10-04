@@ -7,7 +7,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, decisiones, permisos, simulacion
+from .. import bitacora, ciclo_vida, configuracion, decisiones, permisos, simulacion
 from ..agentes import get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..auth import persona_actual
@@ -45,7 +45,7 @@ async def listar(
         status = ESTADO_A_STATUS.get(estado)
         if status is None:
             raise HTTPException(422, f"estado desconocido: {estado}")
-    return [permisos.vista(persona, a) for a in alertas_repo.listar(conn, status)]
+    return permisos.vistas(conn, persona, alertas_repo.listar(conn, status))
 
 
 @router.get("/alertas/{id}", response_model=Alert)
@@ -57,7 +57,7 @@ async def obtener(
     alerta = alertas_repo.obtener(conn, id)
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
-    return permisos.vista(persona, alerta)
+    return permisos.vista(conn, persona, alerta)
 
 
 @router.post("/alertas/{id}/decision", response_model=Alert)
@@ -70,11 +70,12 @@ async def decidir(
     alerta = alertas_repo.obtener(conn, id)
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
-    if not permisos.puede_decidir(persona, alerta):
-        raise HTTPException(403, permisos.negada(alerta))
+    if not permisos.puede_decidir(conn, persona, alerta):
+        raise HTTPException(403, permisos.negada(conn, alerta))
 
+    ajustes = configuracion.leer(conn)
     try:
-        nueva, eventos = decisiones.aplicar(alerta, decision)
+        nueva, eventos = decisiones.aplicar(alerta, decision, ajustes.autonomy)
     except decisiones.ConflictoEstado as e:
         raise HTTPException(409, str(e)) from e
     except decisiones.DecisionInvalida as e:
@@ -91,6 +92,7 @@ async def decidir(
     if isinstance(decision, (DecisionApprove, DecisionEdit)):
         try:
             orq = get_orchestrator()
+            orq.use_thresholds(configuracion.umbrales(ajustes))
             orch_decision: dict = {
                 "id": f"dec_{uuid.uuid4().hex[:8]}",
                 "kind": decision.kind,
@@ -134,6 +136,7 @@ async def decidir(
     elif isinstance(decision, DecisionReject):
         try:
             orq = get_orchestrator()
+            orq.use_thresholds(configuracion.umbrales(ajustes))
             await asyncio.to_thread(orq.resume, id, {
                 "id": f"dec_{uuid.uuid4().hex[:8]}",
                 "kind": "reject",
@@ -143,4 +146,4 @@ async def decidir(
         except Exception as e:
             logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
-    return permisos.vista(persona, nueva)
+    return permisos.vista(conn, persona, nueva)

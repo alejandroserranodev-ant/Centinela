@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS api.bitacora (
 ALTER TABLE api.bitacora ALTER COLUMN alerta_id DROP NOT NULL;
 ALTER TABLE api.bitacora DROP CONSTRAINT IF EXISTS bitacora_tipo_check;
 ALTER TABLE api.bitacora ADD CONSTRAINT bitacora_tipo_check
-  CHECK (tipo IN ('alert', 'evidence', 'proposal', 'decision', 'action', 'result', 'question', 'answer', 'refusal'));
+  CHECK (tipo IN ('alert', 'evidence', 'proposal', 'decision', 'action', 'result', 'question', 'answer', 'refusal', 'configuracion'));
 
 CREATE INDEX IF NOT EXISTS idx_bitacora_alerta ON api.bitacora (alerta_id);
 
@@ -40,4 +40,11 @@ CREATE TABLE IF NOT EXISTS api.consultas (
   dia date NOT NULL,
   consulta text NOT NULL,
   creado_en timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS api.configuracion (
+  id boolean PRIMARY KEY DEFAULT true CHECK (id),
+  cuerpo jsonb NOT NULL,
+  guardado_por jsonb,
+  actualizado_en timestamptz
 );

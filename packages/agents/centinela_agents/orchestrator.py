@@ -29,6 +29,7 @@ Usage:
 """
 
 import logging
+from dataclasses import replace
 from typing import Any, Mapping
 
 from langgraph.types import Command
@@ -99,13 +100,14 @@ class CentinelaOrchestrator:
         self.provider = provider
         self.tools = tools
         self.tree = tree
-        self.metrics = metrics
+        self._thresholds = {name: dict(values) for name, values in metrics.thresholds.items()}
+        self.metrics = replace(metrics, thresholds=self._thresholds)
         self.catalog = catalog
         self.reader = reader
         self._chat_graph = None
 
         owners = dict(owners) if owners is not None else manual_owners(skill("estratega", "acciones"))
-        sources = Sources(kernel or call_from_reader(reader), catalog, metrics, index(tree))
+        sources = Sources(kernel or call_from_reader(reader), catalog, self.metrics, index(tree))
         reasoning = reasoning_provider or provider
 
         self.leaves = {
@@ -128,7 +130,7 @@ class CentinelaOrchestrator:
 
         self.compiler = Compiler(
             leaves=self.leaves,
-            metrics=metrics,
+            metrics=self.metrics,
             catalog=catalog,
             reader=reader,
             classify=lambda state: rejection_target(provider, state),
@@ -138,6 +140,9 @@ class CentinelaOrchestrator:
 
         self.graph = self.compiler.graph(tree)
         logger.info(f"Orchestrator initialized with tree v{tree.version}")
+
+    def use_thresholds(self, thresholds: Mapping[str, Mapping[str, Any]]) -> None:
+        self._thresholds.update({name: dict(values) for name, values in thresholds.items()})
 
     def start(
         self,
