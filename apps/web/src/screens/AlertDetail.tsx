@@ -16,7 +16,7 @@ import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
-import { fillSentence, formatDate } from '../format';
+import { fillSentence, formatAlertTime, formatDate } from '../format';
 import { HowIGotHere } from './HowIGotHere';
 import { ProposedActions } from './ProposedActions';
 
@@ -188,13 +188,15 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
     <article className="arena-stack arena-stack--section detail" aria-labelledby="alert-title">
       {back}
       <header className="arena-stack arena-stack--group">
-        <div className="arena-row detail__badges">
-          <Severity level={alert.severity} />
-          <Labels labels={alert.labels} />
-          <Status status={alert.status} />
-          <Confidence level={alert.confidence.level} />
-          <time className="text-muted" dateTime={alert.simulatedDate}>
-            Detectada el {formatDate(alert.simulatedDate)}
+        <div className="detail__header-top">
+          <div className="arena-row detail__badges">
+            <Severity level={alert.severity} />
+            <Labels labels={alert.labels} />
+            <Status status={alert.status} />
+            <Confidence level={alert.confidence.level} />
+          </div>
+          <time className="text-muted detail__datetime" dateTime={alert.simulatedDate}>
+            {formatDate(alert.simulatedDate)} · {formatAlertTime(alert.simulatedDate)}
           </time>
         </div>
         <h2 id="alert-title" className="detail__title">

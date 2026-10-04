@@ -21,6 +21,12 @@ const monthAxisFormat = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZ
 const dayAxisFormat = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' });
 const isoDayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' });
 const timeFormat = new Intl.DateTimeFormat('es-CO', { timeStyle: 'short', timeZone: 'America/Bogota' });
+const alertTimeFormat = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+  timeZone: 'America/Bogota',
+});
 
 export function formatPesos(value: number): string {
   return pesosFormat.format(value);
@@ -76,6 +82,10 @@ export function formatDayAxis(day: string): string {
     .filter((part) => part.type !== 'literal')
     .map((part) => part.value.replace(/\.$/, ''))
     .join(' ');
+}
+
+export function formatAlertTime(day: string): string {
+  return alertTimeFormat.format(new Date(`${day}T08:00:00-05:00`));
 }
 
 export function formatShortDateTime(iso: string): string {
