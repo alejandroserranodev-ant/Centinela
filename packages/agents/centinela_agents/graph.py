@@ -45,6 +45,10 @@ class ResumeRefused(Exception):
     pass
 
 
+class StartRefused(Exception):
+    pass
+
+
 def merge(*updates: Mapping[str, Any]) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     for update in updates:
@@ -283,8 +287,18 @@ def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier
         "proposal_rejections": list(proposal_rejections),
         "merged_alerts": [],
     }
+    fresh(graph, alert_id)
     graph.invoke(initial, thread(alert_id))
     return graph.get_state(thread(alert_id)).values
+
+
+def fresh(graph, alert_id: str) -> None:
+    snapshot = graph.get_state(thread(alert_id))
+    if not snapshot.values:
+        return
+    if snapshot.next == (GATE,):
+        raise StartRefused(f"{alert_id} awaits a decision, and a start would discard it")
+    graph.checkpointer.delete_thread(alert_id)
 
 
 def awaiting_decision(graph, alert_id: str) -> bool:

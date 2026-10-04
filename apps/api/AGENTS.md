@@ -193,9 +193,9 @@ recorded, and one cause would raise two alerts.
 before it moves the clock and frees it when the stream ends, fails or the client leaves; the
 response's background task frees it for a stream that never starts.
 
-**`avanzar` hands each run the alerts its `Analista` may name as the same cause**: the Spanish state
-of every stored alert that is not final, by id, with its metric, its entity and its cause's
-sentence, `src/centinela_api/agentes.py:brief_of_alert(alerta)`, and each detection of the day not
+**`avanzar` hands each run the alerts its `Analista` may name as the same cause**: every stored
+alert in `proposed`, the one status whose graph waits for a person, by id, with its Spanish state,
+its metric, its entity and its cause's sentence, `src/centinela_api/agentes.py:brief_of_alert(alerta)`, and each detection of the day not
 yet run as `nueva`, `src/centinela_api/agentes.py:brief_of_detection(detection)`. Each alert the
 run records joins the list for the next.
 
@@ -242,18 +242,20 @@ door. How the orchestrator reaches each proposal is
   asks that one cause raise one alert and its lifecycle has no end for the second. `rechazada`
   would claim a decision no person made, so `unida` is final and never counts as decided.
 - **A merge keeps one alert in view and loses nothing.** An alert whose run ends at `fin.unida` is
-  stored `merged` with its `mergedInto` only while its target is `new`, `analyzing` or `proposed`,
-  read with a row lock in the transaction that records it, and the target's `mergedAlerts` gains
-  its summary, `src/centinela_api/agentes.py:merged_summary(alerta)`. So every alert of one cause
-  points to the one that remains and none points to a merged alert. A target already decided
-  refuses the merge: the alert is stored `analyzing`, the last status the record accepted, with its
-  cause and an `alert` row naming the refusal, because the graph has ended and the record wins
-  over the checkpoint.
+  stored `merged` with its `mergedInto` only while its target is still `proposed`, read with a row
+  lock in the transaction that records it, and the target's `mergedAlerts` gains its summary,
+  `src/centinela_api/agentes.py:merged_summary(alerta)`. So every alert of one cause points to the
+  one that remains and none points to a merged alert. A target decided during the run refuses the
+  merge, and the alert runs again on a fresh thread without that target among its candidates, so
+  it reaches its own proposal and a person can decide it; its `alert` row names the refusal.
+  `src/centinela_api/alertas.py:guardar(conn, alerta)` re-reads the row with a lock and keeps every
+  stored `mergedAlerts` entry the alert it writes lacks, so a decision written while a day run adds
+  a merged alert never drops it.
 - **A detection the remaining alert absorbs never runs.** When `explicar.destino_nuevo` names a
   detection of the same day, `src/centinela_api/agentes.py:absorbed_alert(alert_id, detection, into, day_str)`
   stores it `merged` with its detection's title and pesos at risk and the cause "Unida a la alerta
-  …: la misma causa", and the run skips it; a stored alert still `new` is moved to `merged` the same
-  way. `GET /alertas` lists the alert that remains, and its detail carries each merged one's
+  …: la misma causa", and the run skips it; a name that is no detection still to run is refused
+  and logged. `GET /alertas` lists the alert that remains, and its detail carries each merged one's
   detection and evidence. Its pesos at risk stay its own, because two detections of one cause
   would count the same pesos twice.
 

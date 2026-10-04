@@ -38,7 +38,7 @@ def _alerta() -> Alert:
 def guardadas(monkeypatch):
     guardadas: list[Alert] = []
     for modulo in (simulacion_router, alertas_router):
-        monkeypatch.setattr(modulo.alertas_repo, "guardar", lambda conn, alerta: guardadas.append(alerta))
+        monkeypatch.setattr(modulo.alertas_repo, "guardar", lambda conn, alerta: guardadas.append(alerta) or alerta)
         monkeypatch.setattr(modulo.bitacora, "registrar", MagicMock())
         monkeypatch.setattr(modulo.simulacion, "dia_actual", lambda conn: DIA)
     monkeypatch.setattr(simulacion_router.simulacion, "avanzar", lambda conn, dias: DIA)
@@ -228,14 +228,41 @@ def test_una_alerta_se_une_a_una_analizada_antes_que_sigue_abierta(monkeypatch, 
     assert registro.args[1] == unida.id and "Unida a la alerta alerta_1" in registro.args[4]
 
 
-def test_no_se_une_a_una_alerta_ya_decidida(monkeypatch, guardadas):
+def _propuesta(alerta):
+    return {"status": "propuesta", "transitions": [[alerta, "nueva"], [alerta, "en análisis"], [alerta, "propuesta"]], "actions": [_accion_nueva()]}
+
+
+def test_una_union_rechazada_corre_la_alerta_otra_vez_sin_ese_destino(monkeypatch, guardadas):
     rechazada = _alerta().model_copy(update={"status": "rejected"})
-    _dia_con(monkeypatch, [_deteccion("C1", 500)], destino=rechazada)
-    _con_estados(monkeypatch, _unida_a("alerta_1"))
-    TestClient(app).post("/simulacion/avanzar")
+    _dia_con(monkeypatch, [_deteccion("C1", 500)], abiertas=[_alerta()], destino=rechazada)
+    orquestador = _con_estados(monkeypatch, _unida_a("alerta_1"), _propuesta)
+    respuesta = TestClient(app).post("/simulacion/avanzar")
+    primera, segunda = [llamada.kwargs["earlier_alerts"] for llamada in orquestador.start.call_args_list]
+    assert primera == {"alerta_1": "propuesta"} and segunda == {}
     (propia,) = guardadas
-    assert propia.status == "analyzing" and propia.merged_into is None
-    assert "No se unió a la alerta alerta_1" in simulacion_router.bitacora.registrar.call_args_list[0].args[4]
+    assert propia.status == "proposed" and propia.merged_into is None and propia.actions
+    assert f'"newAlerts": ["{propia.id}"]' in _fin(respuesta)
+    assert "No se unió a la alerta alerta_1, que está rejected." in simulacion_router.bitacora.registrar.call_args_list[0].args[4]
+
+
+def test_una_alerta_sin_grafo_en_pausa_no_es_candidata(monkeypatch, guardadas):
+    huerfana = _alerta().model_copy(update={"id": "alerta_2", "status": "analyzing", "actions": []})
+    _dia_con(monkeypatch, [_deteccion("C1", 500)], abiertas=[huerfana, _alerta()])
+    orquestador = _con_estados(monkeypatch, _propuesta)
+    TestClient(app).post("/simulacion/avanzar")
+    assert orquestador.start.call_args.kwargs["earlier_alerts"] == {"alerta_1": "propuesta"}
+    assert set(orquestador.start.call_args.kwargs["alert_briefs"]) == {"alerta_1"}
+
+
+def test_guardar_conserva_las_alertas_unidas_que_otra_escritura_agrego():
+    unida = {"id": "alerta_9", "metric": "saldo_vencido", "simulatedDate": "2026-01-15", "title": {"text": "Otra", "figures": []}, "pesosAtRisk": {"value": 10, "unit": "COP", "queryId": "q9"}, "cause": {"kind": "no_evidence", "reason": "Unida", "queriesReviewed": []}}
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.return_value = ([unida],)
+    guardada = alertas_repo_modulo.guardar(conn, _alerta())
+    assert [m.id for m in guardada.merged_alerts] == ["alerta_9"]
+    lectura, escritura = [llamada.args for llamada in conn.execute.call_args_list]
+    assert "FOR UPDATE" in lectura[0]
+    assert escritura[1][2].obj["mergedAlerts"][0]["id"] == "alerta_9"
 
 
 def test_listar_sin_estado_excluye_las_unidas_y_unida_las_lista(monkeypatch, guardadas):

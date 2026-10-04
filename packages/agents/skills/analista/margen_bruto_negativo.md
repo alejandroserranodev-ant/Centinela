@@ -17,5 +17,5 @@ The entity is one order line: a `pedido_id` and its `linea_n`. The symptom is th
 4. Name in the evidence the line's `sku`, `vendedor_id` and `cliente_id`.
 5. Add to `assumptions`: "No consta aprobación de Gerencia General en los datos." Never say the
    policy was breached.
-6. If the input lists an open `margen_bruto_negativo` alert of another line with the same `sku` and
-   the same `vendedor_id`, and H3 holds, set `same_cause_as` to its `id`. Otherwise, set none.
+6. Set no `same_cause_as`: the only open alerts this metric shares a cause with are of
+   `margen_bruto_negativo` itself, which the contract refuses.

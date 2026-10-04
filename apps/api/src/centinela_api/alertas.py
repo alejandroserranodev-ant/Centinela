@@ -2,7 +2,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from .ciclo_vida import FINALES
-from .modelos import Alert, AlertStatus
+from .modelos import Alert, AlertStatus, MergedAlert
 
 
 def listar(conn: psycopg.Connection, status: AlertStatus | None) -> list[Alert]:
@@ -40,7 +40,20 @@ def obtener(conn: psycopg.Connection, id: str, *, bloquear: bool = False) -> Ale
     return _a_alerta(fila) if fila else None
 
 
-def guardar(conn: psycopg.Connection, alerta: Alert) -> None:
+def guardar(conn: psycopg.Connection, alerta: Alert) -> Alert:
+    with conn.transaction():
+        fila = conn.execute(
+            "SELECT cuerpo->'mergedAlerts' FROM api.alertas WHERE id = %s FOR UPDATE", (alerta.id,)
+        ).fetchone()
+        propias = {unida.id for unida in alerta.merged_alerts}
+        guardadas = [MergedAlert.model_validate(m) for m in ((fila[0] if fila else None) or []) if m.get("id") not in propias]
+        if guardadas:
+            alerta = alerta.model_copy(update={"merged_alerts": [*guardadas, *alerta.merged_alerts]})
+        _escribir(conn, alerta)
+    return alerta
+
+
+def _escribir(conn: psycopg.Connection, alerta: Alert) -> None:
     cuerpo = alerta.model_dump(by_alias=True, exclude={"id", "status", "decided_by", "can_decide"})
     conn.execute(
         "INSERT INTO api.alertas (id, status, cuerpo) VALUES (%s, %s, %s) "

@@ -88,7 +88,7 @@ async def decidir(
     dia = simulacion.dia_actual(conn)
 
     with conn.transaction():
-        alertas_repo.guardar(conn, nueva)
+        nueva = alertas_repo.guardar(conn, nueva)
         for tipo, detalle in eventos:
             bitacora.registrar(conn, nueva.id, tipo, actor, detalle, dia)
 
@@ -118,7 +118,7 @@ async def decidir(
                     ),
                 })
                 with conn.transaction():
-                    alertas_repo.guardar(conn, nueva)
+                    nueva = alertas_repo.guardar(conn, nueva)
                     bitacora.registrar(
                         conn, nueva.id, "result",
                         ActorAgent(agent="ejecutor"),
@@ -185,7 +185,7 @@ async def _reproponer(
     nueva = alerta.model_copy(update={"actions": acciones})
     nuevas = [q for q in state.get("queries") or [] if q.get("queryId") not in vistas]
     with conn.transaction():
-        alertas_repo.guardar(conn, nueva)
+        nueva = alertas_repo.guardar(conn, nueva)
         bitacora.registrar(
             conn, nueva.id, "proposal", estratega,
             f"Nueva propuesta tras la solicitud de cambios: {len(acciones)} acción(es)",

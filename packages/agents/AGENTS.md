@@ -218,9 +218,11 @@ agent its share.
 - **Same cause:** its prompt quotes, as data, each other alert in `nueva`, `en análisis` or
   `propuesta` with its metric, entity and cause's sentence, its placeholders filled in code, and
   its model may name one as `same_cause_as`, by the rule of its contract.
-  `centinela_agents/agents/analista.py:same_cause(answer, cause, found, alert_id)` keeps the id
-  only when it is one of those alerts, not this one, and the cause is `identified`, and logs the
-  drop otherwise. The nodes of `explicar` then merge.
+  `centinela_agents/agents/analista.py:same_cause(answer, cause, found, alert_id, metric)` keeps
+  the id only when it is one of those alerts, not this one, of another metric, and the cause is
+  `identified`, and logs the drop otherwise. Another alert of the same metric is another entity,
+  because an alert is one per metric and entity, and two entities with one kind of cause are two
+  causes. The nodes of `explicar` then merge.
 - **Never:** looks for new alerts, proposes an action, estimates an impact, answers a question.
 
 ### `Chat` answers a question
@@ -312,7 +314,9 @@ It is code, except the step that classifies a rejection reason.
   day, the earlier alerts with their briefs, and the rejection reasons `apps/api` kept for the metric, already split
   by the agent that reads them. To resume one,
   `centinela_agents/graph.py:resume(graph, alert_id, decision)` with the decision `apps/api`
-  recorded. The version of the tree comes through `centinela_agents/graph.py:Compiler`.
+  recorded. The version of the tree comes through `centinela_agents/graph.py:Compiler`. A start on
+  an alert whose thread has ended runs on a fresh thread, `centinela_agents/graph.py:fresh(graph, alert_id)`,
+  so nothing of the earlier run stays, and a start on one that awaits a decision is refused.
 - **Tools: none.** No step needs a query, a policy or an action, so the graph gives it no tool.
 - **Output:** the state of each alert's graph: the transitions it proposes, the log events, the
   target of a rejection reason.

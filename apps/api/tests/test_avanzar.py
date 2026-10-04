@@ -44,7 +44,7 @@ def cliente(conn, monkeypatch):
         "actions": [],
     }
     monkeypatch.setattr(simulacion_router, "get_orchestrator", lambda: orquestador)
-    monkeypatch.setattr(simulacion_router.alertas_repo, "guardar", MagicMock())
+    monkeypatch.setattr(simulacion_router.alertas_repo, "guardar", MagicMock(side_effect=lambda conn, alerta: alerta))
     monkeypatch.setattr(simulacion_router.bitacora, "registrar", MagicMock())
 
     def conexion():

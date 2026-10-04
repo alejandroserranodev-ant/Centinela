@@ -82,6 +82,32 @@ def cliente():
             conn.commit()
 
 
+ID_UNIDA = "alerta_prueba_unida"
+
+
+def test_una_alerta_unida_sale_de_la_lista_y_guardar_no_la_borra_del_destino(cliente):
+    from centinela_api.agentes import merged_summary
+
+    base = _alerta_de_prueba()
+    unida = base.model_copy(update={"id": ID_UNIDA, "status": "merged", "merged_into": ID_ALERTA, "actions": []})
+    try:
+        with conectar() as conn:
+            alertas_repo.guardar(conn, unida)
+            alertas_repo.guardar(conn, base.model_copy(update={"merged_alerts": [merged_summary(unida)]}))
+            alertas_repo.guardar(conn, base.model_copy(update={"changes_requested": True}))
+            conn.commit()
+        ids = [a["id"] for a in cliente.get("/alertas").json()]
+        assert ID_ALERTA in ids and ID_UNIDA not in ids
+        assert [a["id"] for a in cliente.get("/alertas", params={"estado": "unida"}).json()] == [ID_UNIDA]
+        destino = cliente.get(f"/alertas/{ID_ALERTA}").json()
+        assert destino["changesRequested"] is True
+        assert [m["id"] for m in destino["mergedAlerts"]] == [ID_UNIDA]
+    finally:
+        with conectar() as conn:
+            conn.execute("DELETE FROM api.alertas WHERE id = %s", (ID_UNIDA,))
+            conn.commit()
+
+
 def test_listar_filtra_por_estado(cliente):
     respuesta = cliente.get("/alertas", params={"estado": "propuesta"})
     assert respuesta.status_code == 200

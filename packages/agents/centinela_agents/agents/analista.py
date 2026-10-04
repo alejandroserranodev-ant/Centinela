@@ -6,7 +6,8 @@ day, through kpi_consultar, and numbers every figure as a fact. The model choose
 support a cause and writes the Spanish around them; it cites a fact by its ref and never writes a
 number, so every figure of the cause carries the queryId of the query that returned it. The
 open alerts the orchestrator hands are quoted as data; the model may name one as the same cause,
-and code keeps that id only when it is a candidate, not the alert itself, and the cause is identified.
+and code keeps that id only when it is a candidate of another metric, not the alert itself, and the
+cause is identified.
 """
 
 import json
@@ -107,18 +108,21 @@ def candidate_lines(found: Mapping[str, Mapping[str, Any]]) -> str:
         entity = brief.get("entity")
         entity = ", ".join(map(str, entity)) if isinstance(entity, (list, tuple)) else str(entity or "")
         cause = filled(brief.get("cause")) or "sin analizar"
-        lines.append(f'- id: {other} | metric: {brief.get("metric") or ""} | entity: {entity} | estado: {brief["estado"]} | causa: {json.dumps(cause, ensure_ascii=False)}')
+        lines.append(f'- id: {other} | metric: {brief.get("metric") or ""} | entity: {json.dumps(entity, ensure_ascii=False)} | estado: {brief["estado"]} | causa: {json.dumps(cause, ensure_ascii=False)}')
     return "\n".join(lines) or "- ninguna"
 
 
-def same_cause(answer: Mapping[str, Any], cause: Mapping[str, Any], found: Mapping[str, Any], alert_id: str | None) -> str | None:
+def same_cause(answer: Mapping[str, Any], cause: Mapping[str, Any], found: Mapping[str, Any], alert_id: str | None, metric: str) -> str | None:
     named = answer.get("same_cause_as")
     if not named:
         return None
-    if named in found and named != alert_id and cause.get("kind") == "identified":
-        return str(named)
-    logger.info("Analista: dropped same_cause_as %s for %s, no candidate with an identified cause", named, alert_id)
-    return None
+    if named not in found or named == alert_id or cause.get("kind") != "identified":
+        logger.info("Analista: dropped same_cause_as %s for %s, no candidate with an identified cause", named, alert_id)
+        return None
+    if found[named].get("metric") == metric:
+        logger.info("Analista: dropped same_cause_as %s for %s, the same metric on another entity", named, alert_id)
+        return None
+    return str(named)
 
 
 def explain_cause(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) -> dict[str, Any]:
@@ -162,4 +166,4 @@ causa ambas alertas; dos entidades distintas con el mismo tipo de causa son dos 
     allowed = (*map(str, detection["entity"]), day)
     cause = build_cause(response.parsed, ledger, list(ledger.queries), allowed)
     logger.info("Analista: %s for %s:%s", cause["kind"], metric, entity)
-    return {"cause": cause, "same_cause_as": same_cause(response.parsed, cause, found, state.get("alert_id")), "queries": merged_queries(state, ledger)}
+    return {"cause": cause, "same_cause_as": same_cause(response.parsed, cause, found, state.get("alert_id"), metric), "queries": merged_queries(state, ledger)}

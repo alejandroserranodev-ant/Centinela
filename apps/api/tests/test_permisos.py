@@ -96,7 +96,7 @@ def test_la_vista_dice_quien_decide_y_si_esta_persona_puede():
 @pytest.fixture
 def decidir(monkeypatch):
     monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id: alerta(id.removeprefix("alerta_")))
-    monkeypatch.setattr(alertas_router.alertas_repo, "guardar", MagicMock())
+    monkeypatch.setattr(alertas_router.alertas_repo, "guardar", lambda conn, alerta: alerta)
     monkeypatch.setattr(alertas_router.bitacora, "registrar", MagicMock())
     monkeypatch.setattr(alertas_router.simulacion, "dia_actual", MagicMock())
     monkeypatch.setattr(alertas_router, "get_orchestrator", MagicMock)
