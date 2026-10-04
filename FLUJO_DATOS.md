@@ -2,7 +2,7 @@
 
 This page sits at the root, against the rule that a fact lives on the page of the level that owns
 it, because the team keeps the file structure as it is. It covers one thing no level page holds:
-the path one simulated day and one decision take through the code, across `apps/api` and
+the path one simulated day, one decision and one chat question take through the code, across `apps/api` and
 `packages/agents`. The design they are built toward is the root's
 [How the parts connect](./AGENTS.md#how-the-parts-connect). Each level page owns the rules of its own
 steps.
@@ -67,9 +67,29 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    includes the state the in-memory checkpointer loses when the process restarts, so the alert
    stays `approved`. A failed rejection resume is logged.
 
+## One chat question
+
+1. `POST /chat` reaches
+   `apps/api/src/centinela_api/routers/chat.py:chat(pregunta, x_user_name, x_user_role, conn)`.
+   The question's length is checked by its Pydantic model, the day is read, and an `alertId`, when sent,
+   must name a stored alert. One transaction writes the `question` row under the person of the
+   headers, with no alert when none was sent.
+2. `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.ask(question, day, alert)`
+   runs in a worker thread. It screens the question in code, then walks the chat graph from
+   `conversar.raiz`: a flagged question ends there; otherwise the leaf `clasificar` names an
+   intent, the tree routes it, and the leaf `responder` reads the KPI through `kpi_consultar`, the
+   path of `detectar` for the entity's row, or the anchored alert's cause or actions, before the
+   model writes.
+3. The stream sends one `step` per node the walk took, then one `end` with the `ChatMessage`.
+   One transaction records each query in `api.consultas` and as an `evidence` row, then the
+   `answer` or `refusal` row, then one `evidence` row per model step's cost. No alert changes.
+4. A figure of the answer opens its source through `GET /consultas/{queryId}`,
+   `apps/api/src/centinela_api/routers/consultas.py:obtener(query_id, conn)`.
+
 ## Where this departs from the design
 
 - **The agents run in the API's process**, not behind the `/interno/*` endpoints. Nothing calls
   those endpoints.
 - **The `bitácora` gets an `alert` row and its `evidence` rows per alert from a day**, not the
   proposal rows the design lists.
+- **The chat is its own agent on its own root of the tree**, not `Analista` in a chat mode.

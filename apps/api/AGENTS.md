@@ -13,7 +13,7 @@ implement.
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora` |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY` and `ROLES_CON_DECISION` |
 | `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
@@ -22,12 +22,13 @@ implement.
 | `src/centinela_api/decisiones.py` | `aplicar(alerta, decision)`, the pure check of a person's decision |
 | `src/centinela_api/alertas.py` | reads and upserts `api.alertas` |
 | `src/centinela_api/bitacora.py` | appends to and lists `api.bitacora` |
+| `src/centinela_api/consultas.py` | records and reads `api.consultas`, the kernel call behind each `queryId` an agent cited |
 | `src/centinela_api/simulacion.py` | reads and advances the clock |
 | `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
-| `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py`, `tests/test_chat.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py` and `tests/test_ciclo_orquestado.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `interno` |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py` and `tests/test_chat.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -70,12 +71,22 @@ minimal API section; its paths stay as the brief writes them. The web consumes t
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject`, with headers `X-User-Name` and `X-User-Role` | 403 for a role that may not decide; 404; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
-| POST | `/chat` | a question, answered by SSE `step` and `end` events | | `chat` |
+| POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
+| GET | `/consultas/{queryId}` | the kernel call behind a figure, as `Query` | 404 for an unknown query | `getQuery` |
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 
-**`/chat` calls no agent.** `src/centinela_api/routers/chat.py:chat(pregunta)` takes the question
-and the optional `alertId` it is asked from, and answers a fixed "sin evidencia suficiente". It
-costs the brief's chat, and is paid when the question reaches `Analista`.
+**`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, x_user_name, x_user_role, conn)`
+reads the simulated day and the anchored alert, logs the question under the person of
+`X-User-Name` and `X-User-Role`, and calls
+`packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.ask(question, day, alert)`
+through `asyncio.to_thread`. It streams one `step` per node with a Spanish description, then the
+`end`, whose figures pass through `src/centinela_api/agentes.py:_convert_figures(raw)` and whose
+`outcome` names the end the walk reached. A failed call answers `no_evidence`, never an error. The
+headers default to `Sin nombre` and `lectura`, because reading needs no role.
+
+**`/consultas/{queryId}` serves the call, never runs it**: `api.consultas` holds each
+`kpi_consultar` a leaf ran, with its KPI and day, written by the day run and by the chat, so a figure
+opens its source after the process that cited it is gone.
 
 **The internal endpoints `/interno/*` have no caller.** `src/centinela_api/routers/interno.py`
 lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `PUT .../causa`
@@ -93,7 +104,6 @@ consistent with the first, paid when they are wired or removed.
 | GET | undecided | the inbox totals | | `getInboxSummary` |
 | GET | undecided | the watched KPIs, thresholds, owners and autonomy per action type | | `getSettings` |
 | undecided | undecided | saves the settings whole | 422 when any action type's autonomy is `execute` | `saveSettings` |
-| GET | undecided | one query by id, for "how I got here" | 404 for an unknown query | `getQuery` |
 
 **The KPI catalogue's endpoints**, which list the base and approved KPIs and let the administrator
 decide a proposed KPI or retire one, are decided by the pending work on a new KPI's lifecycle, and
@@ -118,7 +128,7 @@ become rows here when it is planned.
 thresholds of `data/metricas.yaml`, the kernel `get_kernel()` connects through
 `packages/agents/centinela_agents/catalog.py:connect_kernel(env)`, a `ToolRegistry` of the four action stubs and an
 `InMemorySaver`. The routers call
-`start` and `resume` through `asyncio.to_thread`, because the graph runs synchronously and the
+`start`, `resume` and `ask` through `asyncio.to_thread`, because the graph runs synchronously and the
 event loop keeps streaming SSE meanwhile. Running in-process saves a service boundary, its
 transport and its secret, and is the answer to whether the agents run here or as a service.
 
@@ -257,7 +267,7 @@ table, and the screen computes none.
 **`api.bitacora` is append-only**: `src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id)`
 inserts, and no code updates or deletes a row; no grant enforces it. Each row carries its type,
 its actor, an agent or a person with name and role, its detail, the simulated day and the real
-time.
+time, and the alert it belongs to, which a chat question asked from no alert leaves empty.
 
 | Type | Written by |
 |---|---|
@@ -267,6 +277,10 @@ time.
 | `decision` | a person's decision |
 | `action` | `POST /interno/alertas/{id}/ejecutar` |
 | `result` | the resume after an approval, when `Ejecutor` returns an executed action |
+| `question` | `/chat`, the person's question with its email addresses and keys masked |
+| `evidence`, from the chat | `/chat`, one row per query the chat ran and one per model step's cost |
+| `answer` | `/chat`, the end and the text of an answer, with its first figure's `queryId` |
+| `refusal` | `/chat`, a question the screen flagged, one outside the chat's use, or one asking to act |
 
 On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
 and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL
@@ -278,13 +292,14 @@ of its own.
 - **No decision, no action.** The API resumes an alert past the approval interrupt only after the
   decision is committed with its role. *No gate holds this.*
 - **The API's state lives in its own schema `api`**, created by `sql/01_esquema.sql` with
-  `IF NOT EXISTS` and no migrations, never in the dataset's `centinela` schema. *No gate holds
-  this.*
+  `IF NOT EXISTS`, never in the dataset's `centinela` schema. The file runs again on a database it
+  built before: its `ALTER`s on `api.bitacora` give the table the shape a new one has, so there is
+  no migration tool. *No gate holds this.*
 
 > **Decided, not built.** The three rules below, where the code differs as each one says.
 
 - **An alert carries its cost**: the API persists the tokens and model calls the orchestrator
-  counts per alert, and per chat answer. `api.alertas.costos` exists and nothing writes it;
+  counts per alert, as `/chat` already logs each step of a chat answer. `api.alertas.costos` exists and nothing writes it;
   `_registrar_costo` records a step's cost sent by `X-Cost-Json` as an `evidence` row and swallows
   any error.
 - **Timeouts and retries are explicit**, as the orchestrator's graph states them, and "not enough

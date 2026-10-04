@@ -20,6 +20,7 @@ the standards the tree rests on:
 | ISO/IEC 42001:2023, AI management system | the laws on human approval, on what an agent may change, and on the `bitácora` |
 | ISO 22400-2:2014+A1:2017, KPI description | the fields of a KPI in the kernel |
 | Goal-Question-Metric (Basili, Caldiera and Rombach, 1994) | the only admissible justification for a new KPI: a node asks a question no KPI answers |
+| OWASP Top 10 for LLM Applications 2025 | the controls of the stage `conversar` against prompt injection, improper output handling and excessive agency, which no ISO clause of the registry names |
 
 GQM is a method, not a standard; it is admitted because it ties a metric to the decision it serves.
 Every clause a node may cite is an entry of [the registry](../../../packages/agents/arbol/fundamentos.yaml).
@@ -35,11 +36,14 @@ flowchart TB
   ejecutar["ejecutar<br/>ISO 31000 §6.5.3 · ISO 9001 §10.2.1 c)<br/>Ejecutor"]
   cerrar(["cerrar: the ends, no node<br/>ISO 31000 §6.6, §6.7 · ISO 9001 §10.2.1 d), §10.2.2<br/>apps/api closes the alert"])
   medir["medir: no node in the base<br/>ISO 31000 §6.6 · ISO 9001 §9.1.1, §9.1.3<br/>Vigía, through the kernel"]
+  conversar["conversar: its own root, conversar.raiz<br/>ISO 31000 §6.2 · ISO/IEC 42001 A.9.4 · OWASP LLM01, LLM05, LLM06<br/>Chat"]
   detectar --> explicar --> proponer --> aprobar --> ejecutar --> cerrar
   medir -. measures for .-> detectar
+  conversar -- answers, never acts --> cerrar
+  conversar -. reads the rules of .-> detectar
 ```
 
-*Draws: `packages/agents/arbol/AGENTS.md` § The stages; `packages/agents/arbol/AGENTS.md` § The ends*
+*Draws: `packages/agents/arbol/AGENTS.md` § The stages; `packages/agents/arbol/AGENTS.md` § The ends; `packages/agents/arbol/AGENTS.md` § The chat*
 
 Each clause is the `funda` of a registry entry. A stage is the first segment of a node's id, not a
 level: which nodes are L1 is the next diagram.
@@ -152,5 +156,6 @@ flowchart TB
    call, becomes a `task` for a person through `nota_manual`.
 7. `cerrar`: `apps/api` records the result and moves the alert to `ejecutada`.
 
-The chat is no node of the tree; where a question goes is
-[packages/agents](../../../packages/agents/AGENTS.md), *Routing*.
+A chat question walks the tree too, from its own root `conversar.raiz`, and never reaches
+`aprobar`: its nodes and why the validator holds that are
+[the tree's page](../../../packages/agents/arbol/AGENTS.md), *The chat*.

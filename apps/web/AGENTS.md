@@ -61,10 +61,11 @@ and what each shows is
 - **Some functions answer inside the client**, because the API serves no endpoint for them:
   `getSimulationState` reads the day from `GET /simulacion/dia-actual` and takes the person from
   the client; `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
-  `saveSettings` refuses `execute` with 422 and stores nothing; `getQuery` refuses every id with
-  404, so "how I got here" and the query dialog show their error state.
-- **There is no login.** `src/api/config.ts:getDecisionHeaders()` sends every decision as
-  `DEFAULT_USER`, a `gerente`, its name percent-encoded in `X-User-Name` because a header is
+  `saveSettings` refuses `execute` with 422 and stores nothing. `getQuery` reads
+  `GET /consultas/{queryId}`, which answers a query an agent ran and refuses the totals' ids with
+  404, so the query dialog of a total shows its error state.
+- **There is no login.** `src/api/config.ts:getDecisionHeaders()` sends every decision and every
+  chat question as `DEFAULT_USER`, a `gerente`, its name percent-encoded in `X-User-Name` because a header is
   ASCII-only.
 - **`src/api/types.ts` is the contract the screens read**: `apps/api`'s Pydantic models are the
   source, and these types follow them field for field. Every number travels as a `Figure` with its
@@ -77,7 +78,7 @@ and what each shows is
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
   including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
   fixtures and of the settings the client returns. The words the data names keep their Spanish in code too: the agents (`vigia`,
-  `analista`, `estratega`, `ejecutor`), the metrics (`margen_pct`…), the `v_*` views and the
+  `analista`, `estratega`, `ejecutor`, `chat`), the metrics (`margen_pct`…), the `v_*` views and the
   `alertas` table, because a translation would make a second name for one thing.
 - **The contract is English except its routes.** Field names and values in
   `src/api/types.ts` are English (`status: 'proposed'`, `severity: 'critical'`), so the
@@ -98,7 +99,8 @@ and what each shows is
   figure cites an example query against a real `v_*` view; the queries are not run.
 - **The screen computes no figure.** The inbox totals are `Figure`s the API computes
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
-  table, which is why `src/api/types.ts:QuerySource` also takes `alertas`. A sum taken on screen
+  table, which is why `src/api/types.ts:QuerySource` also takes `alertas`; a query of the kernel
+  is `kernel`. A sum taken on screen
   would be a figure with no query behind it. Until the API serves the totals,
   `src/api/http-client.ts:getInboxSummary()` takes those sums in the browser, under query ids no
   query answers.
@@ -118,13 +120,21 @@ and what each shows is
   beside the answer. The sheet covers the end of the bar while it is open, because Arena places it
   above fixed navigation.
 - **Enter sends a question and Shift + Enter breaks the line.** `ArenaTextarea` exposes no key
-  events, so the form around it listens for them. The conversation lasts as long as the app stays
-  open, because the chat is mounted once in the shell.
+  events, so the form around it listens for them. The field stops at the API's 500 characters and
+  counts them. The conversation lasts as long as the app stays open, because the chat is mounted
+  once in the shell, but each question is answered alone: the API receives no history.
+- **The chat says why it did not answer.** A `ChatMessage` whose `outcome` is `refused`,
+  `out_of_scope` or `no_evidence` renders as an informative `ArenaAlert` with its own title, and
+  every answer lists, under it, the nodes of the tree its walk took, from the `step` events that
+  name a `node`. The suggestions follow the intents the chat classifies: why, what to do and the
+  cause on an anchored alert, a figure of the day without one, and one question outside its use.
 - **The chat's send button is `secondary`.** The sheet stands beside a view that already has its
   primary action, Approve in the detail, and one view shows one primary action.
 - **A Bitácora filter returns the reader to page 1.** `ArenaTable` returns to page 1 only when
   the page falls out of range, and it does not slice rows, so the screen keeps the page, slices
-  ten rows and resets the page whenever a criterion changes.
+  ten rows and resets the page whenever a criterion changes. A chat row asked from no alert stays
+  in the list, its alert cell an unlinked "Chat, sin alerta", because a question is a step of the
+  log as much as a decision is.
 - **The settings screen has one save action for all its tabs.** A change in any tab is a draft
   until "Guardar cambios", so no tab saves half a configuration. "Ejecuta" is disabled in every
   autonomy group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md)).
@@ -166,7 +176,9 @@ a table view.
 - **A figure on screen carries its source.** Every number links, or expands, to the logged query
   behind it, through `src/common/SentenceWithFigures.tsx:LinkedFigure()` or a sentence whose
   figures `src/common/SentenceWithFigures.tsx:SentenceWithFigures()` links: "how I got here" is
-  the third level of every explanation. *No gate holds this.*
+  the third level of every explanation. An agent writes each figure as a placeholder, `{0}`, and
+  the sentence fills it with the figure as `src/format.ts:formatFigureInText(figure)` writes it
+  before linking it. *No gate holds this.*
 - **Severity is a badge with its word**: `src/common/Badges.tsx:Severity()` pairs each tone with
   its Spanish label, so no screen tells severity by colour alone.
 - **Every amount and date goes through `src/format.ts`**: pesos as `COP` in `es-CO`, dates spelled

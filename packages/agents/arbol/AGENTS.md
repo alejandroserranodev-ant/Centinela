@@ -3,8 +3,8 @@
 The decision tree is every route an alert can take, written as data: atomic rules, each resting on
 one entry of a registry, whose leaves are the decisions of an agent. This page decides how a node,
 a leaf and an end are written, what the validator refuses, and where each kind of change lands.
-What runs: the base below is parsed, validated, walked in `detectar` and compiled to the LangGraph
-graph, and `uv run pytest` holds all four. The leaves the compiled graph calls are the model
+What runs: the base below is parsed, validated, walked in `detectar` and compiled to the two
+LangGraph graphs, the alert's and the chat's, and `uv run pytest` holds all four. The leaves the compiled graph calls are the model
 functions `centinela_agents/orchestrator.py:CentinelaOrchestrator` hands it. What is decided, not built: a client's own version of
 the tree, its growth by self-expansion, the caps on that growth, and the impact formulas; each
 section that states one opens with the marker. How the compiled graph runs an alert is [`../AGENTS.md`](../AGENTS.md).
@@ -19,7 +19,8 @@ section that states one opens with the marker. How the compiled graph runs an al
 ## The tree
 
 **The tree is data, validated by code and walked by a deterministic interpreter; a model acts
-only at a leaf.** Routing is the orchestrator's concern, so the base sits beside the code that
+only at a leaf.** It has two roots: `detectar.raiz`, where every alert starts, and
+`conversar.raiz`, where every chat question starts, `centinela_agents/schema.py:CHAT_ROOT`. Routing is the orchestrator's concern, so the base sits beside the code that
 walks it. It is YAML, as `data/metricas.yaml` is, whose `umbrales` its predicates apply.
 
 **Every entry of the registry that cites a standard names a numbered clause, confirmed against its
@@ -57,6 +58,7 @@ does not measure, such as a price in force, comes from a `v_*` view.
 | `ejecutar` | `Ejecutor` | that the KPI which justified the action still breaks its threshold, in code, at [`ejecutar.vigente`](#the-node-ejecutarvigente). `Ejecutor`'s model consults nothing |
 | `cerrar` | `apps/api` | nothing: it is the set of ends, which `apps/api` closes |
 | `medir` | `Vigía` | validating and dry-running a candidate KPI. *Decided, not built*: no node of the base is in `medir` |
+| `conversar` | `Chat` | the KPI a question names or its anchored alert's, read in code by the leaf `responder`, [below](#the-chat) |
 
 `cerrar` records the action, its result and who made it. Whether the metric of an executed alert
 returns inside its threshold on later simulated days is the effectiveness review ISO 9001 §10.2.1 d)
@@ -146,6 +148,13 @@ classify)` is what the interpreter does on reaching each.
 | `fin.ya_no_aplica` | records that the condition no longer holds; the alert stays `aprobada`, and `Ejecutor` is not called |
 | `fin.ejecutada` | proposes `ejecutada` |
 | `fin.fallo_ejecucion` | records the failure; the alert stays `aprobada` |
+| `fin.chat_respondida` | ends a question whose every sentence cites a figure |
+| `fin.chat_sin_evidencia` | ends a question the data, the alert or the tree cannot answer |
+| `fin.chat_fuera_de_alcance` | ends a question outside the chat's use, or one that asks to act |
+| `fin.chat_rechazada` | ends a question the screen flagged, before any model reads it |
+
+The chat's ends write only `fin`; `centinela_agents/agents/chat.py:closing(state)` turns each into
+the answer a person reads.
 
 ## The orchestrator's writes
 
@@ -174,6 +183,32 @@ fails, because the entity is the key of the KPI and a second row breaks the kern
 code, so `Ejecutor` keeps no discretion, and it rests on `iso9001.10.2.1.c`: an action addresses a
 nonconformity, which a resolved one no longer has.
 
+## The chat
+
+The subtree `conversar` is every route a question can take. Its nodes are L1, because no metric
+family names them, so it changes by pull request only.
+
+`conversar.raiz` ends a flagged question at `fin.chat_rechazada`; `conversar.fuera_de_alcance` and
+`conversar.accion` end a question outside the chat's use or one asking to act at
+`fin.chat_fuera_de_alcance`; `conversar.politica` ends a policy question without evidence; an
+anchored question goes on to `conversar.alerta.*`, which read the alert's cause or actions, and
+any other to `conversar.dato`, which needs a KPI; `conversar.con_evidencia` ends the walk answered
+only when a figure survived. Each rests on the registry entry `base.yaml` names.
+
+**The model never picks a route**: `clasificar` writes an intent from a closed list, and the nodes
+read it as any other field of state. **A question on why an alert fired reuses `detectar`**: the
+leaf `responder` walks the branch of the alert's metric with the entity's row,
+`centinela_agents/walk.py:walk_from(start, state, row, ctx)`, and hands the model each node, its
+branch and its registry entry as facts, so the answer names the rule and the policy that founds it.
+The outputs of `Analista` and `Estratega` are read from the anchored alert, never run again. The
+prompt of `clasificar` puts the question apart as untrusted content, which `owasp-llm01.6` founds.
+
+**No path from `conversar.raiz` acts or changes an alert**, and the validator holds it rather than
+a prompt, which `owasp-llm07.4` founds: `centinela_agents/validator.py:chat_problems(nodes)` refuses
+a chat root whose first node reads anything but `estado.chat.sospechosa`, a path from it to
+`aprobar.decision`, to a node of `centinela_agents/graph.py:BOUND_NODES` or to a leaf of another
+agent, a `chat` leaf `detectar.raiz` reaches, and any node or end both roots reach.
+
 ## The validator
 
 `centinela_agents/validator.py:problems(data, grounds)` returns every problem of a tree, and
@@ -187,7 +222,9 @@ that never fires fails there, and the base itself must pass with no problem. Its
 - a path from `detectar.raiz` to an `Ejecutor` leaf that skips `aprobar.decision` or
   `ejecutar.vigente`;
 - a cycle other than the two capped returns, each reading the counter `effects` keeps equal to 0;
-- a branch to nothing, a node that reaches no end, a node `detectar.raiz` does not reach;
+- a branch to nothing, a node that reaches no end, a node neither root reaches;
+- a chat subtree that does not screen first, reaches the gate, an orchestrator write or another
+  agent's leaf, or crosses the subtree of `detectar.raiz`;
 - a `lee` the catalogue or `STATE_FIELDS` does not declare, a KPI read outside `detectar`, or a KPI
   read where the candidate may be another metric;
 - an `umbral` that names no threshold for its column, or one of no admitted shape;
@@ -219,6 +256,7 @@ moves with what it bounds is no bound.
   `detectar` and `medir`, `Analista` in `explicar`, `Estratega` in `proponer`, `Ejecutor` in
   `ejecutar`. `aprobar` and `cerrar` have no agent and grow by pull request only, because each stage
   has one owner and an agent that rewrites another's stage would decide what that one does.
+  `conversar` holds L1 nodes alone, so `Chat` expands nothing.
 - **An expansion rests only on what the tree already holds**: its `fundamento` is a registry entry,
   its operand a KPI of the catalogue or a declared state field, its threshold an `umbral`. An agent
   cannot introduce a standard, a policy section or a threshold, which is why only a person grows

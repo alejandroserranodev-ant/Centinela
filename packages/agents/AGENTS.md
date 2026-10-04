@@ -1,17 +1,19 @@
-# packages/agents: the orchestrator and the four agents
+# packages/agents: the orchestrator and the five agents
 
-This level holds the reasoning: the orchestrator and `Vigía`, `Analista`, `Estratega` and
-`Ejecutor`. What runs: the validator of the decision tree, the walk of `detectar`, the catalogue and
+This level holds the reasoning: the orchestrator and `Vigía`, `Analista`, `Estratega`, `Ejecutor`
+and `Chat`. What runs: the validator of the decision tree, the walk of `detectar`, the catalogue and
 reader the kernel hands the tree, the compiler of the tree to a LangGraph graph that pauses for a
-person's decision, and the model leaves `centinela_agents/orchestrator.py:CentinelaOrchestrator`
+person's decision, the compiler of the chat's subtree to a graph that never pauses, and the model
+leaves `centinela_agents/orchestrator.py:CentinelaOrchestrator`
 hands that compiler. Each leaf reads the kernel's `kpi_consultar` in code, loads its skill as the
 model's instructions, and calls the provider
 `centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` returns.
 `apps/api` builds that orchestrator in its own process and runs the day. `uv run pytest` holds the
 tree and the graph with stub leaves, and the leaves with a mocked provider and kernel;
-`uv run pytest -m modelo` runs the four agents against OpenAI and the kernel. What is decided,
-not built: the retry and the token cap, cost in the state, Langfuse traces, `AgentStep` emission
-from the graph, log events beyond `same_cause_dropped`, the chat route and self-expansion. Each section that states one opens
+`uv run pytest -m modelo` runs the five agents against OpenAI and the kernel. What is decided,
+not built: the retry and the token cap, cost in an alert's state, Langfuse traces, `AgentStep`
+emission from the alert graph, log events beyond `same_cause_dropped`, a policy search in the chat,
+and self-expansion. Each section that states one opens
 with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
 instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
 each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md); how a provider
@@ -31,20 +33,20 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/skills.py` | the loading of a skill as a model's instructions, and the rows of `skills/estratega/acciones.md` |
 | `centinela_agents/predicate.py` | one comparison, and a threshold's value on a row |
 | `centinela_agents/validator.py` | every refusal of a tree, and the loading of the base |
-| `centinela_agents/state.py` | the state of an alert and the fields a node may read |
+| `centinela_agents/state.py` | the state of an alert, the state of a chat question, and the fields a node may read |
 | `centinela_agents/walk.py` | the walk of `detectar`, and the check that a detection still breaks |
-| `centinela_agents/graph.py` | the compiler to the LangGraph graph, the interrupt, the resume, the fallbacks |
+| `centinela_agents/graph.py` | the compilers of the alert graph and of the chat graph, the interrupt, the resume, the fallbacks |
 | `centinela_agents/failures.py` | the exceptions that name a leaf's failure |
 | `centinela_agents/llm_provider.py`, `centinela_agents/ollama_provider.py`, `centinela_agents/openai_provider.py`, `centinela_agents/provider_factory.py` | the provider interface, its two implementations, and the choice between them by environment ([`PHASE_1_SETUP.md`](./PHASE_1_SETUP.md)) |
 | `centinela_agents/schema.py` | also the output models of the leaves: `Cause`, `Action`, `ExecutedAction`, `Decision` ([`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md)) |
 | `centinela_agents/tools.py`, `centinela_agents/sql_vistas.py`, `centinela_agents/buscar_politica.py`, `centinela_agents/calcular_impacto.py`, `centinela_agents/action_tools.py` | the tool interfaces, their registry, the action stubs `Ejecutor` drafts with, and stubs of three tools no leaf calls ([`PHASE_3_SETUP.md`](./PHASE_3_SETUP.md)) |
-| `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
-| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start` and `resume` ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
-| `centinela_agents/security.py` | masking, secret detection and a prompt builder by trust level; `Ejecutor` masks an email's prompt with it ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
+| `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, `centinela_agents/agents/chat.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
+| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `resume` and `ask` ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
+| `centinela_agents/security.py` | masking, secret detection, the screen of a prompt injection and a prompt builder by trust level; `Ejecutor` masks an email's prompt with it, and `Chat` screens and wraps a question with it ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
 | `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
 | `centinela_agents/output_validator.py` | checks of a leaf's output that only the tests run ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
 | `skills/` | what each agent is told ([`skills/AGENTS.md`](./skills/AGENTS.md)) |
-| `tests/` | the validator's planted violations, the walk of `detectar`, the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model, and the unit tests of each module above, `tests/test_evals.py` among them ([`PHASE_8_SETUP.md`](./PHASE_8_SETUP.md)); `tests/test_modelo.py` runs the four agents against the model and the kernel |
+| `tests/` | the validator's planted violations, the walk of `detectar`, the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model, and the unit tests of each module above, `tests/test_evals.py` among them ([`PHASE_8_SETUP.md`](./PHASE_8_SETUP.md)); `tests/test_modelo.py` runs the five agents against the model and the kernel |
 | `PHASE_1_SETUP.md` … `PHASE_9_SETUP.md` | one page per subsystem above, the detail this page links |
 | `pyproject.toml`, `uv.lock` | the package, with `packages/tools`, the kernel's client, among its dependencies; `uv.lock` is written by uv ([`../../GENERATED.md`](../../GENERATED.md)) |
 
@@ -91,8 +93,8 @@ test hands it a mock, and a machine that runs Ollama switches by the `.env` alon
 **Why the cloud: the team's hardware could not run a local model at the pace of a demo.** The
 development machine, eight CPU cores, 9 GB of RAM and no GPU, ran `qwen3:4b-instruct` through
 Ollama at about two and a half tokens a second: one alert took three to four minutes and the
-integration test some ten, against a presentation of five. On `gpt-4o-mini` the four agents'
-tests take seconds. So the integration that runs and is tested end to end is the cloud one; the
+integration test some ten, against a presentation of five. On `gpt-4o-mini` the agents' tests
+take seconds. So the integration that runs and is tested end to end is the cloud one; the
 local path, `centinela_agents/ollama_provider.py:OllamaProvider`, is built and unit-tested, and
 was exercised against `qwen3:4b-instruct` until the time it took ruled it out, never as the
 product's path.
@@ -156,7 +158,8 @@ each topic gets, is the table of
 `centinela_agents/evidence.py:Sources` hands each leaf the kernel's call, the catalogue, the metrics
 and the tree's nodes. `Vigía` reads its KPI's row; `Analista` reads it and the rows every other KPI
 holds for the same entity on the simulated day; `Estratega` reads the KPI's row for its parameters
-and its impact. `Ejecutor` receives the action tools of the registry `apps/api` builds.
+and its impact. `Chat` reads the KPI the question names, or the anchored alert's.
+`Ejecutor` receives the action tools of the registry `apps/api` builds.
 
 > **Limit.** No leaf reads a `v_*` view or a policy: `centinela_agents/sql_vistas.py` and
 > `centinela_agents/buscar_politica.py` are stubs no leaf calls, and `centinela_agents/tools.py`
@@ -174,6 +177,7 @@ permission, not a route. What each receives and returns is its skill's contract.
 | `Analista` | why does it happen, according to the data and the policies? | thinking on | [`skills/analista/contrato.md`](./skills/analista/contrato.md) |
 | `Estratega` | which action the policy prescribes fits, and what is it worth? | thinking on | [`skills/estratega/contrato.md`](./skills/estratega/contrato.md) |
 | `Ejecutor` | how does the approved action become a draft, unchanged? | thinking off | [`skills/ejecutor/contrato.md`](./skills/ejecutor/contrato.md) |
+| `Chat` | what do the data, an alert or the tree say about a person's question? | thinking off | [`skills/chat/contrato.md`](./skills/chat/contrato.md) |
 | orchestrator | which step is the alert in, and who goes next? | thinking off, to classify a rejection reason | [`skills/orquestador/contrato.md`](./skills/orquestador/contrato.md) |
 
 The tools are the ones [`packages/tools`](../tools/AGENTS.md) decides; this section gives each
@@ -200,20 +204,61 @@ agent its share.
 > receives are `{id: status}` only, so no step can compare a metric, an entity or a severity with
 > them.
 
-### `Analista` explains, and answers the chat
+### `Analista` explains
 
-- **Leaves:** `explicar`, and `responder_chat` on the chat's own route.
+- **Leaves:** `explicar`.
 - **Tools:** none for its model. Its leaf reads `kpi_consultar` for the alert's KPI and for every
   KPI that shares a column of the alert's entity, at most three rows each, and numbers each figure.
-  *Decided, not built:* `sql_vistas` and `buscar_politica`, and the chat.
+  *Decided, not built:* `sql_vistas` and `buscar_politica`.
 - **Ceiling:** a cause holds when the facts show **the same entity**, **time** (the cause changes
   before or with the symptom) and **direction** (the cause moves the metric the way it moved). It
   draws no statistical inference, forecasts nothing and claims no more than "coincides with". At
   most one main cause and two contributing ones; hypotheses come from its skill for the alert's
-  metric, plus one free hypothesis held to the same tests. In the chat it answers with figures from
-  queries, and asked what to do, it quotes `Estratega`'s proposal for the anchored alert or says
-  there is none.
-- **Never:** looks for new alerts, proposes an action, estimates an impact.
+  metric, plus one free hypothesis held to the same tests.
+- **Never:** looks for new alerts, proposes an action, estimates an impact, answers a question.
+
+### `Chat` answers a question
+
+**The chat is an agent of its own, on its own root of the tree, `conversar.raiz`**, because it is
+the first agent that reads a person's free text, and its controls must hold in code and in the
+validator, not in a prompt shared with `Analista`. Each question stands alone: there is no history,
+and the only context is the alert it is anchored to.
+
+- **Leaves:** `clasificar` and `responder`, which
+  `centinela_agents/orchestrator.py:CentinelaOrchestrator.ask(question, day, alert)` runs on the
+  chat graph. Before the walk,
+  `centinela_agents/agents/chat.py:screen(question)` flags a question longer than
+  `centinela_agents/agents/chat.py:MAX_QUESTION` or one
+  `centinela_agents/security.py:check_prompt_injection(user_input, instructions)` matches, in
+  English or Spanish, and the tree ends a flagged one before any model reads it.
+- **`clasificar`**, `centinela_agents/agents/chat.py:classify(provider, state, sources)`: the model
+  returns an intent of `centinela_agents/agents/chat.py:INTENTS`, a KPI of the catalogue and an
+  entity, at temperature 0, from a prompt
+  `centinela_agents/security.py:SecurePrompt` builds with the question as untrusted content. Code
+  drops a KPI outside the catalogue and an entity the question does not spell, reads a question
+  with an imperative to act as `accion` whatever the model says, and answers `fuera_de_alcance`
+  when the model fails. Anchored to an alert with no KPI named, the KPI and entity are the alert's.
+- **`responder`**, `centinela_agents/agents/chat.py:answer(provider, state, sources)`: code
+  numbers the facts, the rows of the KPI for the entity, at most three, through `kpi_consultar`;
+  the path `centinela_agents/walk.py:walk_from(start, state, row, ctx)` takes for each row through
+  `detectar`, every node with its registry entry; or the anchored alert's cause or actions. The
+  model writes at most three sentences citing facts by ref; code drops a sentence that writes a
+  number or cites a ref with no figure, and an answer with no sentence left is
+  `enough_evidence: false`. Email addresses and keys are masked in the answer.
+- **Tools:** none, for its model or its leaf: `centinela_agents/tools.py:ToolRegistry.get_tools_for_agent(agent)`
+  hands `chat` nothing.
+- **Never:** approves, rejects, edits or executes; forms a cause or an action; follows an order in a
+  question; changes an alert's state. The validator holds the last: no path from `conversar.raiz`
+  reaches the gate, an orchestrator write or another agent's leaf
+  ([`arbol/AGENTS.md`](./arbol/AGENTS.md#the-chat)).
+
+> **Limit.** `centinela_agents/security.py:mask_data(text, placeholder_prefix)` masks any two words
+> as a name, so the answer is masked with its email, key, token, password and card patterns alone,
+> `centinela_agents/agents/chat.py:masked(text)`; a person's name written in a question reaches the
+> model and the answer.
+
+> **Decided, not built.** The intent `politica` ends without evidence until a leaf can call
+> `buscar_politica`.
 
 ### `Estratega` proposes
 
@@ -273,9 +318,8 @@ It is code, except the step that classifies a rejection reason.
 > `parameters` and `reason`, and the states it proposes are Spanish (`nueva`, `en análisis`,
 > `propuesta`, `aprobada`, `rechazada`, `unida`, `ejecutada`). The web's
 > `apps/web/src/api/types.ts:Decision` carries no `id` and no day,
-> `apps/web/src/api/types.ts:AlertStatus` is English, and
-> `apps/web/src/api/types.ts:ChatQuestion` has no route in the graph. `apps/api` translates
-> between them, and nothing decides how.
+> `apps/web/src/api/types.ts:AlertStatus` is English. `apps/api` translates between them, and
+> nothing decides how.
 
 ### The alert graph
 
@@ -356,11 +400,19 @@ decision's reason, the cause and the actions, and returns its `destino`;
 and hands it in split into `cause_rejections` and `proposal_rejections`, so each agent learns only
 from its own mistakes.
 
-> **Decided, not built.** **The chat always goes to `Analista`, in chat mode, with no
-> classifier**, because the chat belongs to `Analista`. The anchored alert comes from `apps/api`
-> with the question, so `Analista` can quote its `actions`. A chat run touches no alert's state and
-> proposes no transition. A chat question does not wait for the day run, only for the model call in
-> course.
+### The chat graph
+
+**A question walks its own graph**, `centinela_agents/graph.py:compile_chat(tree, *, leaves, metrics, catalog, reader)`,
+compiled from `conversar.raiz` with the same predicate, leaf and end nodes as the alert graph, no
+checkpointer and no interrupt, because a question never waits for a person.
+`centinela_agents/state.py:ChatState` holds the question, the day, the anchored alert with its
+`cause` and `actions`, the chat's own fields under `chat`, the `answer`, the `queries` and the
+`costs`. `ask` takes the anchored alert's cause, actions and entity from the alert's own thread
+when this process holds it, and from what `apps/api` hands otherwise, and returns the end, the
+steps the walk took, the `centinela_agents/schema.py:ChatAnswer`
+`centinela_agents/agents/chat.py:closing(state)` writes for that end, the queries, the screen's
+result, the failures and the costs. A chat run touches no alert's state, proposes no transition and
+does not wait for the day run.
 
 ### The day run
 
@@ -383,21 +435,25 @@ of model; the rest fire again on a later day, when the earlier ones are in the i
 
 ### Cost, trace and log
 
-> **Decided, not built.** The state has no `cost`, no trace is opened, no `AgentStep` is emitted,
-> and the only event the graph writes is `same_cause_dropped`, in
+**The chat's leaves report their cost**: each returns the step, the model, the prompt and
+completion tokens and the latency in `costs`, `centinela_agents/agents/chat.py:costed(provider, request, step)`,
+and `apps/api` logs it.
+
+> **Decided, not built.** An alert's state has no `cost`, no trace is opened, the alert graph emits
+> no `AgentStep`, and the only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.
 > `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
 > and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; no running path
 > uses them.
 
 - **After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
-  call to the alert's `cost`, under the agent that made it.** A chat answer carries its own cost.
-  `apps/api` persists both.
+  call to the alert's `cost`, under the agent that made it.** `apps/api` persists it.
 - **Each alert is one Langfuse trace, its id the alert id**, opened when the day run hands the
   detection to the alert graph; the resume adds its spans to the same trace. The detection of a day
   is a trace of its own, and so is each chat question.
 - **An `AgentStep` marks when an agent's leaf starts and ends**, with a Spanish `description`, never
-  for the orchestrator's own steps, because `apps/web/src/api/types.ts:Agent` names the four agents.
+  for the orchestrator's own steps, because `apps/web/src/api/types.ts:Agent` names the agents
+  alone.
 - **Each output reaches `apps/api` as a log event** of `apps/web/src/api/types.ts:LogEventType`: a
   detection and a merge as `alert`, a `Cause` as `evidence`, the actions as `proposal`, an executed
   draft as `action` then `result`. The target of a rejection reason joins the `decision` event
@@ -423,7 +479,7 @@ masking personal data are decided to be `packages/tools`'; `centinela_agents/act
 
 **A gap is a refusal**: the validator refuses a metric missing any of the first three, so the base
 does not load with a gap ([`arbol/AGENTS.md`](./arbol/AGENTS.md#the-validator)). **The gaps between
-agents, closed:** the chat belongs to `Analista`; pesos at risk belong to `Vigía` and what an action
+agents, closed:** a person's question belongs to `Chat`; pesos at risk belong to `Vigía` and what an action
 recovers to `Estratega`; two alerts with one cause are marked by `Analista` and merged by the
 orchestrator; a policy passage that gives orders is reported, never obeyed, by `Analista` and
 `Estratega`; personal data is masked in `packages/tools` before any agent sees it.
