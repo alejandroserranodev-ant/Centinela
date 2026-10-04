@@ -18,7 +18,7 @@ decided and marked.
 
 ## What checks behaviour
 
-Two test files hold the cases that need no model and no `apps/api`. Each test is one case of the
+The test files below hold the cases that run. Each test is one case of the
 table below, and its name or its parameters say which.
 
 - **The orchestrator's routing cases**: every `test_orq_*` test of
@@ -27,7 +27,18 @@ table below, and its name or its parameters say which.
   [`../packages/agents/AGENTS.md`](../packages/agents/AGENTS.md) names the command. The cases that
   need `apps/api`'s record (a second `/simulacion/avanzar`, the order of a day's alerts, a reason
   handed to the next run of its metric) are not in that file; the record of a merge is
-  `apps/api/tests/test_ciclo_orquestado.py`'s.
+  `apps/api/tests/test_ciclo_orquestado.py`'s, and the other cases `apps/api` holds are in the next
+  item.
+- **The orchestrator's cases that need `apps/api`**: the 409 of a second `/simulacion/avanzar` is
+  [`../apps/api/tests/test_avanzar.py`](../apps/api/tests/test_avanzar.py); a `request_changes`, one
+  re-proposal and a second refused, is
+  [`../apps/api/tests/test_ciclo_orquestado.py`](../apps/api/tests/test_ciclo_orquestado.py),
+  [`../apps/api/tests/test_decisiones.py`](../apps/api/tests/test_decisiones.py) and
+  `test_orq_*` of `packages/agents/tests/test_orq.py`; the merges, two and three alerts with one
+  cause, are `packages/agents/tests/test_orq.py`,
+  [`../packages/agents/tests/test_leaves_in_the_graph.py`](../packages/agents/tests/test_leaves_in_the_graph.py),
+  `apps/api/tests/test_ciclo_orquestado.py` and
+  [`../apps/api/tests/test_api_integracion.py`](../apps/api/tests/test_api_integracion.py), which needs Postgres.
 - **The chat's cases**: `TestChatRouting` and `TestChatInjections` of
   [`../packages/agents/tests/test_graph_routing.py`](../packages/agents/tests/test_graph_routing.py)
   walk the chat graph with stub leaves, and the base tree with a model that obeys any order; the
@@ -54,7 +65,7 @@ Each case is one row with these columns:
 ## The cases of each agent
 
 > **Decided, not built.** The runner, promptfoo; the case files of every agent but `Chat`; and every case
-> below that the two test files above do not hold. A run's traces go to Langfuse, which
+> below that the test files above do not hold. A run's traces go to Langfuse, which
 > [`../packages/agents/AGENTS.md`](../packages/agents/AGENTS.md) owns.
 
 A case's `id` starts with the agent it tests, `VIG-`, `ANA-`, `EST-`, `EJE-` or `CHA-`, or with `ORQ-` for

@@ -31,7 +31,7 @@ steps.
    alerts and the open ones. `apps/api/src/centinela_api/configuracion.py:umbrales(ajustes)` turns
    them into the thresholds the day uses, which
    `apps/api/src/centinela_api/agentes.py:with_thresholds(ctx, umbrales)` lays over the context and
-   `CentinelaOrchestrator.use_thresholds` hands to the orchestrator, so a change saved by
+   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.use_thresholds(thresholds)` hands to the orchestrator, so a change saved by
    `PUT /configuracion` reaches the next day and no earlier one.
    `apps/api/src/centinela_api/agentes.py:get_context()` builds the walk's context once per
    process: the tree from `packages/agents/arbol/base.yaml`, the thresholds of
@@ -81,9 +81,9 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    `apps/api/src/centinela_api/routers/alertas.py:decidir(id, decision, persona, conn)`, whose
    person `apps/api/src/centinela_api/auth.py:persona_actual(authorization)` reads from the
    bearer token. The alert is read, the person is checked by
-   `apps/api/src/centinela_api/permisos.py:puede_decidir(conn, persona, alerta)`, which reads the owner from the settings,, and
+   `apps/api/src/centinela_api/permisos.py:puede_decidir(conn, persona, alerta)`, which reads the owner from the settings, and
    `apps/api/src/centinela_api/decisiones.py:aplicar(alerta, decision, autonomia)` checks the
-   decision against the autonomy the settings give each action type and returns the alert as `approved` or `rejected`, together with its log event.
+   decision against the autonomy the settings give each action type and returns the alert as `approved` or `rejected`, or still `proposed` with its changes requested, together with its log event.
 2. One transaction stores the alert and writes the `decision` row, whose actor is the signed-in
    person's name and role.
 3. The graph resumes with
