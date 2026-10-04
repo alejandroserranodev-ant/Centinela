@@ -34,6 +34,9 @@ the kit delivers the dataset free to use for the challenge.
 
 ## Rules of this level
 
+- **A metric's severity is its `severidad` block**: `por_defecto` is `high`, and a higher level
+  cites the document that raises it. *The validator of `packages/agents` refuses a metric with no
+  block.*
 - **The semantic layer is the only definition of a metric.** A base metric is an entry in
   `metricas.yaml` whose `kernel:` block compiles to `centinela.k_<metric>(dia)` in
   `sql/05_kpis.generated.sql`; the `v_*` views are the kit's reference and the cause views. An
@@ -53,10 +56,10 @@ the kit delivers the dataset free to use for the challenge.
   because an owner can drop or alter its functions and `centinela_kernel` is a login role a tool
   uses; neither tool role, `centinela_lector` nor `centinela_kernel`, can
   `SET ROLE centinela_propietario`. **One limit grants cannot close:** a session that turns
-  `default_transaction_read_only` off on purpose can still `ALTER ROLE` itself
-  (its settings, its password) or alter its default privileges; tables, schemas, functions and
-  large objects stay unwritable by privilege. Both login roles' passwords are their names, like the
-  compose's, because the database holds only the synthetic dataset. Write access belongs to the
+  `default_transaction_read_only` off can still `ALTER ROLE` itself or alter its default
+  privileges; tables, schemas, functions and large objects stay unwritable by privilege. Both login
+  roles' passwords are their names, because the database holds only the synthetic dataset. Write
+  access belongs to the
   API's own tables, never to this schema. `packages/tools/tests/test_roles.py` holds this against
   the scratch database of [`../packages/tools/AGENTS.md`](../packages/tools/AGENTS.md).
 - **`sql/01_esquema.sql` also creates `tools_reader`, which reads what the grants above

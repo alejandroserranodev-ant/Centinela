@@ -9,6 +9,7 @@ from .catalog import Catalog, thresholds_named
 from .metrics import Metrics, load_metrics, threshold_shape_problem
 from .predicate import KPI_PATH, STATE_PATH
 from .graph import BOUND_NODES
+from .severity import severity_problems
 from .schema import AGENT_DECISIONS, CHAT_ROOT, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, reachable, stage_of
 from .state import STATE_FIELDS
 from .yaml_loader import load_yaml
@@ -64,6 +65,7 @@ def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
         *threshold_problems(tree, grounds),
         *leaf_problems(tree, grounds.skills),
         *coverage_problems(tree, grounds),
+        *severity_problems(grounds.metrics, grounds.catalog),
         *base_problems(tree, grounds.base),
     ]
 

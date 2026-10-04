@@ -13,6 +13,8 @@ metricas:
     umbral_alerta: "caída > 3 puntos vs. promedio de las 8 semanas previas, o margen bajo ref_margen_minimo_linea"
     umbrales: { caida_pts: 3, margen_pct: { columna: margen_minimo_pct } }
     fuente_umbral: "kit; margen mínimo en OPE-POL-007 §4 (vista v_margen_minimo_linea)"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "(max(promedio 8 semanas previas, margen_minimo_pct) - margen_pct) / 100 * ventas de la semana"
     unidad: "%"
     rango: { min: null, max: 100 }
@@ -60,7 +62,18 @@ metricas:
     umbral_alerta: "max_dias_vencido > 15 (política de crédito) o saldo_abierto > cupo_credito"
     umbrales: { max_dias_vencido: 15, saldo_abierto: { columna: cupo_credito } }
     fuente_umbral: "FIN-POL-004 §3 y §4"
-    tramos: "FIN-POL-004 §4 por max_dias_vencido: tramo_1 de 1 a 15, tramo_2 de 16 a 30, tramo_3 de 31 a 60, tramo_4 más de 60"
+    tramos:
+      fuente: "FIN-POL-004 §4"
+      columna: max_dias_vencido
+      niveles:
+        - { tramo: tramo_1, desde: 1, hasta: 15 }
+        - { tramo: tramo_2, desde: 16, hasta: 30 }
+        - { tramo: tramo_3, desde: 31, hasta: 60 }
+        - { tramo: tramo_4, desde: 61 }
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
+      niveles:
+        - { nivel: critical, tramo: tramo_4, fuente: "FIN-POL-004 §4: más de 60 días vencido escala a Dirección Financiera; lectura de severidad a confirmar en el pull request" }
     pesos_en_riesgo: "saldo_vencido"
     unidad: COP
     rango: { min: 0, max: null }
@@ -92,6 +105,8 @@ metricas:
     umbral_alerta: "> 10% de la cartera vencida total"
     umbrales: { concentracion_vencida_pct: 10 }
     fuente_umbral: "FIN-POL-004 §5"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "saldo_vencido"
     unidad: "%"
     rango: { min: 0, max: 100 }
@@ -119,6 +134,8 @@ metricas:
     umbral_alerta: "aumento > 50% frente al promedio histórico del cliente"
     umbrales: { aumento_pct: 50 }
     fuente_umbral: "FIN-POL-004 §5"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "saldo_abierto del cliente en v_cartera_cliente"
     unidad: días
     rango: { min: 0, max: null }
@@ -151,6 +168,14 @@ metricas:
     umbral_alerta: "< 10 días en clase A (política de inventario); crítico < 5 días con pedidos pendientes"
     umbrales: { cobertura_dias: { por: clase_abc, valores: { A: 10, B: 7 } } }
     fuente_umbral: "OPE-POL-007 §2; clase B < 7 días; clase C sin acción automática, no alerta"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
+      niveles:
+        - nivel: critical
+          fuente: "OPE-POL-007 §2: cobertura menor a 5 días con pedidos pendientes de despacho es crítico"
+          cuando:
+            - { columna: cobertura_dias, op: "<", umbral: 5 }
+            - { columna: pedidos_pendientes, op: ">", umbral: 0 }
     pesos_en_riesgo: "demanda_prom_30d * (cobertura mínima de la clase - cobertura_dias) * precio_lista vigente en v_precio_sku"
     unidad: días
     rango: { min: 0, max: null }
@@ -200,6 +225,8 @@ metricas:
     umbral_alerta: "> 5% sin un cambio de precio_lista en v_precio_sku dentro de 10 días hábiles"
     umbrales: { variacion_pct: 5, dias_habiles_sin_traslado: 10 }
     fuente_umbral: "OPE-POL-007 §4"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "(costo_unitario - costo_anterior) * unidades vendidas del SKU desde fecha_vigencia en v_ventas"
     unidad: "%"
     rango: { min: null, max: null }
@@ -274,6 +301,8 @@ metricas:
     umbral_alerta: "> 0 en una orden no recibida"
     umbrales: { dias_retraso: 0, recibida: false }
     fuente_umbral: "OPE-POL-007 §3"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "cantidad * costo_unitario de la orden"
     unidad: días
     rango: { min: 0, max: null }
@@ -302,6 +331,8 @@ metricas:
     umbral_alerta: "cualquier línea; agrupar por vendedor y semana"
     umbrales: { descuento_en_exceso: 0 }
     fuente_umbral: "COM-POL-002 §2 y §3; dos semanas consecutivas del mismo vendedor escala según §5"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "sum(descuento_en_exceso)"
     unidad: COP
     rango: { min: 0, max: null }
@@ -331,6 +362,8 @@ metricas:
     umbral_alerta: "margen_bruto < 0"
     umbrales: { margen_bruto: 0 }
     fuente_umbral: "COM-POL-002 §4; los datos no registran la aprobación escrita de Gerencia General"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "-sum(margen_bruto)"
     unidad: COP
     rango: { min: null, max: 0 }
@@ -359,6 +392,8 @@ metricas:
     umbral_alerta: "> 3 veces el intervalo habitual en clientes con 10 o más pedidos"
     umbrales: { pedidos: 10, veces_intervalo_habitual: 3 }
     fuente_umbral: "kit"
+    severidad:
+      por_defecto: { nivel: high, fuente: "supuesto: incumplir una regla escrita es high" }
     pesos_en_riesgo: "valor_neto promedio por mes del cliente en v_ventas, últimos 6 meses hasta ultima_compra"
     unidad: veces
     rango: { min: 0, max: null }

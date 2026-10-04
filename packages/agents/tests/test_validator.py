@@ -1,9 +1,11 @@
 # One planted violation per rule of the validator, each on a copy of the base, so a rule that
 # never fires fails here. The base itself must pass with no problem. A plant that needs other
 # grounds, a threshold of metricas.yaml, returns them as keywords of grounds().
+from dataclasses import replace
+
 import pytest
 
-from centinela_agents.metrics import Metrics, load_metrics
+from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import GATE
 from centinela_agents.validator import InvalidTree, checked_base, load_base, load_registry, problems
 from support import ARBOL, METRICAS, SKILLS, KERNEL_CATALOG, base_data, grounds, node_of
@@ -67,7 +69,7 @@ def add_node(node):
 def set_threshold(metric, column, spec):
     def plant(data):
         real = load_metrics(METRICAS)
-        return {"metrics": Metrics(real.descriptions, {**real.thresholds, metric: {**real.thresholds[metric], column: spec}})}
+        return {"metrics": replace(real, thresholds={**real.thresholds, metric: {**real.thresholds[metric], column: spec}})}
     return plant
 
 
@@ -157,7 +159,7 @@ def test_the_validator_refuses_each_planted_violation(name, plant, expected):
 
 def test_a_metric_with_no_branch_skill_or_action_row_is_refused():
     real = load_metrics(METRICAS)
-    metrics = Metrics({**real.descriptions, "metrica_nueva": "Nueva"}, {**real.thresholds, "metrica_nueva": {"x": 1}})
+    metrics = replace(real, descriptions={**real.descriptions, "metrica_nueva": "Nueva"}, thresholds={**real.thresholds, "metrica_nueva": {"x": 1}})
     found = problems(base_data(), grounds(metrics=metrics))
     assert "metric metrica_nueva has no L3 branch in detectar" in found
     assert "metric metrica_nueva has no skills/analista/metrica_nueva.md" in found

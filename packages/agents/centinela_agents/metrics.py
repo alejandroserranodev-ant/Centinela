@@ -11,6 +11,10 @@ class Metrics:
     thresholds: Mapping[str, Mapping[str, Any]]
     labels: Mapping[str, str] = field(default_factory=dict)
     dimension_labels: Mapping[str, str] = field(default_factory=dict)
+    rules: Mapping[str, str] = field(default_factory=dict)
+    threshold_sources: Mapping[str, str] = field(default_factory=dict)
+    severities: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    tranches: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -25,6 +29,10 @@ def load_metrics(path: Path) -> Metrics:
         thresholds={name: entry.get("umbrales", {}) for name, entry in entries.items()},
         labels={name: entry["etiqueta"] for name, entry in entries.items()},
         dimension_labels=document["nombres_dimensiones"],
+        rules={name: entry.get("umbral_alerta", "") for name, entry in entries.items()},
+        threshold_sources={name: entry.get("fuente_umbral", "") for name, entry in entries.items()},
+        severities={name: entry["severidad"] for name, entry in entries.items() if "severidad" in entry},
+        tranches={name: entry["tramos"] for name, entry in entries.items() if "tramos" in entry},
     )
 
 
