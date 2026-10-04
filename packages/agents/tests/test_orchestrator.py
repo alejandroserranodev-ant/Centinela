@@ -1,9 +1,11 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from langgraph.checkpoint.memory import InMemorySaver
 
 from centinela_agents.day import AlertRun, Verdict
-from centinela_agents.graph import classified
+from centinela_agents.graph import GATE, classified
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
@@ -117,7 +119,26 @@ def test_a_request_for_changes_returns_a_paused_alert_through_the_nodes_of_its_o
     orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
     reject = {"id": "dec-1", "kind": "request_changes", "reason": "La propuesta no sirve", "simulated_day": DECISION_DAY}
     returned = orchestrator.resume("A1", reject)
-    assert "hoja.estratega.proponer" in [node for node, _ in returned["camino"]][5:]
+    walked = [node for node, _ in returned["camino"]]
+    assert "hoja.estratega.proponer" in walked[walked.index(GATE):]
     assert returned["arbol_version"] == 1
-    assert split not in [node for node, _ in returned["camino"]]
+    assert split not in walked
     assert split in [node for node, _ in orchestrator.start(saldo_detection(), alert_id="A2", day=DAY)["camino"]]
+
+
+def test_use_tree_points_the_sources_at_the_nodes_of_the_tree_in_use():
+    orchestrator, _ = paused_saldo_alert()
+    split = "proponer.cartera.saldo_vencido.division_1"
+    assert split not in orchestrator.sources.nodes
+    orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
+    assert split in orchestrator.sources.nodes
+
+
+def test_an_alert_that_started_on_a_version_the_orchestrator_does_not_hold_has_no_paused_graph():
+    orchestrator, action_id = paused_saldo_alert()
+    orchestrator._graphs.clear()
+    assert orchestrator.graph_of("A1") is None
+    assert not orchestrator.is_awaiting_decision("A1")
+    assert orchestrator.get_state("A1") == {}
+    with pytest.raises(LookupError):
+        orchestrator.resume("A1", approve(action_id=action_id))

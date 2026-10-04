@@ -328,7 +328,11 @@ It is code, except the step that classifies a rejection reason.
   `centinela_agents/orchestrator.py:CentinelaOrchestrator.use_tree(tree)` last received: `run_day`
   walks it whatever nodes its context carries, and a decision resumes on the graph of the version
   the alert started on, `centinela_agents/orchestrator.py:CentinelaOrchestrator.graph_of(alert_id)`,
-  because the checkpoint is that graph's. A start on
+  because the checkpoint is that graph's; an alert whose version the orchestrator does not hold
+  has no paused graph (`is_awaiting_decision` is false and `resume` raises `LookupError`), and the
+  graphs are kept for the life of the process, so memory grows by one compiled graph per version
+  and nothing evicts one while a paused alert may still need it. `use_tree` also points the
+  evidence's `Sources` at the nodes of that tree. A start on
   an alert whose thread has ended runs on a fresh thread, `centinela_agents/graph.py:fresh(graph, alert_id)`,
   so nothing of the earlier run stays, and a start on one that awaits a decision is refused.
 - **Tools: none.** No step needs a query, a policy or an action, so the graph gives it no tool.

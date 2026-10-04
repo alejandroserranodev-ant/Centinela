@@ -154,6 +154,12 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
     raise error
 
 
+def leaf_input(leaf, state: Mapping[str, Any]) -> Mapping[str, Any]:
+    if leaf.agente == "ejecutor":
+        return {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
+    return {**state, "excluye": list(leaf.excluye)} if leaf.excluye else state
+
+
 def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int | None = None):
     leaf = node.hoja
 
@@ -161,11 +167,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
         write = get_stream_writer()
         step = {"alert_id": state.get("alert_id"), "agent": leaf.agente, "node": node.id, "description": STEP_LABELS.get((leaf.agente, leaf.decision), leaf.decision)}
         write({**step, "status": "running"})
-        given = (
-            {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
-            if leaf.agente == "ejecutor"
-            else {**state, "excluye": list(leaf.excluye)} if leaf.excluye else state
-        )
+        given = leaf_input(leaf, state)
         cleared = {key: None for key in LEAF_OUTPUTS.get((leaf.agente, leaf.decision), ())}
         with metering(leaf.agente, spent(state.get("cost")), token_cap) as meter:
             try:

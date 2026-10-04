@@ -2,9 +2,9 @@
 # compiled with stub leaves and a stub KPI reader, and each test names its case. The order of a
 # day, the coverage by earlier alerts and the verdicts are in tests/test_day.py; a second
 # avanzar and a reason handed to the next run need apps/api's record and are not here.
-import pytest
-
 from unittest.mock import MagicMock
+
+import pytest
 
 from centinela_agents.agents.estratega import propose_actions
 from centinela_agents.catalog import Catalog, Kpi
@@ -309,7 +309,10 @@ def test_orq_a_split_leaf_that_excludes_every_row_reaches_one_manual_review():
     provider = MagicMock()
     provider.generate_structured.side_effect = AssertionError("the model was called")
     rows = {"saldo_vencido": [SALDO_ROW]}
-    kernel = lambda name, arguments: {"kpi": arguments["kpi"], "dia": arguments["dia"], "consulta": "SELECT 1", "filas": rows.get(arguments["kpi"], [])}
+
+    def kernel(name, arguments):
+        return {"kpi": arguments["kpi"], "dia": arguments["dia"], "consulta": "SELECT 1", "filas": rows.get(arguments["kpi"], [])}
+
     sources = Sources(kernel, KERNEL_CATALOG, load_metrics(METRICAS), index(base_tree()))
     every = tuple(f"act-saldo_vencido-r{n}" for n in range(1, 6))
     nothing = {("estratega", "proponer"): lambda state: propose_actions(provider, state, state.get("cause"), sources)}
