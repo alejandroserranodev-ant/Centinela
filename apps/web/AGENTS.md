@@ -18,6 +18,7 @@ and what each shows is
 | `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
 | `src/api/client.ts` | the one module the screens import the API from; it re-exports `src/api/http-client.ts` |
 | `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
+| `src/api/sse.ts` | `readSse(body)`, which reads a server-sent event stream as `event` and parsed `data` pairs, the name from each event's `event:` line; `src/api/sse.test.ts` tests it with Node's test runner |
 | `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and the person every decision is sent as |
 | `src/api/types.ts` | the contract the client and the screens share, following `apps/api`'s Pydantic models |
 | `src/api/fixtures/` | the illustrative data the screens ran on before the fetch client; no module imports it |
@@ -27,7 +28,7 @@ and what each shows is
 | `src/app.css` | the layout Arena does not ship, written in Arena's tokens only: the shell's grid, the inbox's two columns, the alert row, the totals, the chat bubbles |
 | `index.html` | the page shell; its inline script puts the stored or preferred palette's class on the document before React loads, so the first paint wears the right theme. Its palette list matches `arena.config.json` and the call to `initArenaTheme` in `src/main.tsx` |
 | `vite.config.ts` | Vite with the React plugin and nothing else |
-| `tsconfig.json` | strict TypeScript over `src/` and the Vite config, with no emit, because Vite builds and `tsc` only checks |
+| `tsconfig.json` | strict TypeScript over `src/` and the Vite config, with no emit, because Vite builds and `tsc` only checks; it allows `.ts` import paths, because Node runs a test's imports as written |
 | `arena.config.json` | Centinela's palettes, light and dark, its fonts, and the style plugin Arena reads |
 | `design/centinela/plugin.tokens.json` | the style plugin: Centinela's answer to every role Arena's style kernel asks |
 | `design/identity.html` | the approved appearance, each choice with its reason |
@@ -71,8 +72,7 @@ and what each shows is
   disagree is listed under the rules below.
 - **The agents' current step is on screen while they work.** `src/shell/CurrentStep.tsx:CurrentStep()`
   renders the `step` events of the day run, which `apps/api` streams by SSE
-  ([`../api/AGENTS.md`](../api/AGENTS.md)). The fetch client yields none, as the rules
-  below say.
+  ([`../api/AGENTS.md`](../api/AGENTS.md)).
 - **Code is written in English; what a person reads stays in Spanish.** Files, components,
   functions, types, props, state keys and our own CSS classes are English. Every text on screen,
   including `aria-label`s, hints and notices, is Spanish, and so is the displayed content of the
@@ -138,6 +138,7 @@ Run from this directory, after `npm install`:
 | `npm run dev` | regenerates Arena's stylesheets, then serves the app with hot reload |
 | `npm run build` | regenerates the stylesheets, typechecks, and builds into `dist/` |
 | `npm run typecheck` | typechecks only |
+| `npm test` | runs the tests of `src/` with Node's test runner, which strips their types |
 | `npm run arena:audit` | regenerates the stylesheets and fails on a rule of Arena's language broken in `src/` |
 
 `arena-to-prod` writes the stylesheets `src/main.tsx` imports; [`../../GENERATED.md`](../../GENERATED.md)
@@ -173,15 +174,9 @@ a table view.
   vocabulary reaches a manager's screen.
 - **A rejection and a request for changes go through `src/screens/ReasonDialog.tsx:ReasonDialog()`**,
   which sends nothing without a reason, and the reason travels in the `Decision`.
-- **What the client sends and reads matches the API.** *No gate holds this*, and these
-  places break it, each costing the step of the demo named:
-  - `advanceDay` and `chat`, the async generators of `src/api/http-client.ts`, read an
-    SSE event's name from its JSON body, but `apps/api` writes it on the `event:` line, and names
-    the day run's step `agent_step` where the types say `step`. A day run
-    therefore yields nothing: the simulated day on screen does not move, the inbox does not
-    refresh and no notice appears until the page is reloaded; a chat answer never arrives.
-  - `decide` sends a `request_changes` as a `reject` carrying the same reason, because the API has
-    no `request_changes`: asking for another proposal closes the alert as rejected.
+- **What the client sends and reads matches the API.** *No gate holds this*, and one place
+  breaks it: `decide` sends a `request_changes` as a `reject` carrying the same reason, because
+  the API has no `request_changes`, so asking for another proposal closes the alert as rejected.
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.
 - **Arena's rules hold in every source file**: tokens only, no class of ours on an Arena
   component, one primary action per view, danger as outline. `npm run arena:audit` holds the ones

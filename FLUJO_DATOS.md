@@ -21,7 +21,7 @@ steps.
    `packages/agents/centinela_agents/walk.py:detect(ctx, day)` walks the detection nodes over the
    reader's rows. The router keeps only the detections whose metric is in `API_METRICS`, because
    the API's `Alert` model accepts no other.
-3. For each detection the stream sends an `agent_step` event. Then
+3. For each detection the stream sends a `step` event, an `AgentStep` of `vigia`. Then
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)`
    runs the graph in a worker thread, through `asyncio.to_thread`, so the event loop keeps
    serving the stream. It runs until the approval interrupt or an end. The orchestrator comes from
@@ -33,7 +33,7 @@ steps.
    `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)`, in whatever status the graph
    reached, and writes one `alert` row, actor `vigia`, with
    `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id)`.
-5. Another `agent_step` reports the proposal, and the stream closes with `end`, which carries the
+5. Another `step`, of `estratega`, reports the proposal, and the stream closes with `end`, which carries the
    simulated day and the ids of the new alerts. `apps/api/src/centinela_api/sse.py:flujo(eventos)`
    writes each event's name on its `event:` line.
 

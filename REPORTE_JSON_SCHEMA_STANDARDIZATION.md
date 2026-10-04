@@ -26,8 +26,8 @@ What each endpoint serves and refuses is the endpoint table of that page.
   `json_schema_extra`.
 - **Every JSON route declares its `response_model`**, so the schema names its response. The SSE
   routes (`/simulacion/avanzar`, `/chat`) return a `StreamingResponse` and declare none; the
-  models of their events are `AgentStep` and `ChatMessage`, except the `agent_step` and `end`
-  events of `avanzar`, which are plain dictionaries the schema does not describe.
+  models of their events are `AgentStep` and `ChatMessage`, except the `end` event of
+  `avanzar`, a plain dictionary the schema does not describe.
 - **Query parameters carry a description**, and the endpoint's docstring is its description in
   the schema.
 - **Routers are tagged** where the schema groups them: `alerts` for `/alertas` and `internal` for

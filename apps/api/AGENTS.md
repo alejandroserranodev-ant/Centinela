@@ -27,7 +27,7 @@ comes from the dataset. The sections marked below hold decisions the code does n
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
 | `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py` and `tests/test_decisiones.py` are pure; `tests/test_flujo_agentes.py` mocks the database; `tests/test_api_integracion.py` needs Postgres |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_chat.py` are pure; `tests/test_flujo_agentes.py` and `tests/test_avanzar.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -63,7 +63,7 @@ minimal API section; its paths stay as the brief writes them. The web consumes t
 | Method | Path | Serves | Refuses | Web function |
 |---|---|---|---|---|
 | GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulationState` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `agent_step` events per detection and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject`, with headers `X-User-Name` and `X-User-Role` | 403 for a role that may not decide; 404; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |

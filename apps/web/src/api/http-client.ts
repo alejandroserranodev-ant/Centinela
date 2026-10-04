@@ -1,6 +1,8 @@
 import { API_BASE_URL, API_HEADERS, getDecisionHeaders } from './config';
+import { readSse } from './sse';
 import type {
   AdvanceEvent,
+  AgentStep,
   Alert,
   AlertFilter,
   ChatEvent,
@@ -57,42 +59,18 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
     throw new ApiError(response.status, response.statusText);
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) {
+  if (!response.body) {
     throw new Error('No response body');
   }
 
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const event = data.event as string;
-            if (event === 'end') {
-              yield {
-                event: 'end',
-                data: { simulatedDay: data.simulatedDay, newAlerts: data.newAlerts },
-              };
-            }
-          } catch (e) {
-            console.error('Failed to parse SSE event:', line, e);
-          }
-        }
-      }
+  for await (const { event, data } of readSse(response.body)) {
+    if (event === 'step') {
+      yield { event: 'step', data: data as AgentStep };
+    } else if (event === 'alert') {
+      yield { event: 'alert', data: data as Alert };
+    } else if (event === 'end') {
+      yield { event: 'end', data: data as { simulatedDay: string; newAlerts: string[] } };
     }
-  } finally {
-    reader.releaseLock();
   }
 }
 
@@ -145,41 +123,18 @@ export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator
     throw new ApiError(response.status, response.statusText);
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) {
+  if (!response.body) {
     throw new Error('No response body');
   }
 
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const event = data.event as string;
-            if (event === 'step') {
-              yield { event: 'step', data: data };
-            } else if (event === 'end') {
-              yield { event: 'end', data: data as ChatMessage };
-            }
-          } catch (e) {
-            console.error('Failed to parse SSE event:', line, e);
-          }
-        }
-      }
+  for await (const { event, data } of readSse(response.body)) {
+    if (event === 'step') {
+      yield { event: 'step', data: data as AgentStep };
+    } else if (event === 'chunk') {
+      yield { event: 'chunk', data: data as { text: string } };
+    } else if (event === 'end') {
+      yield { event: 'end', data: data as ChatMessage };
     }
-  } finally {
-    reader.releaseLock();
   }
 }
 
