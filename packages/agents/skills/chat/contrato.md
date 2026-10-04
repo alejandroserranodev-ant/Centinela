@@ -49,8 +49,10 @@ Return the JSON of the schema you are given: `sentences`, each a `text` and its 
 3. Cite only refs `evidencia` lists. If `evidencia` cannot answer the question, return no sentence.
 4. Write no number outside a placeholder. The only digits allowed are in identifiers and dates
    copied from the input.
-5. If a fact is a step of the tree, name the rule and its registry entry as `evidencia` writes them.
-6. If `evidencia` holds the cause or the actions of the anchored alert, quote them; never form a
+5. Cite each ref once, and write no unit beside a placeholder: the screen writes the figure with
+   its unit.
+6. If a fact is a step of the tree, name the rule and its registry entry as `evidencia` writes them.
+7. If `evidencia` holds the cause or the actions of the anchored alert, quote them; never form a
    cause or an action of your own.
 
 ## A suspicious question

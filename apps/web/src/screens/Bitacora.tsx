@@ -24,6 +24,9 @@ const EVENT: Record<LogEventType, string> = {
   decision: 'Decisión',
   action: 'Acción',
   result: 'Resultado',
+  question: 'Pregunta',
+  answer: 'Respuesta',
+  refusal: 'Pregunta rechazada',
 };
 
 const STAGE: Record<Agent, string> = {
@@ -31,6 +34,7 @@ const STAGE: Record<Agent, string> = {
   analista: 'análisis',
   estratega: 'propuesta',
   ejecutor: 'ejecución',
+  chat: 'chat',
 };
 
 const COLUMNS: ArenaTableColumn[] = [
@@ -77,7 +81,7 @@ export function Bitacora() {
 
   return (
     <div className="arena-band page arena-stack arena-stack--section">
-      <ArenaPageHead title="Bitácora" subtitle="Cada detección, propuesta, decisión y resultado, del más reciente al más antiguo" />
+      <ArenaPageHead title="Bitácora" subtitle="Cada detección, propuesta, decisión, resultado y pregunta al chat, del más reciente al más antiguo" />
       <div className="filters">
         <ArenaSelect
           label="Alerta"
@@ -112,9 +116,15 @@ export function Bitacora() {
             <ArenaTableRow key={e.id}>
               <ArenaTableCell>{formatShortDateTime(e.date)}</ArenaTableCell>
               <ArenaTableCell>{formatShortDate(e.simulatedDay)}</ArenaTableCell>
-              <ArenaTableCell href={`/alertas/${e.alertId}`} onNavigate={() => navigate(`/alertas/${e.alertId}`)}>
-                {titles.get(e.alertId) ?? e.alertId}
-              </ArenaTableCell>
+              {e.alertId ? (
+                <ArenaTableCell href={`/alertas/${e.alertId}`} onNavigate={() => navigate(`/alertas/${e.alertId}`)}>
+                  {titles.get(e.alertId) ?? e.alertId}
+                </ArenaTableCell>
+              ) : (
+                <ArenaTableCell>
+                  <span className="text-muted">Chat, sin alerta</span>
+                </ArenaTableCell>
+              )}
               <ArenaTableCell>
                 <ArenaTag>{EVENT[e.type]}</ArenaTag>
               </ArenaTableCell>

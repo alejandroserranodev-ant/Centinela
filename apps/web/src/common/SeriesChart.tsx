@@ -26,6 +26,7 @@ const TITLE_BY_SOURCE: Record<QuerySource, string> = {
   v_descuentos_fuera_politica: 'Descuentos fuera de política',
   v_actividad_cliente: 'Actividad del cliente',
   alertas: 'Alertas',
+  kernel: 'KPI del kernel',
 };
 
 export function sourceTitle(source: QuerySource): string {

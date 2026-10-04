@@ -9,6 +9,7 @@ const STAGE_NAME: Record<Agent, string> = {
   analista: 'Explicando la causa',
   estratega: 'Preparando la propuesta',
   ejecutor: 'Ejecutando lo aprobado',
+  chat: 'Respondiendo una pregunta',
 };
 
 export function CurrentStep() {

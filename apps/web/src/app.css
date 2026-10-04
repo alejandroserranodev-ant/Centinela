@@ -345,6 +345,12 @@ ol {
   align-items: start;
 }
 
+.chat__path ol {
+  margin: 0;
+  padding-inline-start: var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
 .chat__conversation {
   list-style: none;
   padding: 0;

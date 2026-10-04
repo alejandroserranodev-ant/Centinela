@@ -30,8 +30,16 @@ function locate(text: string, figures: Figure[]): Span[] {
   return spans.sort((a, b) => a.start - b.start);
 }
 
-export function SentenceWithFigures({ text, figures }: { text: string; figures: Figure[] }) {
+function filled(text: string, figures: Figure[]): string {
+  return text.replace(/\{(\d+)\}/g, (placeholder, index: string) => {
+    const figure = figures[Number(index)];
+    return figure ? formatFigureInText(figure) : placeholder;
+  });
+}
+
+export function SentenceWithFigures({ text: written, figures }: { text: string; figures: Figure[] }) {
   const { openQuery } = useSimulation();
+  const text = filled(written, figures);
   const parts: ReactNode[] = [];
   let cursor = 0;
   for (const span of locate(text, figures)) {

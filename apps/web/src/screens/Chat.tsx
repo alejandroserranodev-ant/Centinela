@@ -9,24 +9,50 @@ import {
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
 import { chat, getAlert, getQuery } from '../api/client';
-import type { ChatMessage, Query } from '../api/types';
+import type { ChatMessage, ChatOutcome, Query } from '../api/types';
 import { SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
 
 const FIELD_ID = 'chat-question';
 
+const MAX_QUESTION = 500;
+
 type Entry =
   | { id: number; role: 'user'; text: string }
-  | { id: number; role: 'centinela'; status: 'searching' | 'writing'; step: string; text: string }
-  | { id: number; role: 'centinela'; status: 'ready'; message: ChatMessage }
+  | { id: number; role: 'centinela'; status: 'searching' | 'writing'; step: string; text: string; path: string[] }
+  | { id: number; role: 'centinela'; status: 'ready'; message: ChatMessage; path: string[] }
   | { id: number; role: 'centinela'; status: 'error' };
 
-const ALERT_SUGGESTIONS: Record<string, string[]> = {
-  'alert-hogar-margin': ['¿Qué clientes compran esos SKU?'],
+const ALERT_SUGGESTIONS = ['¿Por qué se generó esta alerta?', '¿Qué propones hacer?', '¿Cuál es la causa?'];
+
+const GLOBAL_SUGGESTIONS = [
+  '¿Qué clientes tienen más saldo vencido hoy?',
+  '¿Cómo va la cobertura de inventario?',
+  '¿Cuál es la tasa de cambio del dólar hoy?',
+];
+
+const UNANSWERED: Record<Exclude<ChatOutcome, 'answered'>, { title: string; icon: string }> = {
+  no_evidence: { title: 'Sin evidencia suficiente', icon: 'ph-bold ph-question' },
+  out_of_scope: { title: 'Fuera de lo que respondo', icon: 'ph-bold ph-signpost' },
+  refused: { title: 'Pregunta no procesada', icon: 'ph-bold ph-shield-warning' },
 };
 
-const GLOBAL_SUGGESTIONS = ['¿Cómo va el margen de Hogar?', '¿Cuál es la tasa de cambio del dólar hoy?'];
+function Path({ steps }: { steps: string[] }) {
+  if (steps.length === 0) {
+    return null;
+  }
+  return (
+    <div className="arena-stack chat__path">
+      <span className="eyebrow">Camino en el árbol de decisión</span>
+      <ol className="text-muted">
+        {steps.map((step, index) => (
+          <li key={index}>{step}</li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 function MessageChart({ message }: { message: ChatMessage }) {
   const [source, setSource] = useState<Query | null>(null);
@@ -60,12 +86,17 @@ function Answer({ entry }: { entry: Exclude<Entry, { role: 'user' }> }) {
       </div>
     );
   }
-  const { message } = entry;
-  if (!message.enoughEvidence) {
+  const { message, path } = entry;
+  const outcome = message.outcome === 'answered' && !message.enoughEvidence ? 'no_evidence' : message.outcome;
+  if (outcome !== 'answered') {
+    const { title, icon } = UNANSWERED[outcome];
     return (
-      <ArenaAlert tone="info" icon="ph-bold ph-question" title="Sin evidencia suficiente">
-        <SentenceWithFigures text={message.text} figures={message.figures} />
-      </ArenaAlert>
+      <div className="arena-stack arena-stack--group">
+        <ArenaAlert tone="info" icon={icon} title={title}>
+          <SentenceWithFigures text={message.text} figures={message.figures} />
+        </ArenaAlert>
+        <Path steps={path} />
+      </div>
     );
   }
   return (
@@ -74,6 +105,7 @@ function Answer({ entry }: { entry: Exclude<Entry, { role: 'user' }> }) {
         <SentenceWithFigures text={message.text} figures={message.figures} />
       </p>
       <MessageChart message={message} />
+      <Path steps={path} />
     </div>
   );
 }
@@ -132,13 +164,16 @@ export function Chat() {
     setEntries((current) => [
       ...current,
       { id: questionId, role: 'user', text: clean },
-      { id: answerId, role: 'centinela', status: 'searching', step: 'Buscando la respuesta', text: '' },
+      { id: answerId, role: 'centinela', status: 'searching', step: 'Buscando la respuesta', text: '', path: [] },
     ]);
     try {
       for await (const event of chat({ question: clean, ...(state.alertId ? { alertId: state.alertId } : {}) })) {
         if (event.event === 'step') {
           const step = event.data.description;
-          update(answerId, (e) => (e.role === 'centinela' && e.status === 'searching' ? { ...e, step } : e));
+          const walked = event.data.node ? [step] : [];
+          update(answerId, (e) =>
+            e.role === 'centinela' && e.status === 'searching' ? { ...e, step, path: [...e.path, ...walked] } : e,
+          );
         } else if (event.event === 'chunk') {
           const chunk = event.data.text;
           update(answerId, (e) =>
@@ -148,7 +183,13 @@ export function Chat() {
           );
         } else {
           const message = event.data;
-          update(answerId, () => ({ id: answerId, role: 'centinela', status: 'ready', message }));
+          update(answerId, (e) => ({
+            id: answerId,
+            role: 'centinela',
+            status: 'ready',
+            message,
+            path: e.role === 'centinela' && e.status !== 'error' ? e.path : [],
+          }));
         }
       }
     } catch {
@@ -170,7 +211,7 @@ export function Chat() {
     }
   };
 
-  const suggestions = state.alertId ? (ALERT_SUGGESTIONS[state.alertId] ?? []) : GLOBAL_SUGGESTIONS;
+  const suggestions = state.alertId ? ALERT_SUGGESTIONS : GLOBAL_SUGGESTIONS;
 
   return (
     <ArenaSheet
@@ -187,6 +228,8 @@ export function Chat() {
             id={FIELD_ID}
             label="Tu pregunta"
             rows={2}
+            maxLength={MAX_QUESTION}
+            counter
             hint="Enter envía; Mayús + Enter, nueva línea"
             value={question}
             onChange={setQuestion}
@@ -211,7 +254,9 @@ export function Chat() {
         </div>
         {entries.length === 0 ? (
           <div className="arena-stack arena-stack--group">
-            <p className="text-muted">Respondo con los datos de la empresa, y cada cifra lleva su fuente. Por ejemplo:</p>
+            <p className="text-muted">
+              Respondo con los datos de la empresa y cada cifra lleva su fuente. No apruebo ni ejecuto: eso se decide en la bandeja. Por ejemplo:
+            </p>
             <div className="arena-stack chat__suggestions">
               {suggestions.map((s) => (
                 <ArenaButton key={s} variant="ghost" size="sm" icon="ph-bold ph-chat-circle-text" onClick={() => void ask(s)}>

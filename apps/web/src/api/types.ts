@@ -21,7 +21,7 @@ export type SemanticView =
   | 'v_descuentos_fuera_politica'
   | 'v_actividad_cliente';
 
-export type QuerySource = SemanticView | 'alertas';
+export type QuerySource = SemanticView | 'alertas' | 'kernel';
 
 export interface Query {
   id: string;
@@ -107,11 +107,12 @@ export interface Alert {
 
 export type MergedAlert = Pick<Alert, 'id' | 'metric' | 'simulatedDate' | 'title' | 'pesosAtRisk' | 'cause'>;
 
-export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor';
+export type Agent = 'vigia' | 'analista' | 'estratega' | 'ejecutor' | 'chat';
 
 export interface AgentStep {
   alertId: string | null;
   agent: Agent;
+  node?: string | null;
   status: 'running' | 'done';
   description: string;
   start: string;
@@ -125,27 +126,39 @@ export interface User {
 
 export type Actor = { kind: 'agent'; agent: Agent } | ({ kind: 'person' } & User);
 
-export type LogEventType = 'alert' | 'evidence' | 'proposal' | 'decision' | 'action' | 'result';
+export type LogEventType =
+  | 'alert'
+  | 'evidence'
+  | 'proposal'
+  | 'decision'
+  | 'action'
+  | 'result'
+  | 'question'
+  | 'answer'
+  | 'refusal';
 
 export interface LogEvent {
   id: string;
   date: string;
   simulatedDay: string;
-  alertId: string;
+  alertId: string | null;
   type: LogEventType;
   actor: Actor;
   detail: string;
   queryId?: string;
 }
 
+export type ChatOutcome = 'answered' | 'no_evidence' | 'out_of_scope' | 'refused';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'centinela';
   text: string;
   figures: Figure[];
-  alertId?: string;
+  alertId?: string | null;
   series?: SeriesPoint[];
   enoughEvidence: boolean;
+  outcome: ChatOutcome;
   date: string;
 }
 

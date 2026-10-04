@@ -115,7 +115,7 @@ export async function decide(id: string, decision: Decision): Promise<Alert> {
 export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator<ChatEvent> {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: 'POST',
-    headers: API_HEADERS,
+    headers: getDecisionHeaders(),
     body: JSON.stringify({ question, alertId }),
   });
 
@@ -246,6 +246,6 @@ export async function listBitacora(filter: LogFilter = {}): Promise<LogEvent[]> 
   return fetchJson<LogEvent[]>(url.toString());
 }
 
-export async function getQuery(_id: string): Promise<Query> {
-  throw new ApiError(404, 'No existe esa consulta');
+export async function getQuery(id: string): Promise<Query> {
+  return fetchJson<Query>(`${API_BASE_URL}/consultas/${encodeURIComponent(id)}`);
 }
