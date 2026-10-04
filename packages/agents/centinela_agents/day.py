@@ -155,6 +155,7 @@ def run_day(graph, ctx: Context, day: str, *, earlier: Iterable[Earlier] = (), w
                     proposal_rejections=(proposal_rejections or {}).get(detection.metric, ()),
                     tracer=tracer,
                     masking=masking,
+                    arbol_version=ctx.version,
                 ):
                     yield step_of(written, detection)
                 state = graph.get_state(thread(current)).values

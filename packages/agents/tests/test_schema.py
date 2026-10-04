@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from centinela_agents.schema import Tree, branches, index, level, reachable, stage_of
+from centinela_agents.schema import AGENT_DECISIONS, Tree, branches, index, level, live, reachable, resolve, stage_of
 from centinela_agents.yaml_loader import parse_yaml
 
 TREE = {
@@ -65,3 +65,27 @@ def test_reachable_skips_the_nodes_it_is_told_to_avoid():
     nodes = index(Tree.model_validate(TREE))
     assert reachable(nodes, ["hoja.vigia.titular"]) == {"hoja.vigia.titular", "explicar.x", "fin.unida", "fin.rechazada"}
     assert reachable(nodes, ["hoja.vigia.titular"], without=frozenset({"explicar.x"})) == {"hoja.vigia.titular"}
+
+
+CHAIN = {
+    "version": 1,
+    "nodos": [
+        {"id": "proponer.cartera.a", "fundamento": "x", "predicado": {"lee": "estado.actions", "op": "existe"}, "si": "hoja.estratega.n", "no": "proponer.cartera.b", "divide": "hoja.estratega.proponer"},
+        {"id": "proponer.cartera.b", "fundamento": "x", "predicado": {"lee": "estado.actions", "op": "existe"}, "si": "hoja.estratega.m", "no": "hoja.estratega.proponer", "divide": "hoja.estratega.proponer", "retirado": "No ayudó"},
+    ],
+}
+
+
+def test_a_reference_to_a_split_resolves_to_the_leaf_it_divides():
+    nodes = index(Tree.model_validate(CHAIN))
+    assert resolve("proponer.cartera.a", nodes) == "hoja.estratega.proponer"
+    assert resolve("hoja.estratega.n", nodes) == "hoja.estratega.n"
+
+
+def test_a_retired_node_lives_on_its_no_branch_alone():
+    nodes = index(Tree.model_validate(CHAIN))
+    assert live(nodes, ["proponer.cartera.a"]) == {"proponer.cartera.a", "hoja.estratega.n", "proponer.cartera.b", "hoja.estratega.proponer"}
+
+
+def test_no_agent_decides_to_expand_at_a_leaf():
+    assert all("expandir" not in decisions for decisions in AGENT_DECISIONS.values())

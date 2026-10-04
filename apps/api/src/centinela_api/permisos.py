@@ -37,6 +37,10 @@ def puede_configurar(persona: Persona) -> bool:
     return persona.role in ("analista", "gerente")
 
 
+def puede_retirar(persona: Persona) -> bool:
+    return persona.role in ("analista", "gerente")
+
+
 AUDITORIA = "Auditoría consulta las alertas; no las decide"
 
 

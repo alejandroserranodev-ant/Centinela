@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, configuracion, consultas, permisos, simulacion
+from .. import arboles, bitacora, ciclo_vida, configuracion, consultas, permisos, simulacion
 from ..agentes import (
     ALERTS_PER_DAY,
     STATUS_A_ESTADO,
@@ -40,6 +40,7 @@ day_run = asyncio.Lock()
 UNIBLES = frozenset({"proposed"})
 VIGIA = ActorAgent(agent="vigia")
 ANALISTA = ActorAgent(agent="analista")
+DIA_FALLIDO = "El análisis de este día no se pudo completar. El equipo técnico tiene el detalle del error."
 
 
 def _unir(conn: psycopg.Connection, alerta: Alert, dia: datetime.date, nota: str) -> Alert | None:
@@ -138,6 +139,7 @@ def _registrar(conn, corrida: AlertRun, dia: datetime.date, day_str: str, nota: 
         alertas_repo.fijar_entidad(conn, alert_id, detection.entity)
         alertas_repo.fijar_costo(conn, alert_id, state.get("cost") or {})
         bitacora.registrar_prompts(conn, alert_id, state.get("prompts") or [], dia)
+        alertas_repo.fijar_version(conn, alert_id, state.get("arbol_version"))
         consultas.registrar(conn, state.get("queries") or [])
         for query in state.get("queries") or []:
             bitacora.registrar(conn, alert_id, "evidence", ANALISTA, detalle_de_consulta(query), dia, query["queryId"])
@@ -195,15 +197,18 @@ async def avanzar(
 
         day_str = nuevo_dia.isoformat()
         new_alert_ids: list[str] = []
+        fallo: str | None = None
 
         try:
             with conn.transaction():
                 ajustes = configuracion.leer(conn)
                 anteriores = alertas_repo.anteriores(conn)
             umbrales = configuracion.umbrales(ajustes)
+            arbol = arboles.del_dia(conn, nuevo_dia)
             ctx = with_thresholds(get_context(), umbrales)
             orq = get_orchestrator()
             orq.use_thresholds(umbrales)
+            orq.use_tree(arbol)
             dia_en_curso = orq.run_day(
                 ctx, day_str,
                 earlier=[earlier_of(alerta, entidad) for alerta, entidad in anteriores],
@@ -246,8 +251,9 @@ async def avanzar(
 
         except Exception as e:
             logger.error(f"Detection phase failed: {e}", exc_info=True)
+            fallo = DIA_FALLIDO
 
-        yield "end", AdvanceEnd(simulated_day=day_str, new_alerts=new_alert_ids)
+        yield "end", AdvanceEnd(simulated_day=day_str, new_alerts=new_alert_ids, failure=fallo)
 
     cierre = BackgroundTasks()
     cierre.add_task(release)

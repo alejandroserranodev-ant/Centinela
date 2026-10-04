@@ -99,7 +99,7 @@ def test_las_filas_se_guardan_como_json_plano():
 def test_las_cifras_de_dos_alertas_propuestas_abren_su_consulta():
     from centinela_api import alertas as alertas_repo
     from centinela_api.db import conectar
-    from tests.test_api_integracion import _alerta_de_prueba, CABECERAS_GERENTE
+    from test_api_integracion import _alerta_de_prueba, CABECERAS_GERENTE
 
     ids = ["alerta_prueba_resumen_a", "alerta_prueba_resumen_b"]
     with conectar() as conn:

@@ -13,7 +13,7 @@ implement.
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion`; `api.alertas` holds `entidad`, the values of the KPI's entity, which coverage compares, and `costos`, the alert's `cost` by agent ([`../../DOUBTS.md`](../../DOUBTS.md#filed-debts) files its default) |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion`, `api.arbol_versiones`, `api.rechazos`; `api.alertas` holds `entidad`, the values of the KPI's entity, which coverage compares, `costos`, the alert's `cost` by agent ([`../../DOUBTS.md`](../../DOUBTS.md#filed-debts) files its default), and `arbol_version`, the version of the tree it walked |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin, mounts the routers and logs every package at INFO |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
 | `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
@@ -31,8 +31,10 @@ implement.
 | `src/centinela_api/simulacion.py` | reads and advances the clock |
 | `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
-| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `bandeja`, `configuracion`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py`, `tests/test_bitacora.py`, `tests/test_permisos.py` and `tests/test_configuracion.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `src/centinela_api/arboles.py` | the tree's versions: the store, the replay when what the validator reads changes, the growth of a day and the retirement of an expansion |
+| `src/centinela_api/rechazos.py` | records each rejection the classifier targeted, with its metric and the actions it rejected, and lists them as evidence |
+| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `bandeja`, `configuracion`, `arbol`, `interno` |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py`, `tests/test_bitacora.py`, `tests/test_permisos.py`, `tests/test_configuracion.py`, `tests/test_arboles.py` and `tests/test_arbol.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -75,7 +77,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day and `ultimoDia`, the last day with data, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of an alert starts and as it ends, opening with the detection, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of an alert starts and as it ends, opening with the detection, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay`, `newAlerts`, the alerts that remain to decide, and `failure`, in Spanish when the day's analysis did not finish, null otherwise | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk; without `estado`, every alert but the merged ones, which `estado=unida` lists | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`, when its graph no longer waits for a decision, or while another decision resumes it; 422 for a failed check | `decide` |
@@ -85,6 +87,8 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 | GET | `/configuracion` | the `Settings`: watched metrics, their thresholds and owners, autonomy per action type | | `getSettings` |
 | PUT | `/configuracion` | saves the `Settings` whole and returns them as stored | 403 unless analista or gerente; 422 for a failed check | `saveSettings` |
+| GET | `/arbol/expansiones` | the expansions of the tree, newest first, as `TreeExpansion`: the agent, the change in Spanish, the alerts behind it, and its status, `active`, `retired` or `inactive`, with who retired it and why, or with `inactiveReason` | | `listExpansions` |
+| POST | `/arbol/expansiones/{id}/retiro` | retires an expansion with a `RetireExpansion` reason and returns it | 403 unless analista or gerente; 404 for an unknown expansion; 409 for one already retired; 422 for a blank reason, an `inactive` expansion, or one the validator refuses, each in Spanish, with the validator's reasons in the log | `retireExpansion` |
 
 **`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, quien, conn)`
 reads the simulated day and the anchored alert, logs the question under the person signed in, and
@@ -159,7 +163,10 @@ transport and its secret, and is the answer to whether the agents run here or as
   merge target, and the absorbed alerts it stored. It reads each result through
   `src/centinela_api/routers/simulacion.py:_siguiente(dia_en_curso, veredicto)`, because a
   `StopIteration` cannot cross `asyncio.to_thread`. Why the order, the cap and the id is
-  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#the-day-run).
+  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#the-day-run). Before the run
+  it takes the newest version of the tree from `src/centinela_api/arboles.py:del_dia(conn, dia)`
+  and hands it to `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.use_tree(tree)`,
+  and `_registrar` stores each alert's `arbol_version`.
 - **`src/centinela_api/agentes.py:state_to_alert(alert_id, state, detection, day_str)` reads the
   graph's state**: the title, the cause and the actions with the figures the leaves cited, and the
   cause's confidence. A figure with no `queryId` is dropped, never given one. Severity and pesos at
@@ -194,6 +201,61 @@ before the day run or the resume, so the re-check before `Ejecutor` reads them t
 never rebuilt, because its `InMemorySaver` holds the paused alerts. An owner decides as described
 under decisions and roles, and an action type at `inform` cannot be approved.
 
+## The tree's versions
+
+**`api.arbol_versiones` holds every version of the client's tree as the move that made it**, keyed
+by the client, `src/centinela_api/arboles.py:CLIENTE`, each with its `origen`, its parent, the agent
+or the person, the alerts that drafted it, the base's `version` and hash, the hash of L0 and L1 and
+the tree it yields, with the simulated day and the real time it was written. A version's id is the `Tree.version` the run walks and each alert stores. What
+a move is, what refuses it and what the drafter returns is
+[`../../packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md#how-the-tree-grows).
+
+| `origen` | Written when |
+|---|---|
+| `base` | the base, or anything else the validator reads, changed since the newest version was written |
+| `expansion` | a move the drafter returned passed its criteria |
+| `retiro` | a person retired an expansion |
+| `descartada` | a draft the criteria refused, which carries its move and its evidence; or a move a replay refuses, which carries its move and names, in `retira`, the row it drops, whose evidence stays on that row. No run walks it |
+
+- **A change to what the validator reads replays the client's moves.**
+  `src/centinela_api/arboles.py:vigente(conn, grounds, growth, dia)` returns the newest version
+  while its stored `base_hash` equals `src/centinela_api/arboles.py:huella(grounds, growth)`, the
+  fingerprint whose inputs
+  [`../../packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md#how-the-tree-grows)
+  lists. Otherwise it replays every `expansion` and `retiro` in order over the base, writes a
+  `base` row, and writes each move the replay refuses once as `descartada`, with a warning in the
+  log and an `arbol` row of the `bitácora`; a retirement of an expansion dropped in the same pass
+  writes nothing, and the expansion stays `retired`. A move written so is never replayed again and
+  its evidence stays consumed, which departs from replaying every move on every replay, because a
+  refused move would otherwise be logged again on every day run, and a move that came back on a
+  later replay could share a node id the drafter has since given another split. Who changed an
+  input is in the commit log, not in the row.
+- **The tree grows at the start of each day run.** `src/centinela_api/arboles.py:del_dia(conn, dia)`
+  takes an advisory lock, reads the version in force through `vigente`, hands the drafter the
+  rejections of `api.rechazos` and every alert a row already names, and writes each move that
+  passed as an `expansion` row with an `arbol` row of the `bitácora` under its agent. A refused
+  draft is written once as `descartada`, with its `arbol` row and a warning, so its evidence is
+  consumed and it is neither drafted again, replayed nor listed. It returns the newest version. A
+  failure of the drafter is logged and the day runs on the version in force; a failure to read or
+  rebuild the stored version is not caught there, and lands in the day run's `Detection phase
+  failed` handler: an ERROR in the log, a clock that has advanced, and an `end` whose `failure`
+  says the day's analysis did not finish, so it does not read as a quiet day.
+- **`api.rechazos` keeps each rejection the classifier targeted**, with the alert's metric, the
+  ids of the actions it rejected and the reason, written by the decision route after the resume;
+  a rejection recorded with no paused graph has no target and keeps nothing.
+- **An expansion is `active`, `retired` or `inactive`**, derived from the current tree: `inactive`
+  is a move a replay dropped, `inactiveReason` `dropped_by_base`, or one no longer live because a
+  move it nests under was retired, `parent_retired`. Between a change to what the validator reads
+  and the next day run they describe the tree built on the old inputs, because a read never writes
+  a version.
+- **A person retires an expansion**, `src/centinela_api/arboles.py:retirar(conn, id, motivo, persona, dia, titulos)`:
+  under the same lock, it refuses an expansion already retired or one not `active`, the retirement
+  of the expansion's first node passes the criteria, then a `retiro` row and an `arbol` row of the
+  `bitácora` under the person are written. It applies from the next day run; an alert already
+  paused keeps the version it started on. The roles are
+  `src/centinela_api/permisos.py:puede_retirar(persona)`'s, `analista` and `gerente`, the roles
+  that configure, because a retirement changes what the agents decide, as a setting does.
+
 ## The clock
 
 **The API owns the simulated clock**, the single row of `api.simulacion`. The first read seeds
@@ -217,7 +279,7 @@ its metric, its entity and its cause's sentence, for `Analista` to name as the s
 stored before `entidad` existed has none and covers nothing.
 
 > **Decided, not built.** The API hands the day run the rejection reasons kept for each metric,
-> each with the target the orchestrator classified it to, the metric and the entity. `avanzar`
+> each with the target the orchestrator classified it to. `api.rechazos` keeps them, and `avanzar`
 > hands none.
 
 ## The alert lifecycle
@@ -379,9 +441,10 @@ figures its detail's placeholders point to.
 | `evidence`, from the chat | `/chat`, one row per query the chat ran |
 | `answer` | `/chat`, the text of an answer with its figures and its first figure's `queryId` |
 | `costo` | `/chat`, one per model step, through `src/centinela_api/bitacora.py:registrar_costo(conn, alerta_id, actor, detalle, dia_simulado)`; `GET /bitacora` never serves it |
-| `prompt` | `avanzar`, a resume and `/chat`, one per model call, the masked prompt the model received, through `src/centinela_api/bitacora.py:registrar_prompts(conn, alerta_id, prompts, dia_simulado)`, so an audit reads what left; `GET /bitacora` never serves it |
+| `prompt` | `avanzar`, a resume and `/chat`, one per model call, the masked prompt the model received, through `src/centinela_api/bitacora.py:registrar_prompts(conn, alerta_id, prompts, dia_simulado)`, so an audit reads what left, in a savepoint of its own, so a failed write is logged and never undoes the alert or the decision; `GET /bitacora` never serves it |
 | `refusal` | `/chat`, a question the screen flagged, one outside the chat's use, or one asking to act |
 | `configuracion` | `PUT /configuracion`, the person who saved and each change, with no alert |
+| `arbol` | the growth of a day, under the agent whose move it is, a move refused by the criteria or dropped by a replay, and a retirement, under the person, each with no alert |
 
 On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
 and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL

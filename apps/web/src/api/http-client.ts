@@ -3,6 +3,7 @@ import { API_BASE_URL, API_HEADERS, authHeaders } from './config';
 import { getToken, notifyUnauthorized } from './session';
 import { readSse } from './sse';
 import type {
+  AdvanceEnd,
   AdvanceEvent,
   AgentStep,
   Alert,
@@ -20,6 +21,7 @@ import type {
   Session,
   Settings,
   SimulatedDay,
+  TreeExpansion,
 } from './types';
 
 export const STATUS_ESTADO: Record<AlertStatus, string> = {
@@ -99,7 +101,7 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
     } else if (event === 'alert') {
       yield { event: 'alert', data: data as Alert };
     } else if (event === 'end') {
-      yield { event: 'end', data: data as { simulatedDay: string; newAlerts: string[] } };
+      yield { event: 'end', data: data as AdvanceEnd };
     }
   }
 }
@@ -162,6 +164,17 @@ export async function getSettings(): Promise<Settings> {
 
 export async function saveSettings(next: Settings): Promise<Settings> {
   return fetchJson<Settings>(`${API_BASE_URL}/configuracion`, { method: 'PUT', body: JSON.stringify(next) });
+}
+
+export async function listExpansions(): Promise<TreeExpansion[]> {
+  return fetchJson<TreeExpansion[]>(`${API_BASE_URL}/arbol/expansiones`);
+}
+
+export async function retireExpansion(id: string, reason: string): Promise<TreeExpansion> {
+  return fetchJson<TreeExpansion>(`${API_BASE_URL}/arbol/expansiones/${encodeURIComponent(id)}/retiro`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function listBitacora(filter: LogFilter = {}): Promise<LogEvent[]> {

@@ -18,12 +18,14 @@ from centinela_agents.buscar_politica import BuscarPoliticaStub
 from centinela_agents.calcular_impacto import CalcularImpactoStub
 from centinela_agents.catalog import KernelAccess, connect_kernel
 from centinela_agents.day import Earlier, entity_labels, labels
+from centinela_agents.expansion import Growth, load_growth
 from centinela_agents.metrics import load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.provider_factory import get_provider, get_reasoning_provider
 from centinela_agents.schema import Tree
 from centinela_agents.tools import ToolRegistry
 from centinela_agents.tracing import langfuse_tracer
+from centinela_agents.validator import Grounds, load_grounds
 from centinela_agents.walk import Context, Detection
 from centinela_agents.yaml_loader import load_yaml
 from langgraph.checkpoint.memory import InMemorySaver
@@ -48,6 +50,8 @@ logger = logging.getLogger(__name__)
 _ROOT = config.RAIZ
 _ARBOL = _ROOT / "packages" / "agents" / "arbol" / "base.yaml"
 METRICAS = _ROOT / "data" / "metricas.yaml"
+_SKILLS = _ROOT / "packages" / "agents" / "skills"
+_CRECIMIENTO = _ARBOL.parent / "crecimiento.yaml"
 
 API_METRICS = frozenset({
     "margen_pct", "saldo_vencido", "dias_pago_prom",
@@ -58,6 +62,7 @@ ALERTS_PER_DAY = "CENTINELA_ALERTAS_POR_DIA"
 _kernel: KernelAccess | None = None
 _orchestrator: CentinelaOrchestrator | None = None
 _context: Context | None = None
+_grounds: Grounds | None = None
 
 
 def get_kernel() -> KernelAccess:
@@ -83,6 +88,18 @@ def get_context() -> Context:
         kernel = get_kernel()
         _context = Context.of(_load_tree(), load_metrics(METRICAS), kernel.catalog, kernel.reader, call=kernel.call)
     return _context
+
+
+def get_grounds() -> Grounds:
+    global _grounds
+    if _grounds is None:
+        _grounds = load_grounds(_ARBOL.parent, METRICAS, _SKILLS, get_kernel().catalog)
+    return _grounds
+
+
+@cache
+def get_growth() -> Growth:
+    return load_growth(_CRECIMIENTO)
 
 
 def with_thresholds(ctx: Context, thresholds: Mapping[str, Mapping[str, Any]]) -> Context:

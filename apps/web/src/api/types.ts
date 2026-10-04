@@ -34,6 +34,8 @@ export type Settings = Schemas['Settings'];
 export type SimulatedDay = Schemas['SimulatedDay'];
 export type WatchedMetric = Schemas['WatchedMetric'];
 export type Threshold = Schemas['Threshold'];
+export type TreeExpansion = Schemas['TreeExpansion'];
+export type ExpansionEvidence = Schemas['ExpansionEvidence'];
 export type AutonomyLevel = Settings['autonomy'][string];
 
 export type QuerySource = Query['source'];

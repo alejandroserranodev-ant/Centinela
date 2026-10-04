@@ -1,14 +1,18 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from langgraph.checkpoint.memory import InMemorySaver
 
-from centinela_agents.graph import classified
+from centinela_agents.day import AlertRun, Verdict
+from centinela_agents.graph import GATE, classified
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.action_tools import TaskStub
 from centinela_agents.tools import ToolRegistry
-from support import DAY, DECISION_DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, approve, base_tree, reader_from, saldo_detection
+from centinela_agents.walk import Context
+from support import DAY, DECISION_DAY, EMAIL, IDENTIFIED, KERNEL_CATALOG, METRICAS, SALDO_ROW, approve, base_tree, reader_from, saldo_detection, split_tree
 
 STATE = {
     "alert_id": "A1",
@@ -76,3 +80,65 @@ def test_use_thresholds_swaps_what_the_recheck_reads_and_keeps_the_graph_and_the
     state = orchestrator.resume("A1", approve(action_id=action_id))
     assert state["fin"] == "fin.ya_no_aplica"
     assert state.get("executed_action") is None
+
+
+def test_a_paused_alert_resumes_on_the_graph_of_the_version_it_started_on():
+    orchestrator, action_id = paused_saldo_alert()
+    first = orchestrator.graph
+    orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
+    assert orchestrator.graph is not first
+    assert orchestrator.graph_of("A1") is first
+    assert orchestrator.get_state("A1")["arbol_version"] == 1
+    assert orchestrator.is_awaiting_decision("A1")
+    assert ["ejecutar.vigente", "si"] in orchestrator.resume("A1", approve(action_id=action_id))["camino"]
+    assert orchestrator.start(saldo_detection(), alert_id="A2", day=DAY)["arbol_version"] == 2
+
+
+def test_run_day_walks_the_tree_in_use_whatever_tree_its_context_carries():
+    orchestrator, _ = paused_saldo_alert()
+    orchestrator.use_tree(base_tree().model_copy(update={"version": 5}))
+    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: {"saldo_vencido": [SALDO_ROW]}}))
+    run, sent, states = orchestrator.run_day(ctx, DAY), None, []
+    while True:
+        try:
+            event = run.send(sent)
+        except StopIteration:
+            break
+        sent = Verdict(recorded=True) if isinstance(event, AlertRun) else None
+        if isinstance(event, AlertRun):
+            states.append(event.state)
+    assert [state["arbol_version"] for state in states] == [5]
+
+
+def test_a_request_for_changes_returns_a_paused_alert_through_the_nodes_of_its_own_version(monkeypatch):
+    monkeypatch.setattr("centinela_agents.orchestrator.rejection_target", lambda provider, state: "propuesta")
+    split = "proponer.cartera.saldo_vencido.division_1"
+    monkeypatch.setattr("centinela_agents.orchestrator.explain_cause", lambda provider, state, sources: {"cause": IDENTIFIED, "same_cause_as": None})
+    monkeypatch.setattr("centinela_agents.orchestrator.propose_actions", lambda provider, state, cause, sources: {"actions": [EMAIL], "insufficient_cause": None})
+    orchestrator, _ = paused_saldo_alert()
+    orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
+    reject = {"id": "dec-1", "kind": "request_changes", "reason": "La propuesta no sirve", "simulated_day": DECISION_DAY}
+    returned = orchestrator.resume("A1", reject)
+    walked = [node for node, _ in returned["camino"]]
+    assert "hoja.estratega.proponer" in walked[walked.index(GATE):]
+    assert returned["arbol_version"] == 1
+    assert split not in walked
+    assert split in [node for node, _ in orchestrator.start(saldo_detection(), alert_id="A2", day=DAY)["camino"]]
+
+
+def test_use_tree_points_the_sources_at_the_nodes_of_the_tree_in_use():
+    orchestrator, _ = paused_saldo_alert()
+    split = "proponer.cartera.saldo_vencido.division_1"
+    assert split not in orchestrator.sources.nodes
+    orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
+    assert split in orchestrator.sources.nodes
+
+
+def test_an_alert_that_started_on_a_version_the_orchestrator_does_not_hold_has_no_paused_graph():
+    orchestrator, action_id = paused_saldo_alert()
+    orchestrator._graphs.clear()
+    assert orchestrator.graph_of("A1") is None
+    assert not orchestrator.is_awaiting_decision("A1")
+    assert orchestrator.get_state("A1") == {}
+    with pytest.raises(LookupError):
+        orchestrator.resume("A1", approve(action_id=action_id))

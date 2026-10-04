@@ -18,10 +18,11 @@ class Context:
     reader: KpiReader
     owners: Mapping[str, str] = field(default_factory=dict)
     call: KernelCall | None = None
+    version: int = 0
 
     @classmethod
     def of(cls, tree: Tree, metrics: Metrics, catalog: Catalog, reader: KpiReader, owners: Mapping[str, str] | None = None, call: KernelCall | None = None) -> "Context":
-        return cls(index(tree), metrics, catalog, reader, dict(owners or {}), call)
+        return cls(index(tree), metrics, catalog, reader, dict(owners or {}), call, tree.version)
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,9 @@ def walk_from(start: str, state: Mapping[str, Any], row: Mapping[str, Any], ctx:
     while current in ctx.nodes and ctx.nodes[current].hoja is None:
         node = ctx.nodes[current]
         predicate = node.predicado
-        if is_kpi(predicate.lee):
+        if node.retirado is not None:
+            passed = False
+        elif is_kpi(predicate.lee):
             metric, _ = kpi_column(predicate.lee)
             if metric != state["candidato"]["metrica"]:
                 raise ValueError(f"{node.id} reads {metric} on a row of {state['candidato']['metrica']}")

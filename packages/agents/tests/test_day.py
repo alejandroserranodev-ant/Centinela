@@ -207,3 +207,10 @@ def test_a_failed_alert_is_yielded_and_the_day_goes_on(monkeypatch):
 
 def test_an_unwatched_metric_raises_no_alert():
     assert runs(drive(run_day(compiled(Recorder()), context(saldo("CLI-001")), DAY, watched={"margen_pct"}))) == []
+
+
+def test_orq_each_alert_of_a_day_carries_the_version_of_the_tree_it_walked():
+    tree = base_tree().model_copy(update={"version": 7})
+    ctx = Context.of(tree, load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: {"saldo_vencido": [saldo("CLI-001")]}}))
+    (run,) = runs(drive(run_day(compiled(Recorder(), tree=tree), ctx, DAY)))
+    assert run.state["arbol_version"] == 7

@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -6,6 +7,8 @@ from psycopg.types.json import Jsonb
 from collections.abc import Mapping, Sequence
 
 from .modelos import Actor, Figure, LogEvent, LogEventType
+
+logger = logging.getLogger(__name__)
 
 
 def registrar(
@@ -46,11 +49,17 @@ def registrar_costo(conn: psycopg.Connection, alerta_id: str | None, actor: Acto
 
 
 def registrar_prompts(conn: psycopg.Connection, alerta_id: str | None, prompts: Sequence[Mapping[str, str]], dia_simulado: datetime.date) -> None:
-    for prompt in prompts:
-        conn.execute(
-            "INSERT INTO api.bitacora (alerta_id, tipo, actor, detalle, dia_simulado) VALUES (%s, 'prompt', %s, %s, %s)",
-            (alerta_id, Jsonb({"kind": "agent", "agent": prompt["agent"]}), detalle_de_prompt(prompt), dia_simulado),
-        )
+    if not prompts:
+        return
+    try:
+        with conn.transaction():
+            for prompt in prompts:
+                conn.execute(
+                    "INSERT INTO api.bitacora (alerta_id, tipo, actor, detalle, dia_simulado) VALUES (%s, 'prompt', %s, %s, %s)",
+                    (alerta_id, Jsonb({"kind": "agent", "agent": prompt["agent"]}), detalle_de_prompt(prompt), dia_simulado),
+                )
+    except psycopg.Error as error:
+        logger.error("The masked prompts of %s were not logged: %s", alerta_id or "a chat question", error)
 
 
 def detalle_de_prompt(prompt: Mapping[str, str]) -> str:

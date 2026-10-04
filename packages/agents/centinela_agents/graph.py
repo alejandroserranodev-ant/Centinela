@@ -157,6 +157,12 @@ def fallback(leaf: Leaf, state: Mapping[str, Any], error: Exception, ctx: Contex
     raise error
 
 
+def leaf_input(leaf, state: Mapping[str, Any]) -> Mapping[str, Any]:
+    if leaf.agente == "ejecutor":
+        return {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
+    return {**state, "excluye": list(leaf.excluye)} if leaf.excluye else state
+
+
 def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int | None = None):
     leaf = node.hoja
 
@@ -164,11 +170,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
         write = get_stream_writer()
         step = {"alert_id": state.get("alert_id"), "agent": leaf.agente, "node": node.id, "description": STEP_LABELS.get((leaf.agente, leaf.decision), leaf.decision)}
         write({**step, "status": "running"})
-        given = (
-            {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
-            if leaf.agente == "ejecutor"
-            else state
-        )
+        given = leaf_input(leaf, state)
         cleared = {key: None for key in LEAF_OUTPUTS.get((leaf.agente, leaf.decision), ())}
         masking = privacy.of_config(get_config())
         privacy.register_state(masking, ctx.catalog, state)
@@ -194,7 +196,7 @@ def predicate_node(node: Node, ctx: Context):
             if decision["kind"] in DECIDED_STATUS:
                 recorded["status"] = DECIDED_STATUS[decision["kind"]]
             state = {**state, **recorded}
-        passed = state_holds(node.predicado, state, ctx)
+        passed = node.retirado is None and state_holds(node.predicado, state, ctx)
         branch = "si" if passed else "no"
         target = node.si if passed else node.no
         change = merge(recorded, effects(node.id, branch, state))
@@ -302,12 +304,13 @@ def run_config(alert_id: str, tracer=None, masking: Masking | None = None) -> di
     return {**traced, "configurable": {**(traced.get("configurable") or {}), **privacy.configured(masking).get("configurable", {}), **thread(alert_id)["configurable"]}}
 
 
-def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections) -> dict[str, Any]:
+def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, arbol_version=None) -> dict[str, Any]:
     earlier = {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id}
     return {
         "alert_id": alert_id,
         "simulated_day": day,
         "entry": detection.entry,
+        "arbol_version": arbol_version,
         "earlier_alerts": earlier,
         "alert_briefs": {other: dict(brief) for other, brief in (alert_briefs or {}).items() if other in earlier},
         "detection": detection_state(detection),
@@ -322,14 +325,14 @@ def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts,
     }
 
 
-def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, masking: Masking | None = None) -> Iterator[dict[str, Any]]:
-    initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)
+def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None, masking: Masking | None = None) -> Iterator[dict[str, Any]]:
+    initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, arbol_version)
     fresh(graph, alert_id)
     yield from graph.stream(initial, run_config(alert_id, tracer, masking or Masking()), stream_mode="custom")
 
 
-def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, masking: Masking | None = None) -> dict[str, Any]:
-    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer, masking=masking):
+def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None, arbol_version=None, masking: Masking | None = None) -> dict[str, Any]:
+    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer, arbol_version=arbol_version, masking=masking):
         pass
     return graph.get_state(thread(alert_id)).values
 

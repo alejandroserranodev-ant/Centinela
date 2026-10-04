@@ -46,8 +46,9 @@ both of its steps load `chat/contrato.md`.
 > **Decided, not built.** The metric files: `<metric>.md` is to be loaded for an alert of that
 > metric, once a leaf can run the view queries its hypotheses
 > name. Of the table in `estratega/acciones.md`, only the rows of the alert's metric reach the
-> model, as refs in the user prompt, because the token cost of each alert is recorded and judged. A pending spec adds a file per decision for
-> `expandir` and `proponer_kpi`, loaded only when the walk reaches that decision's leaf.
+> model, as refs in the user prompt, because the token cost of each alert is recorded and judged. A pending spec adds a file for
+> `proponer_kpi`, loaded only when the walk reaches that decision's leaf; an expansion is drafted
+> in code and loads none.
 
 ## How a skill is written
 
