@@ -11,7 +11,7 @@ import {
 } from '@dravensoft/arena-react';
 import { getAlert, getQuery } from '../api/client';
 import type { Alert, Evidence, MergedAlert, Query } from '../api/types';
-import { Confidence, Severity, Status } from '../common/Badges';
+import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
@@ -131,6 +131,7 @@ export function AlertDetail({ id }: { id: string }) {
       <header className="arena-stack arena-stack--group">
         <div className="arena-row detail__badges">
           <Severity level={alert.severity} />
+          <Labels labels={alert.labels} />
           <Status status={alert.status} />
           <Confidence level={alert.confidence.level} />
           <time className="text-muted" dateTime={alert.simulatedDate}>

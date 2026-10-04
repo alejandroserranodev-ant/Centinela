@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -9,6 +9,8 @@ from .yaml_loader import load_yaml
 class Metrics:
     descriptions: Mapping[str, str]
     thresholds: Mapping[str, Mapping[str, Any]]
+    labels: Mapping[str, str] = field(default_factory=dict)
+    dimension_labels: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -16,10 +18,13 @@ class Metrics:
 
 
 def load_metrics(path: Path) -> Metrics:
-    entries = load_yaml(path)["metricas"]
+    document = load_yaml(path)
+    entries = document["metricas"]
     return Metrics(
         descriptions={name: entry["descripcion"] for name, entry in entries.items()},
         thresholds={name: entry.get("umbrales", {}) for name, entry in entries.items()},
+        labels={name: entry["etiqueta"] for name, entry in entries.items()},
+        dimension_labels=document["nombres_dimensiones"],
     )
 
 

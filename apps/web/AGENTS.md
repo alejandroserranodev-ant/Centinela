@@ -85,6 +85,8 @@ and what each shows is
   string stay as the brief writes them, because the jury calls them by those names; where the
   brief's query string carries a lifecycle value, `src/api/http-client.ts:listAlerts(filter)` sends
   the brief's spelling (`proposed` travels as `estado=propuesta`).
+- **An alert shows its identity labels beside its urgency.** `Alert.labels` carries the metric's
+  short name and the affected entity, composed by `apps/api`; the web renders each as an `ArenaTag`.
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.

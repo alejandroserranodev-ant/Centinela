@@ -9,11 +9,12 @@ root .env, using LangGraph with InMemorySaver (state is per-process).
 import hashlib
 import logging
 import os
+import re
 from typing import Any
 
 from centinela_agents.action_tools import EmailDraftStub, PriceChangeDraftStub, PurchaseOrderDraftStub, TaskStub
-from centinela_agents.catalog import KernelAccess, connect_kernel
-from centinela_agents.metrics import load_metrics
+from centinela_agents.catalog import Catalog, KernelAccess, connect_kernel
+from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.provider_factory import get_provider, get_reasoning_provider
 from centinela_agents.schema import Tree
@@ -256,10 +257,22 @@ def detection_query(state: dict, metric: str) -> str | None:
     return None
 
 
+def _labels(metric: str, entity: tuple, metrics: Metrics, catalog: Catalog) -> list[str]:
+    """The metric's short name and its entity as `<dimension> <value>`, skipping the time bucket."""
+    kpi = catalog.kpis.get(metric)
+    head = [metrics.labels[metric]] if metric in metrics.labels else []
+    return head + [
+        f"{metrics.dimension_labels.get(column, column)} {value}"
+        for column, value in zip(kpi.entity if kpi else (), entity)
+        if value is not None and not re.match(r"\d{4}-\d{2}-\d{2}", str(value))
+    ]
 def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: str) -> Alert:
     """Convert a LangGraph alert state to an API Alert model."""
     metric = detection.metric
     row = detection.row
+
+    ctx = get_context()
+    labels = _labels(metric, detection.entity, ctx.metrics, ctx.catalog)
 
     status = _STATUS_MAP.get(state.get("status", "nueva"), "new")
     severity = _derive_severity(metric, row)
@@ -293,6 +306,7 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
         status=status,
         severity=severity,
         metric=metric,
+        labels=labels,
         title=title,
         pesos_at_risk=Figure(
             value=pesos_of(detection),

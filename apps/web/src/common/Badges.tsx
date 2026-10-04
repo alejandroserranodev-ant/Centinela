@@ -38,6 +38,10 @@ export function Confidence({ level }: { level: ConfidenceLevel }) {
   return <ArenaTag>{CONFIDENCE[level]}</ArenaTag>;
 }
 
+export function Labels({ labels }: { labels: string[] }) {
+  return labels.map((label) => <ArenaTag key={label}>{label}</ArenaTag>);
+}
+
 export function Status({ status }: { status: AlertStatus }) {
   const tone = status === 'approved' || status === 'executed' ? 'success' : 'neutral';
   return <ArenaTag tone={tone}>{STATUS[status]}</ArenaTag>;
