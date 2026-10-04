@@ -72,13 +72,7 @@ reanudando: set[str] = set()
 
 def _en_pausa(id: str) -> bool:
     try:
-        orq = get_orchestrator()
-        if orq.is_awaiting_decision(id):
-            return True
-        # If InMemorySaver has no state for this alert (e.g. after an API restart), the
-        # alert may still be proposed in the DB.  Let the decision proceed: the DB update
-        # will go through and orq.resume() will fail gracefully inside its own try/except.
-        return orq.has_no_graph_state(id)
+        return get_orchestrator().is_awaiting_decision(id)
     except Exception as e:
         logger.error(f"Orchestrator state unreadable for {id}: {e}", exc_info=True)
         return False
