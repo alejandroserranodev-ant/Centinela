@@ -67,7 +67,7 @@ export function declares(text: string, member: string, language: string): boolea
   const ownerFound =
     owner === undefined || new RegExp(`(?:class|interface|type|const|function)\\s+${escape(owner)}\\b`).test(text);
   const forms = [
-    new RegExp(`(?:function|const|let|var|class|type|interface|enum)\\s+${name}\\b`),
+    new RegExp(`(?:function\\*?|const|let|var|class|type|interface|enum)\\s+${name}\\b`),
     new RegExp(`export\\s*\\{[^}]*\\b${name}\\b`),
     ...(owner === undefined ? [] : [new RegExp(`\\b${name}\\s*[(:=?]`)]),
   ];

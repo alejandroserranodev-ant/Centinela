@@ -56,6 +56,17 @@ test('a member the file does not declare fails, in Python and TypeScript', () =>
   ]);
 });
 
+test('a generator function is a member a TypeScript file declares', () => {
+  const found = problems(
+    plant({
+      ...sound,
+      'pkg/AGENTS.md': '# Pkg\n\n## The rules\n\n`src/stream.ts:advance(days)`\n',
+      'pkg/src/stream.ts': 'export async function* advance(days: number) {}\n',
+    }),
+  );
+  assert.deepEqual(found, []);
+});
+
 test('a citation by line number fails', () => {
   const found = problems(plant({ ...sound, 'pkg/AGENTS.md': '# Pkg\n\n## The rules\n\n`src/mod.py:12`\n' }));
   assert.deepEqual(found, ['pkg/AGENTS.md: `src/mod.py:12` cites code by line number; cite path:member(parameters)']);
