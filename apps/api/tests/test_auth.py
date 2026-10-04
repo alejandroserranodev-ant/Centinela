@@ -11,6 +11,7 @@ CLAVE = "Andina2026!"
 
 @pytest.fixture
 def perfiles(monkeypatch):
+    monkeypatch.setattr(auth, "ITERACIONES", 1000)
     cifrada = auth.cifrar(CLAVE, iteraciones=1000)
     monkeypatch.setattr(auth, "FICTICIA", auth.cifrar("nadie", iteraciones=1000))
     monkeypatch.setattr(auth, "PERFILES", auth.cargar(
@@ -38,6 +39,9 @@ def test_el_alta_de_los_perfiles_rechaza_una_lista_mal_formada():
         auth.cargar('[{"correo": "a@b", "nombre": "A", "rol": "gerente", "clave": "Andina2026!"}]')
     with pytest.raises(RuntimeError, match="CENTINELA_USUARIOS"):
         auth.cargar("no es json")
+    otra_cuenta = auth.cifrar(CLAVE, iteraciones=1000)
+    with pytest.raises(RuntimeError, match="CENTINELA_USUARIOS"):
+        auth.cargar('[{"correo": "a@b", "nombre": "A", "rol": "gerente", "clave": "%s"}]' % otra_cuenta)
 
 
 def test_los_perfiles_del_env_cargan_con_la_clave_cifrada():
@@ -69,6 +73,22 @@ def test_un_token_alterado_es_401(perfiles):
         respuesta = perfiles.get("/auth/sesion", headers={"Authorization": f"Bearer {alterado}"})
         assert respuesta.status_code == 401
         assert respuesta.headers["WWW-Authenticate"] == "Bearer"
+
+
+def test_un_token_firmado_con_otra_clave_es_401(perfiles, monkeypatch):
+    persona = auth.PERFILES["gerente@andina.test"].persona()
+    propia = auth.AUTH_SECRET_KEY
+    monkeypatch.setattr(auth, "AUTH_SECRET_KEY", b"la clave que alguien leyo en el repositorio")
+    ajeno = auth.emitir(persona)
+    monkeypatch.setattr(auth, "AUTH_SECRET_KEY", propia)
+    assert auth.leer(ajeno) is None
+    assert perfiles.get("/auth/sesion", headers={"Authorization": f"Bearer {ajeno}"}).status_code == 401
+
+
+def test_sin_clave_en_el_entorno_la_firma_es_aleatoria():
+    from centinela_api import config
+
+    assert isinstance(config.AUTH_SECRET_KEY, bytes) and len(config.AUTH_SECRET_KEY) >= 32
 
 
 def test_un_token_vencido_es_401(perfiles):

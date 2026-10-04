@@ -1,5 +1,5 @@
 import { API_BASE_URL, API_HEADERS, authHeaders } from './config';
-import { notifyUnauthorized } from './session';
+import { getToken, notifyUnauthorized } from './session';
 import { readSse } from './sse';
 import type {
   AdvanceEvent,
@@ -43,6 +43,7 @@ async function errorMessage(response: Response): Promise<string> {
 }
 
 async function request(url: string, options?: RequestInit, anonymous = false): Promise<Response> {
+  const sent = getToken();
   const response = await fetch(url, {
     ...options,
     headers: { ...(anonymous ? API_HEADERS : authHeaders()), ...options?.headers },
@@ -51,7 +52,7 @@ async function request(url: string, options?: RequestInit, anonymous = false): P
   if (!response.ok) {
     const message = await errorMessage(response);
     if (response.status === 401 && !anonymous) {
-      notifyUnauthorized();
+      notifyUnauthorized(sent);
     }
     throw new ApiError(response.status, message);
   }

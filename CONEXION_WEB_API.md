@@ -19,7 +19,8 @@ psql "postgresql://centinela:centinela@localhost:5432/centinela" -f sql/01_esque
 ```
 
 **2. The API**, from `apps/api/`, in a Python 3.12 environment, because `packages/agents` asks for
-it; why pip needs the paths is [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands):
+it; why pip needs the paths is [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands). The agents
+call OpenAI with the key of `.env.local` at the root, as [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) says:
 
 ```bash
 pip install -e ../../packages/tools -e ../../packages/agents -e ".[dev]"
@@ -27,6 +28,8 @@ uvicorn centinela_api.main:app --reload
 ```
 
 It listens on `http://localhost:8000` and serves its OpenAPI at `http://localhost:8000/docs`.
+Without `AUTH_SECRET_KEY` in `.env.local` it signs with a random key, so a restart signs everyone
+out; why the key is never versioned is [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#decisions-and-roles).
 
 **3. The web**, from `apps/web/`:
 
@@ -43,7 +46,7 @@ Vite serves it on `http://localhost:5173`; where the fetch client and the API di
 | Process | Reads | What it needs there |
 |---|---|---|
 | the web | `apps/web/.env`, through Vite | `VITE_API_URL`; without it the client calls `http://localhost:8000` |
-| the API | the versioned `.env` at the root, then `.env.local` over it, as [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands) says | `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY`, `CENTINELA_USUARIOS`, the kernel's DSNs and the model provider's variables of [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) |
+| the API | the versioned `.env` at the root, then `.env.local` over it, as [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands) says | `DSN_ADMIN`, `AGENT_SECRET_KEY`, `CENTINELA_USUARIOS`, `AUTH_SECRET_KEY` only in `.env.local`, the kernel's DSNs and the model provider's variables of [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) |
 
 Both files are versioned with local values and no secret, so a clone runs with no copying. Without
 `LLM_MODEL`, a day run logs the provider's error and ends with no new alerts, which looks like a

@@ -1,4 +1,5 @@
 import datetime
+import hmac
 import uuid
 
 import psycopg
@@ -27,7 +28,7 @@ router = APIRouter(prefix="/interno", tags=["internal"])
 
 def validar_agente(x_agent_key: str = Header(...)) -> None:
     """Valida que la llamada venga de un agente autorizado."""
-    if x_agent_key != AGENT_SECRET_KEY:
+    if not hmac.compare_digest(x_agent_key.encode(), AGENT_SECRET_KEY.encode()):
         raise HTTPException(401, "Agente no autorizado")
 
 

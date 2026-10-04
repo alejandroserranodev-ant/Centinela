@@ -380,7 +380,7 @@ export interface components {
             kind: "person";
             /**
              * Name
-             * @description Person name (percent-encoded)
+             * @description Name of the person signed in
              */
             name: string;
             /**

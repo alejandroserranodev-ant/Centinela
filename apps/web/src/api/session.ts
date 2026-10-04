@@ -39,7 +39,10 @@ export function onUnauthorized(callback: (() => void) | null): void {
   unauthorized = callback;
 }
 
-export function notifyUnauthorized(): void {
+export function notifyUnauthorized(sent: string | null): void {
+  if (sent !== getToken()) {
+    return;
+  }
   setToken(null);
   unauthorized?.();
 }

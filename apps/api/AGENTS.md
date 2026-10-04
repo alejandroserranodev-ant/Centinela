@@ -16,8 +16,8 @@ implement.
 | `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
-| `src/centinela_api/auth.py` | the profiles, the password check, the token and `persona_actual(authorization)`, the dependency that names the person |
-| `src/centinela_api/permisos.py` | who owns a metric, who may decide an alert, who may configure |
+| `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
+| `src/centinela_api/permisos.py` | who owns a metric, who may decide an alert and who may configure, and `vista(persona, alerta)`, the alert as the person signed in reads it |
 | `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
 | `src/centinela_api/modelos.py` | the Pydantic models, the HTTP contract's source; their conventions are [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md) |
 | `src/centinela_api/contrato.py` | `esquema()`, the OpenAPI document plus the payloads of the event streams, and `exportar(destino)`, which `python -m centinela_api.contrato` runs to write `../web/src/api/openapi.json` |
@@ -65,12 +65,13 @@ pytest -m integracion
 
 The brief's minimal API is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its
 minimal API section; its paths stay as the brief writes them. The web consumes them through
-`apps/web/src/api/http-client.ts`. Every route but `/auth/login`, the docs and `/interno/*` needs
-a bearer token, and answers 401 without a valid one.
+`apps/web/src/api/http-client.ts`. Every route but `/auth/login`, the OpenAPI document and
+`/interno/*` asks for `Authorization: Bearer <token>`, and answers 401 "Inicia sesión para
+continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered or expired.
 
 | Method | Path | Serves | Refuses | Web function |
 |---|---|---|---|---|
-| POST | `/auth/login` | a `Sesion`, token and `Persona`, for `Credenciales` | 401, one message for any failure | `login` |
+| POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulatedDay` |
 | POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one | `advanceDay` |
@@ -224,22 +225,44 @@ door. How the orchestrator reaches each proposal is
 
 ## Decisions and roles
 
-**A person signs in; every route reads the person from the token.** The profiles are
-`CENTINELA_USUARIOS` in the root `.env`, each `clave` a PBKDF2 hash from
-`python -m centinela_api.auth hash`, because that file is public; a malformed list stops the API.
-`src/centinela_api/auth.py:verificar(correo, clave)` hashes even for an unknown email, so nothing
-tells which half failed. The token signs the email and an eight-hour expiry with
-`AUTH_SECRET_KEY`, and the person is re-read from the profiles. Full enterprise authentication
-stays out of scope.
+**A person signs in, and every route reads the person from the token.** The profiles are
+`CENTINELA_USUARIOS` in the root `.env`
+([`../../CONEXION_WEB_API.md`](../../CONEXION_WEB_API.md#signing-in) lists them), each `clave` a
+PBKDF2-SHA256 hash at the iterations `ITERACIONES` names, written by
+`python -m centinela_api.auth hash`, because that file is public. A malformed list stops the API at
+import, so a typo never signs everyone out silently.
+`src/centinela_api/auth.py:verificar(correo, clave)` matches the email in any case and hashes
+against a dummy of the same cost when the email is unknown, so neither the time nor the message
+tells which half failed. `src/centinela_api/auth.py:emitir(persona, ahora)` signs the email and an
+eight-hour expiry with HMAC-SHA256, and `src/centinela_api/auth.py:leer(token, ahora)` checks the
+signature and the expiry and re-reads the person from the profiles, so removing a profile ends its
+sessions.
 
-**Who decides is checked first.** `src/centinela_api/permisos.py:puede_decidir(persona, alerta)`
-lets the `gerente` decide any alert and a `lider_proceso` those whose metric its `area` owns in
-`packages/agents/skills/estratega/acciones.md`. Anyone else gets 403, which names the owner: the
-request is valid, the person may not make it. Each alert returned carries `decidedBy` and
-`canDecide`, never stored, so the screen decides no permission. Then
-`src/centinela_api/decisiones.py:aplicar(alerta, decision)` requires `proposed` (409), a
-rejection's reason and one of the alert's actions (422). The decision and its `bitácora` row
-commit before the orchestrator resumes, so no action runs unrecorded.
+**The signing key is never versioned.** A key in the public `.env` would let anyone with the
+repository sign a `gerente` token without a password. `AUTH_SECRET_KEY` comes from `.env.local`;
+without it, `src/centinela_api/config.py` draws a random key per process, and every session ends
+when the API restarts. A stable key, for a demo that restarts, goes in `.env.local`.
+
+**Sign-out is the client's.** "Salir" drops the browser's copy; the token stays valid until it
+expires, and nothing throttles `/auth/login`. Full enterprise authentication, revocation included,
+is out of scope ([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md)).
+
+**Who decides is checked before the decision.**
+`src/centinela_api/permisos.py:puede_decidir(persona, alerta)` lets the `gerente` decide every
+alert, and a `lider_proceso` the alerts whose metric its `area` owns, as
+`src/centinela_api/permisos.py:area_que_decide(metric)` reads the owner from "The owner of a manual
+review" in `packages/agents/skills/estratega/acciones.md`. An owner no `lider_proceso` profile
+holds, such as `vendedor_id`, leaves the alert to the `gerente`, because no one else could act on
+it. Anyone else gets 403 "Esta alerta la decide" and the area, or "la gerencia": the request is
+valid, the person may not make it. `src/centinela_api/permisos.py:vista(persona, alerta)` adds
+`decidedBy`, the area or `Gerencia`, and the person's `canDecide` to every alert returned, so the
+screen decides no permission; `src/centinela_api/alertas.py:guardar(conn, alerta)` strips both,
+because they belong to the request. Then `src/centinela_api/decisiones.py:aplicar(alerta, decision)`
+requires the alert in `proposed` (409), a rejection to carry a reason (422), and an approval or an
+edit to name one of the alert's actions (422). The decision and its `bitácora` row, whose actor is
+the person's name and role, commit in one transaction before the orchestrator resumes, so no action
+runs without a recorded decision; an approval or an edit then resumes into `Ejecutor`, and a
+rejection resumes to close the graph.
 
 > **Decided, not built.** The rules below, where the code differs as each one says.
 

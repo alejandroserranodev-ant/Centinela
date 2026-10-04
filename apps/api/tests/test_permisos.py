@@ -107,6 +107,15 @@ def test_la_gerente_decide_y_la_respuesta_lo_dice(decidir):
     assert (respuesta.json()["decidedBy"], respuesta.json()["canDecide"]) == ("Comercial", True)
 
 
+@pytest.mark.parametrize("metric", ["veces_intervalo_habitual", "descuento_en_exceso"])
+def test_un_dueno_que_ningun_lider_tiene_lo_decide_la_gerencia(metric):
+    assert permisos.responsable(metric) in ("vendedor_id", "Control Comercial")
+    vista = permisos.vista(COMERCIAL, alerta(metric))
+    assert (vista.decided_by, vista.can_decide) == ("Gerencia", False)
+    assert permisos.negada(alerta(metric)) == "Esta alerta la decide la gerencia"
+    assert permisos.vista(GERENTE, alerta(metric)).can_decide
+
+
 def test_una_metrica_sin_area_la_decide_la_gerencia(monkeypatch):
     monkeypatch.setattr(permisos, "responsable", lambda metric: None)
     assert permisos.negada(alerta("margen_pct")) == "Esta alerta la decide la gerencia"

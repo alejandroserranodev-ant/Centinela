@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { arenaToastDelay, type ArenaToastEntry, type ArenaToastNotice, type ArenaToastQueue } from '@dravensoft/arena-react';
-import { advanceDay, getSimulatedDay } from '../api/client';
+import { advanceDay, ApiError, getSimulatedDay } from '../api/client';
 import type { AgentStep } from '../api/types';
 import { formatDate } from '../format';
 
@@ -83,12 +83,6 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const [openQueryId, setOpenQueryId] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatState>({ open: false });
 
-  useEffect(() => {
-    getSimulatedDay()
-      .then(setSimulatedDay)
-      .catch(() => undefined);
-  }, []);
-
   const changed = useCallback(() => setVersion((v) => v + 1), []);
 
   const { raise } = toasts;
@@ -103,6 +97,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   );
 
   const toastAction = useCallback((id: number) => actions.current.get(id), []);
+
+  useEffect(() => {
+    getSimulatedDay()
+      .then(setSimulatedDay)
+      .catch((e: unknown) => {
+        if (!(e instanceof ApiError && e.status === 401)) {
+          notify({ tone: 'danger', title: 'No se pudo leer el día simulado', message: 'Revisa que la API esté en marcha y recarga la página.' });
+        }
+      });
+  }, [notify]);
 
   const advance = useCallback(async () => {
     if (advancing) {

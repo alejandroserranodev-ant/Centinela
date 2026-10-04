@@ -188,7 +188,7 @@
             "type": "string"
           },
           "name": {
-            "description": "Person name (percent-encoded)",
+            "description": "Name of the person signed in",
             "title": "Name",
             "type": "string"
           },
@@ -1016,12 +1016,14 @@
         "properties": {
           "email": {
             "description": "Sign-in email",
+            "maxLength": 256,
             "minLength": 1,
             "title": "Email",
             "type": "string"
           },
           "password": {
             "description": "Password",
+            "maxLength": 256,
             "minLength": 1,
             "title": "Password",
             "type": "string"

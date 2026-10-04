@@ -72,11 +72,17 @@ and what each shows is
   `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
   `saveSettings` refuses `execute` with 422 and stores nothing. `getQuery` gets 404 for a total's
   id, so the query dialog of a total shows its error state.
-- **A person signs in first.** `src/state/Session.tsx:RequireSession()` sends a visitor with no
-  session to `/ingresar` and back after it. The token lives in `sessionStorage`, so it dies with
-  the tab; a 401 clears it and the guard returns to `/ingresar`. The bar shows the person, the role
-  and "Salir". The screen decides no permission: with `canDecide` false an alert shows no decision
-  buttons, only "Decide:" and its `decidedBy`.
+- **A person signs in before any screen.** `/ingresar` is the one route outside the shell; every
+  other route sits behind `src/state/Session.tsx:RequireSession()`, which sends a visitor with no
+  session there and back to the requested path after it. The token lives in `sessionStorage`, so
+  it dies with the tab, and every call sends it through `src/api/config.ts:authHeaders()`. A 401
+  clears the session through `src/api/session.ts:notifyUnauthorized(sent)` only when it answers
+  the token still in use, so a late answer to an older token never signs out a newer session. An
+  API that does not answer on load keeps the token and offers a retry instead.
+- **The screen decides no permission.** The bar shows the person's name and role on a desktop,
+  and "Salir" everywhere. An alert arrives with `canDecide` and `decidedBy`; when `canDecide` is
+  false the proposed actions show no Approve, Edit, Request changes or Reject, only "Decide:" and
+  the owner. A 403 the API still answers reaches the person as its message.
 - **`src/api/types.ts` is the contract the screens read**: it aliases the types that
   `src/api/schema.generated.ts` generates from the OpenAPI document of `apps/api`, so the API's
   Pydantic models are the source. After a change to a model, run `python -m centinela_api.contrato`
@@ -108,11 +114,14 @@ and what each shows is
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
-- **The fixtures in `src/api/fixtures/` are illustrative**, English-named, and imported by no
-  module. They come from the brief's public example (line `Hogar`, supplier X, $42 M a month),
-  never from the dataset, whose figures would name the seeded scenarios
-  ([`../../data/AGENTS.md`](../../data/AGENTS.md)). Each figure cites an unrun query on a real
-  `v_*` view.
+- **Fixture files and ids are English** (`src/api/fixtures/alerts.json`, `alert-hogar-margin`,
+  `q-hogar-drop`); the line name stays as the data spells it. An id never reaches a manager's
+  screen.
+- **The fixtures in `src/api/fixtures/` are illustrative**, and no module imports them. They are
+  built from the brief's public example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
+  examples, never from the dataset, because figures read from `data/csv/` would name the seeded
+  scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
+  figure cites an example query against a real `v_*` view; the queries are not run.
 - **The screen computes no figure.** The inbox totals are `Figure`s the API computes
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
   table, which is why `src/api/types.ts:QuerySource` also takes `alertas`; a query of the kernel

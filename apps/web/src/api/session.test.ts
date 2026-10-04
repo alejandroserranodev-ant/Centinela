@@ -18,10 +18,22 @@ test('a 401 clears the token and calls the registered callback once', () => {
   onUnauthorized(() => {
     calls += 1;
   });
-  notifyUnauthorized();
+  notifyUnauthorized('abc.def');
   assert.equal(getToken(), null);
   assert.equal(calls, 1);
   onUnauthorized(null);
-  notifyUnauthorized();
+  notifyUnauthorized(null);
   assert.equal(calls, 1);
+});
+
+test('a late 401 for an older token leaves the newer one in place', () => {
+  setToken('new.token');
+  let calls = 0;
+  onUnauthorized(() => {
+    calls += 1;
+  });
+  notifyUnauthorized('old.token');
+  assert.equal(getToken(), 'new.token');
+  assert.equal(calls, 0);
+  onUnauthorized(null);
 });

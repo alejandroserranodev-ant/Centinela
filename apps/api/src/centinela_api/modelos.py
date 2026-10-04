@@ -162,7 +162,7 @@ class ActorAgent(Esquema):
 class ActorPerson(Esquema):
     """Alert decision made by a human."""
     kind: Literal["person"] = Field("person", description="Discriminator: action by person")
-    name: str = Field(..., description="Person name (percent-encoded)")
+    name: str = Field(..., description="Name of the person signed in")
     role: str = Field(..., description="Person role (gerente, lider_proceso, analista, auditor)")
 
 
@@ -293,8 +293,8 @@ class Persona(Esquema):
 
 class Credenciales(Esquema):
     """Email and password a person signs in with."""
-    email: str = Field(..., min_length=1, description="Sign-in email")
-    password: str = Field(..., min_length=1, description="Password")
+    email: str = Field(..., min_length=1, max_length=256, description="Sign-in email")
+    password: str = Field(..., min_length=1, max_length=256, description="Password")
 
 
 class Sesion(Esquema):

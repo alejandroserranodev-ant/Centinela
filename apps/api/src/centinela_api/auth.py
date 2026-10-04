@@ -39,12 +39,12 @@ class Perfil(BaseModel):
     def cifrada(cls, clave: str) -> str:
         partes = clave.split("$")
         try:
-            legible = len(partes) == 4 and partes[0] == ALGORITMO and int(partes[1]) > 0
+            legible = len(partes) == 4 and partes[0] == ALGORITMO and int(partes[1]) == ITERACIONES
             legible = legible and bool(base64.b64decode(partes[2], validate=True)) and bool(base64.b64decode(partes[3], validate=True))
         except (ValueError, binascii.Error):
             legible = False
         if not legible:
-            raise ValueError(f"la clave debe ser {ALGORITMO}$<iteraciones>$<sal>$<hash>, escrita por python -m centinela_api.auth hash")
+            raise ValueError(f"la clave debe ser {ALGORITMO}${ITERACIONES}$<sal>$<hash>, escrita por python -m centinela_api.auth hash")
         return clave
 
     def persona(self) -> Persona:
@@ -63,9 +63,6 @@ def cargar(texto: str) -> dict[str, Perfil]:
         raise RuntimeError("CENTINELA_USUARIOS repite un correo")
     return {p.correo: p for p in perfiles}
 
-
-if not AUTH_SECRET_KEY:
-    raise RuntimeError("AUTH_SECRET_KEY está vacía: la API no puede firmar sesiones")
 
 PERFILES = cargar(CENTINELA_USUARIOS)
 
@@ -97,7 +94,7 @@ def _de_b64(texto: str) -> bytes:
 
 
 def _firma(carga: str) -> str:
-    return _b64(hmac.new(AUTH_SECRET_KEY.encode(), carga.encode(), hashlib.sha256).digest())
+    return _b64(hmac.new(AUTH_SECRET_KEY, carga.encode(), hashlib.sha256).digest())
 
 
 def emitir(persona: Persona, ahora: float | None = None) -> str:
