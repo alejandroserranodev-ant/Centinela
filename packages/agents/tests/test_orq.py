@@ -6,7 +6,7 @@ import pytest
 
 from centinela_agents.catalog import Catalog, Kpi
 from centinela_agents.failures import StepTimeout
-from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, manual_owners, resume, start_alert
+from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, manual_owners, resume, start_alert, stream_alert
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import Tree
 from centinela_agents.validator import InvalidTree, checked_base, load_registry, problems
@@ -25,14 +25,29 @@ def started(recorder, alert_id="A1", earlier=None, **options):
     return graph, state
 
 
-def test_orq_start_reports_each_agent_as_it_runs():
-    entered = []
+def test_orq_each_leaf_of_an_alert_starts_and_ends_on_the_stream_in_order():
     graph = compiled(Recorder())
-
-    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY, on_step=lambda agent, node: entered.append(agent))
-
-    assert entered == ["vigia", "analista", "estratega"]
+    steps = list(stream_alert(graph, saldo_detection(), alert_id="A1", day=DAY))
+    assert [(step["agent"], step["node"], step["status"]) for step in steps] == [
+        ("vigia", "hoja.vigia.titular", "running"),
+        ("vigia", "hoja.vigia.titular", "done"),
+        ("analista", "hoja.analista.explicar", "running"),
+        ("analista", "hoja.analista.explicar", "done"),
+        ("estratega", "hoja.estratega.proponer", "running"),
+        ("estratega", "hoja.estratega.proponer", "done"),
+    ]
+    assert steps[2]["description"] == "Buscando la causa" and steps[2]["alert_id"] == "A1"
+    assert not any(step.get("failed") for step in steps)
     assert awaiting_decision(graph, "A1")
+
+
+def test_orq_a_failed_leaf_ends_its_step_as_failed():
+    def broken(state):
+        raise RuntimeError("sin datos")
+
+    graph = compiled(Recorder(), overrides={("analista", "explicar"): broken})
+    ends = [step for step in stream_alert(graph, saldo_detection(), alert_id="A1", day=DAY) if step["status"] == "done"]
+    assert [step["failed"] for step in ends] == [False, True, False]
 
 
 def test_orq_a_tree_with_a_missing_no_is_refused_at_startup():

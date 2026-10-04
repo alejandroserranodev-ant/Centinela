@@ -454,11 +454,10 @@ of model; the rest fire again on a later day, when the earlier ones are in the i
 completion tokens and the latency in `costs`, `centinela_agents/agents/chat.py:costed(provider, request, step)`,
 and `apps/api` logs it.
 
-**Each leaf's start reaches `on_step(agent, node_id)`** of
-`centinela_agents/graph.py:start_alert(graph, detection, alert_id, day, on_step)`.
+**Each leaf streams its start and end**, labelled by `centinela_agents/graph.py:STEP_LABELS`,
+through `centinela_agents/graph.py:stream_alert(graph, detection, alert_id, day)`.
 
-> **Decided, not built.** An alert's state has no `cost`, no trace is opened, the end of a leaf is
-> not reported, and the only event the graph writes is `same_cause_dropped`, in
+> **Decided, not built.** An alert's state has no `cost`, no trace is opened, and the only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.
 > `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
 > and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; no running path

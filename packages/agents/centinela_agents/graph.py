@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import re
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterator, Mapping
 
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 LeafFunction = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 Classifier = Callable[[Mapping[str, Any]], str]
-StepListener = Callable[[str, str], None]
 DECISION_KINDS = ("approve", "edit", "reject", "request_changes")
 REJECTION_TARGETS = ("causa", "propuesta", "ambos", "ninguno")
 DECIDED_STATUS = {"approve": "aprobada", "edit": "aprobada", "reject": "rechazada"}
@@ -32,6 +31,18 @@ REASONS = {
 }
 MANUAL_REVIEW_OWNERS = "## The owner of a manual review"
 BOUND_NODES = frozenset({"explicar.destino_nuevo", "proponer.retorno_disponible", "aprobar.recarga_disponible", GATE})
+STEP_LABELS = {
+    ("vigia", "detectar"): "Detectada anomalía",
+    ("vigia", "titular"): "Redactando el título",
+    ("analista", "explicar"): "Buscando la causa",
+    ("estratega", "proponer"): "Proponiendo acciones",
+    ("estratega", "revision_manual"): "Preparando la revisión manual",
+    ("ejecutor", "ejecutar"): "Ejecutando la acción aprobada",
+    ("ejecutor", "nota_manual"): "Redactando la nota de la tarea manual",
+    ("chat", "clasificar"): "Leyendo la pregunta",
+    ("chat", "responder"): "Respondiendo con los datos",
+}
+
 LEAF_OUTPUTS = {
     ("vigia", "titular"): ("title",),
     ("analista", "explicar"): ("cause", "same_cause_as"),
@@ -147,7 +158,9 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
     leaf = node.hoja
 
     def run(state: Mapping[str, Any]) -> dict[str, Any]:
-        get_stream_writer()({"agent": leaf.agente, "node": node.id})
+        write = get_stream_writer()
+        step = {"alert_id": state.get("alert_id"), "agent": leaf.agente, "node": node.id, "description": STEP_LABELS.get((leaf.agente, leaf.decision), leaf.decision)}
+        write({**step, "status": "running"})
         given = (
             {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
             if leaf.agente == "ejecutor"
@@ -161,6 +174,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
                 logger.warning("Leaf %s failed for %s: %s", node.id, state.get("alert_id") or "chat", error, exc_info=error)
                 update = {**cleared, **fallback(leaf, state, error, ctx)}
                 failures = [{"step": node.id, "kind": failure_kind(error), "attempts": meter.attempts}]
+        write({**step, "status": "done", "failed": bool(failures)})
         return merge(update, entering(node.sigue, {**state, **update}, ctx.nodes), {"camino": [[node.id, "hoja"]], "failures": failures, "cost": meter.cost()})
 
     return run
@@ -276,9 +290,9 @@ def thread(alert_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": alert_id}}
 
 
-def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), on_step: StepListener | None = None) -> dict[str, Any]:
+def initial_state(detection: Detection, alert_id: str, day: str, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections) -> dict[str, Any]:
     earlier = {other: status for other, status in (earlier_alerts or {}).items() if other != alert_id}
-    initial = {
+    return {
         "alert_id": alert_id,
         "simulated_day": day,
         "entry": detection.entry,
@@ -294,10 +308,17 @@ def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier
         "proposal_rejections": list(proposal_rejections),
         "merged_alerts": [],
     }
+
+
+def stream_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None) -> Iterator[dict[str, Any]]:
+    initial = initial_state(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)
     fresh(graph, alert_id)
-    for entered in graph.stream(initial, thread(alert_id), stream_mode="custom"):
-        if on_step is not None:
-            on_step(entered["agent"], entered["node"])
+    yield from graph.stream(initial, thread(alert_id), stream_mode="custom")
+
+
+def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier_alerts=None, alert_briefs=None, cause_rejections=(), proposal_rejections=(), tracer=None) -> dict[str, Any]:
+    for _ in stream_alert(graph, detection, alert_id=alert_id, day=day, earlier_alerts=earlier_alerts, alert_briefs=alert_briefs, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=tracer):
+        pass
     return graph.get_state(thread(alert_id)).values
 
 
