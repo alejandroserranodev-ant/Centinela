@@ -10,7 +10,7 @@ from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.action_tools import TaskStub
 from centinela_agents.tools import ToolRegistry
 from centinela_agents.walk import Context
-from support import DAY, DECISION_DAY, KERNEL_CATALOG, METRICAS, SALDO_ROW, approve, base_tree, reader_from, saldo_detection, split_tree
+from support import DAY, DECISION_DAY, EMAIL, IDENTIFIED, KERNEL_CATALOG, METRICAS, SALDO_ROW, approve, base_tree, reader_from, saldo_detection, split_tree
 
 STATE = {
     "alert_id": "A1",
@@ -106,3 +106,18 @@ def test_run_day_walks_the_tree_in_use_whatever_tree_its_context_carries():
         if isinstance(event, AlertRun):
             states.append(event.state)
     assert [state["arbol_version"] for state in states] == [5]
+
+
+def test_a_request_for_changes_returns_a_paused_alert_through_the_nodes_of_its_own_version(monkeypatch):
+    monkeypatch.setattr("centinela_agents.orchestrator.rejection_target", lambda provider, state: "propuesta")
+    split = "proponer.cartera.saldo_vencido.division_1"
+    monkeypatch.setattr("centinela_agents.orchestrator.explain_cause", lambda provider, state, sources: {"cause": IDENTIFIED, "same_cause_as": None})
+    monkeypatch.setattr("centinela_agents.orchestrator.propose_actions", lambda provider, state, cause, sources: {"actions": [EMAIL], "insufficient_cause": None})
+    orchestrator, _ = paused_saldo_alert()
+    orchestrator.use_tree(split_tree().model_copy(update={"version": 2}))
+    reject = {"id": "dec-1", "kind": "request_changes", "reason": "La propuesta no sirve", "simulated_day": DECISION_DAY}
+    returned = orchestrator.resume("A1", reject)
+    assert "hoja.estratega.proponer" in [node for node, _ in returned["camino"]][5:]
+    assert returned["arbol_version"] == 1
+    assert split not in [node for node, _ in returned["camino"]]
+    assert split in [node for node, _ in orchestrator.start(saldo_detection(), alert_id="A2", day=DAY)["camino"]]
