@@ -467,6 +467,12 @@ export interface components {
          */
         AdvanceEnd: {
             /**
+             * Failure
+             * @description Why the day's analysis did not run to its end, in Spanish for the person who advanced the clock; null when it did
+             * @default null
+             */
+            failure: string | null;
+            /**
              * Newalerts
              * @description IDs of the alerts raised on that day
              */
@@ -1418,6 +1424,11 @@ export interface components {
              * @description The version the change wrote
              */
             id: string;
+            /**
+             * Inactivereason
+             * @description Why an inactive change no longer holds: a merged base dropped it, or a retired change it nests under left it unreachable; null unless inactive
+             */
+            inactiveReason: ("dropped_by_base" | "parent_retired") | null;
             /**
              * Retirereason
              * @description Why it was retired

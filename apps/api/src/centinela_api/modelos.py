@@ -201,6 +201,7 @@ class AdvanceEnd(Esquema):
     """Final event of the simulated clock's advance stream."""
     simulated_day: str = Field(..., description="Simulated day the clock reached (ISO 8601)")
     new_alerts: list[str] = Field(default_factory=list, description="IDs of the alerts raised on that day")
+    failure: str | None = Field(None, description="Why the day's analysis did not run to its end, in Spanish for the person who advanced the clock; null when it did")
 
 
 class ChatQuestion(Esquema):
@@ -366,6 +367,7 @@ class TreeExpansion(Esquema):
     description: str = Field(..., description="What the change does, in Spanish")
     evidence: list[ExpansionEvidence] = Field(..., description="The alerts whose rejections drafted it")
     status: Literal["active", "retired", "inactive"] = Field(..., description="Whether the change still holds: active; retired by a person; or inactive, when a merged base dropped it or a retired change it nests under left it unreachable")
+    inactive_reason: Literal["dropped_by_base", "parent_retired"] | None = Field(None, description="Why an inactive change no longer holds: a merged base dropped it, or a retired change it nests under left it unreachable; null unless inactive")
     retired_by: str | None = Field(None, description="Who retired it")
     retire_reason: str | None = Field(None, description="Why it was retired")
 

@@ -1,15 +1,16 @@
 # The tree's versions in apps/api over an in-memory store: the base row a first day writes, the
 # expansion three rejections draft, the evidence a version already used or a refused draft spent,
 # the replay a merged base forces, the status each expansion takes from the current tree, and the
-# retirement of an expansion and its refusals.
+# retirement of an expansion and its refusals, and why an inactive one is so.
 import datetime as dt
 from dataclasses import replace
 from unittest.mock import MagicMock
 
 import pytest
 
-from centinela_agents.expansion import Caps, Growth
+from centinela_agents.expansion import Caps, Growth, depth
 from centinela_agents.growth import Rejection
+from centinela_agents.schema import index
 from centinela_agents.validator import load_grounds
 
 from centinela_api import agentes, arboles
@@ -31,8 +32,8 @@ class Almacen:
     def versiones(self, conn):
         return list(self.filas)
 
-    def insertar(self, conn, *, padre, origen, arbol, base, dia, agente=None, autor=None, movimiento=None, evidencia=(), retira=None):
-        fila = arboles.Version(len(self.filas) + 1, padre, origen, agente, autor, movimiento, list(evidencia), retira, arboles.huella(base), arbol.model_dump(mode="json"), dia, dt.datetime(2026, 10, 4, 12, tzinfo=dt.UTC))
+    def insertar(self, conn, *, padre, origen, arbol, grounds, growth, dia, agente=None, autor=None, movimiento=None, evidencia=(), retira=None):
+        fila = arboles.Version(len(self.filas) + 1, padre, origen, agente, autor, movimiento, list(evidencia), retira, arboles.huella(grounds, growth), arbol.model_dump(mode="json"), dia, dt.datetime(2026, 10, 4, 12, tzinfo=dt.UTC))
         self.filas.append(fila)
         return fila.id
 
@@ -175,7 +176,7 @@ def test_un_borrador_rechazado_se_descarta_una_vez_y_su_evidencia_no_vuelve_a_co
     assert arboles.expansiones(almacen.filas, {}) == []
 
 
-def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactive_y_no_se_retira(almacen, monkeypatch):
+def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactiva_y_no_se_retira(almacen, monkeypatch):
     tres_rechazos(monkeypatch)
     arboles.del_dia(MagicMock(), DIA)
     base_nueva(monkeypatch, 2)
@@ -185,7 +186,7 @@ def test_una_expansion_descartada_sobre_la_base_nueva_queda_inactive_y_no_se_ret
     assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "base", "descartada"]
     assert arboles.bitacora.registrar.call_count == 2
     (expansion,) = arboles.expansiones(almacen.filas, {})
-    assert (expansion.id, expansion.status) == ("2", "inactive")
+    assert (expansion.id, expansion.status, expansion.inactive_reason) == ("2", "inactive", "dropped_by_base")
     with pytest.raises(arboles.RetiroRechazado):
         arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
 
@@ -201,20 +202,20 @@ def test_una_division_que_reusa_el_id_de_una_descartada_no_choca_con_ella(almace
     arboles.del_dia(MagicMock(), DIA)
     base_nueva(monkeypatch, 3)
     arbol = arboles.del_dia(MagicMock(), DIA)
-    assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "base", "descartada", "expansion", "base"]
+    assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "base", "descartada", "base", "expansion", "base"]
     hoja = next(nodo for nodo in arbol.nodos if nodo.id == "hoja.estratega.proponer.saldo_vencido.1")
     assert hoja.hoja.excluye == ("act-saldo_vencido-r2",)
-    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("5", "active"), ("2", "inactive")]
+    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("6", "active"), ("2", "inactive")]
 
 
-def test_una_division_anidada_bajo_una_retirada_queda_inactive_y_no_se_retira(almacen, monkeypatch):
+def test_una_division_anidada_bajo_una_retirada_queda_inactiva_y_no_se_retira(almacen, monkeypatch):
     rechazos = tres_rechazos(monkeypatch)
     arboles.del_dia(MagicMock(), DIA)
     tres_rechazos(monkeypatch, "r2", 3, rechazos)
     arboles.del_dia(MagicMock(), DIA)
     assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "expansion"]
     arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
-    assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive"), ("2", "retired")]
+    assert [(expansion.id, expansion.status, expansion.inactive_reason) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive", "parent_retired"), ("2", "retired", None)]
     with pytest.raises(arboles.RetiroRechazado):
         arboles.retirar(MagicMock(), 3, "No ayudó", GERENTE, DIA, {})
 
@@ -227,3 +228,62 @@ def test_una_division_anidada_describe_solo_la_fila_que_agrega(almacen, monkeypa
     primera, segunda = (expansion.description for expansion in reversed(arboles.expansiones(almacen.filas, {})))
     assert ";" not in segunda and segunda != primera
     assert arboles.bitacora.registrar.call_args.args[4].count(";") == 0
+
+
+def test_un_fallo_al_rehacer_la_version_guardada_sale_del_dia(almacen, monkeypatch):
+    tres_rechazos(monkeypatch)
+    arboles.del_dia(MagicMock(), DIA)
+    base_nueva(monkeypatch, 2)
+    monkeypatch.setattr(arboles, "replay", MagicMock(side_effect=RuntimeError("roto")))
+    with pytest.raises(RuntimeError, match="roto"):
+        arboles.del_dia(MagicMock(), DIA)
+
+
+def test_un_cambio_en_lo_que_lee_el_validador_reaplica_las_expansiones(almacen, monkeypatch):
+    tres_rechazos(monkeypatch)
+    arboles.del_dia(MagicMock(), DIA)
+    monkeypatch.setattr(arboles.agentes, "get_growth", lambda: Growth({"estratega": 4}, GROWTH.caps))
+    arboles.del_dia(MagicMock(), DIA)
+    assert [fila.origen for fila in almacen.filas] == ["base", "expansion", "base"]
+
+
+def test_una_base_nueva_que_descarta_una_expansion_retirada_conserva_el_retiro(almacen, monkeypatch):
+    tres_rechazos(monkeypatch)
+    arboles.del_dia(MagicMock(), DIA)
+    arboles.retirar(MagicMock(), 2, "No ayudó", GERENTE, DIA, {})
+    arboles.bitacora.registrar.reset_mock()
+    base_nueva(monkeypatch, 2)
+    monkeypatch.setattr(arboles.agentes, "get_growth", lambda: ESTRECHO)
+    arboles.del_dia(MagicMock(), DIA)
+    assert [(fila.origen, fila.retira) for fila in almacen.filas] == [("base", None), ("expansion", None), ("retiro", 2), ("base", None), ("descartada", 2)]
+    arboles.bitacora.registrar.assert_called_once()
+    (expansion,) = arboles.expansiones(almacen.filas, {})
+    assert (expansion.status, expansion.retired_by, expansion.retire_reason, expansion.inactive_reason) == ("retired", "Ana", "No ayudó", None)
+
+
+def test_una_base_nueva_descarta_en_la_misma_pasada_una_division_y_la_que_anida_bajo_ella(almacen, monkeypatch):
+    rechazos = tres_rechazos(monkeypatch)
+    arboles.del_dia(MagicMock(), DIA)
+    tres_rechazos(monkeypatch, "r2", 3, rechazos)
+    arboles.del_dia(MagicMock(), DIA)
+    arboles.bitacora.registrar.reset_mock()
+    base_nueva(monkeypatch, 2)
+    monkeypatch.setattr(arboles.agentes, "get_growth", lambda: ESTRECHO)
+    arbol = arboles.del_dia(MagicMock(), DIA)
+    assert [(fila.origen, fila.retira) for fila in almacen.filas] == [("base", None), ("expansion", None), ("expansion", None), ("base", None), ("descartada", 2), ("descartada", 3)]
+    assert arbol.nodos == ARBOL.nodos and arboles.bitacora.registrar.call_count == 2
+    assert [(expansion.id, expansion.status, expansion.inactive_reason) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive", "dropped_by_base"), ("2", "inactive", "dropped_by_base")]
+
+
+def test_una_base_nueva_descarta_la_division_anidada_y_conserva_la_primera(almacen, monkeypatch):
+    rechazos = tres_rechazos(monkeypatch)
+    primera = arboles.del_dia(MagicMock(), DIA)
+    tres_rechazos(monkeypatch, "r2", 3, rechazos)
+    segunda = arboles.del_dia(MagicMock(), DIA)
+    assert depth(index(segunda)) > depth(index(primera))
+    base_nueva(monkeypatch, 2)
+    monkeypatch.setattr(arboles.agentes, "get_growth", lambda: Growth({"estratega": 3}, Caps(depth=depth(index(primera)), nodes_per_stage=100)))
+    arbol = arboles.del_dia(MagicMock(), DIA)
+    assert [(fila.origen, fila.retira) for fila in almacen.filas][-2:] == [("base", None), ("descartada", 3)]
+    assert DIVISION in {nodo.id for nodo in arbol.nodos}
+    assert [(expansion.id, expansion.status, expansion.inactive_reason) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive", "dropped_by_base"), ("2", "active", None)]

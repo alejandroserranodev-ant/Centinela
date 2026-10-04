@@ -3,6 +3,7 @@ import { API_BASE_URL, API_HEADERS, authHeaders } from './config';
 import { getToken, notifyUnauthorized } from './session';
 import { readSse } from './sse';
 import type {
+  AdvanceEnd,
   AdvanceEvent,
   AgentStep,
   Alert,
@@ -100,7 +101,7 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
     } else if (event === 'alert') {
       yield { event: 'alert', data: data as Alert };
     } else if (event === 'end') {
-      yield { event: 'end', data: data as { simulatedDay: string; newAlerts: string[] } };
+      yield { event: 'end', data: data as AdvanceEnd };
     }
   }
 }

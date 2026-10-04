@@ -40,6 +40,7 @@ day_run = asyncio.Lock()
 UNIBLES = frozenset({"proposed"})
 VIGIA = ActorAgent(agent="vigia")
 ANALISTA = ActorAgent(agent="analista")
+DIA_FALLIDO = "El análisis de este día no se pudo completar. El equipo técnico tiene el detalle del error."
 
 
 def _unir(conn: psycopg.Connection, alerta: Alert, dia: datetime.date, nota: str) -> Alert | None:
@@ -195,6 +196,7 @@ async def avanzar(
 
         day_str = nuevo_dia.isoformat()
         new_alert_ids: list[str] = []
+        fallo: str | None = None
 
         try:
             with conn.transaction():
@@ -248,8 +250,9 @@ async def avanzar(
 
         except Exception as e:
             logger.error(f"Detection phase failed: {e}", exc_info=True)
+            fallo = DIA_FALLIDO
 
-        yield "end", AdvanceEnd(simulated_day=day_str, new_alerts=new_alert_ids)
+        yield "end", AdvanceEnd(simulated_day=day_str, new_alerts=new_alert_ids, failure=fallo)
 
     cierre = BackgroundTasks()
     cierre.add_task(release)

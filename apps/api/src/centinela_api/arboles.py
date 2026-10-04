@@ -1,18 +1,18 @@
 import datetime
-import hashlib
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, NamedTuple
 
 import psycopg
 from psycopg.types.json import Jsonb
 
 from centinela_agents.agents.estratega import described
-from centinela_agents.expansion import MOVE, Branch, Retire, Split, apply_move, entry_of, expansion_problems, layer_hash, replay
+from centinela_agents.expansion import MOVE, Branch, Growth, Retire, Split, apply_move, entry_of, expansion_problems, fingerprint, layer_hash, replay
 from centinela_agents.growth import grow
 from centinela_agents.schema import ROOT, Tree, index, live
 from centinela_agents.skills import action_rows
+from centinela_agents.validator import Grounds
 
 from . import agentes, bitacora, configuracion, rechazos
 from .modelos import ActorAgent, ActorPerson, ExpansionEvidence, Persona, Sentence, TreeExpansion
@@ -56,8 +56,13 @@ class RetiroRechazado(Exception):
         self.problemas = problemas
 
 
-def huella(base: Tree) -> str:
-    return hashlib.sha256(base.model_dump_json().encode()).hexdigest()
+class Estado(NamedTuple):
+    status: Literal["active", "retired", "inactive"]
+    inactive_reason: Literal["dropped_by_base", "parent_retired"] | None = None
+
+
+def huella(grounds: Grounds, growth: Growth) -> str:
+    return fingerprint(grounds, growth)
 
 
 def versiones(conn: psycopg.Connection) -> list[Version]:
@@ -65,7 +70,21 @@ def versiones(conn: psycopg.Connection) -> list[Version]:
     return [Version(*fila) for fila in filas]
 
 
-def insertar(conn: psycopg.Connection, *, padre, origen, arbol: Tree, base: Tree, dia, agente=None, autor=None, movimiento=None, evidencia=(), retira=None) -> int:
+def insertar(
+    conn: psycopg.Connection,
+    *,
+    padre: int | None,
+    origen: str,
+    arbol: Tree,
+    grounds: Grounds,
+    growth: Growth,
+    dia: datetime.date,
+    agente: str | None = None,
+    autor: Mapping[str, Any] | None = None,
+    movimiento: Mapping[str, Any] | None = None,
+    evidencia: Sequence[str] = (),
+    retira: int | None = None,
+) -> int:
     return conn.execute(
         "INSERT INTO api.arbol_versiones (cliente, padre, origen, agente, autor, movimiento, evidencia, retira, "
         "base_version, base_hash, hash_l01, arbol, dia_simulado) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
@@ -73,7 +92,7 @@ def insertar(conn: psycopg.Connection, *, padre, origen, arbol: Tree, base: Tree
             CLIENTE, padre, origen, agente,
             None if autor is None else Jsonb(dict(autor)),
             None if movimiento is None else Jsonb(dict(movimiento)),
-            Jsonb(list(evidencia)), retira, base.version, huella(base), layer_hash(arbol),
+            Jsonb(list(evidencia)), retira, grounds.base.version, huella(grounds, growth), layer_hash(arbol),
             Jsonb(arbol.model_dump(mode="json")), dia,
         ),
     ).fetchone()[0]
@@ -135,16 +154,19 @@ def retiros(filas: list[Version]) -> dict[int, Version]:
 def vigente(conn: psycopg.Connection, grounds, growth, dia: datetime.date) -> Tree:
     filas = versiones(conn)
     ultima = cabeza(filas)
-    if ultima is not None and ultima.base_hash == huella(grounds.base):
+    if ultima is not None and ultima.base_hash == huella(grounds, growth):
         return con_version(Tree.model_validate(ultima.arbol), ultima.id)
     caidas = descartadas(filas)
     cambios = [fila for fila in filas if fila.origen in CAMBIOS and fila.id not in caidas and fila.retira not in caidas]
     arbol, dropped = replay(grounds.base, [MOVE.validate_python(fila.movimiento) for fila in cambios], grounds, growth.caps)
-    id = insertar(conn, padre=ultima.id if ultima else None, origen="base", arbol=arbol, base=grounds.base, dia=dia)
+    id = insertar(conn, padre=ultima.id if ultima else None, origen="base", arbol=arbol, grounds=grounds, growth=growth, dia=dia)
+    caen = {cambios[posicion].id for posicion, _ in dropped}
     for posicion, problemas in dropped:
         fila = cambios[posicion]
+        if fila.origen == "retiro" and fila.retira in caen:
+            continue
         logger.warning("Version %s does not apply over the new base: %s", fila.id, problemas)
-        insertar(conn, padre=id, origen=DESCARTADA, arbol=arbol, base=grounds.base, dia=dia, agente=fila.agente, autor=fila.autor, movimiento=fila.movimiento, retira=fila.id)
+        insertar(conn, padre=id, origen=DESCARTADA, arbol=arbol, grounds=grounds, growth=growth, dia=dia, agente=fila.agente, autor=fila.autor, movimiento=fila.movimiento, retira=fila.id)
         bitacora.registrar(conn, None, "arbol", actor(fila), f"Un cambio del árbol no se aplicó sobre la base nueva y se descartó: {describir(MOVE.validate_python(fila.movimiento), previas_de(filas, fila))}", dia)
     return con_version(arbol, id)
 
@@ -168,27 +190,30 @@ def del_dia(conn: psycopg.Connection, dia: datetime.date) -> Tree:
             movimiento = crecido.move.model_dump(mode="json")
             if crecido.tree is None:
                 logger.warning("A draft of %s was refused: %s", crecido.agent, crecido.problems)
-                insertar(conn, padre=arbol.version, origen=DESCARTADA, arbol=arbol, base=grounds.base, dia=dia, agente=crecido.agent, movimiento=movimiento, evidencia=crecido.evidence)
+                insertar(conn, padre=arbol.version, origen=DESCARTADA, arbol=arbol, grounds=grounds, growth=growth, dia=dia, agente=crecido.agent, movimiento=movimiento, evidencia=crecido.evidence)
                 bitacora.registrar(conn, None, "arbol", quien, f"Un cambio del árbol no pasó el validador y se descartó: {describir(crecido.move, previas(arbol.nodos, crecido.move))}", dia)
                 continue
-            id = insertar(conn, padre=arbol.version, origen="expansion", arbol=crecido.tree, base=grounds.base, dia=dia, agente=crecido.agent, movimiento=movimiento, evidencia=crecido.evidence)
+            id = insertar(conn, padre=arbol.version, origen="expansion", arbol=crecido.tree, grounds=grounds, growth=growth, dia=dia, agente=crecido.agent, movimiento=movimiento, evidencia=crecido.evidence)
             arbol = con_version(crecido.tree, id)
             bitacora.registrar(conn, None, "arbol", quien, f"Cambió el árbol de decisión: {describir(crecido.move, previas(arbol.nodos, crecido.move))}. Lo sostienen {len(crecido.evidence)} alertas rechazadas.", dia)
     return arbol
 
 
-def estados(filas: list[Version]) -> dict[int, str]:
+def estados(filas: list[Version]) -> dict[int, Estado]:
     ultima = cabeza(filas)
     vivos = live(index(Tree.model_validate(ultima.arbol)), [ROOT]) if ultima else set()
     caidas, retiradas = descartadas(filas), retiros(filas)
     return {
-        fila.id: "retired" if fila.id in retiradas else "inactive" if fila.id in caidas or entry_of(MOVE.validate_python(fila.movimiento)) not in vivos else "active"
+        fila.id: Estado("retired") if fila.id in retiradas
+        else Estado("inactive", "dropped_by_base") if fila.id in caidas
+        else Estado("inactive", "parent_retired") if entry_of(MOVE.validate_python(fila.movimiento)) not in vivos
+        else Estado("active")
         for fila in filas
         if fila.origen == "expansion"
     }
 
 
-def expansion(fila: Version, estado: str, retiro: Version | None, titulos: Mapping[str, Sentence], antes: tuple[str, ...] = ()) -> TreeExpansion:
+def expansion(fila: Version, estado: Estado, retiro: Version | None, titulos: Mapping[str, Sentence], antes: tuple[str, ...] = ()) -> TreeExpansion:
     return TreeExpansion(
         id=str(fila.id),
         agent=fila.agente,
@@ -196,7 +221,8 @@ def expansion(fila: Version, estado: str, retiro: Version | None, titulos: Mappi
         created_at=fila.creado_en.isoformat(),
         description=describir(MOVE.validate_python(fila.movimiento), antes),
         evidence=[ExpansionEvidence(alert_id=id, title=titulos.get(id) or Sentence(text=id, figures=[])) for id in fila.evidencia],
-        status=estado,
+        status=estado.status,
+        inactive_reason=estado.inactive_reason,
         retired_by=retiro.autor["name"] if retiro and retiro.autor else None,
         retire_reason=MOVE.validate_python(retiro.movimiento).motivo if retiro else None,
     )
@@ -205,7 +231,7 @@ def expansion(fila: Version, estado: str, retiro: Version | None, titulos: Mappi
 def expansiones(filas: list[Version], titulos: Mapping[str, Sentence]) -> list[TreeExpansion]:
     estado, retirada = estados(filas), retiros(filas)
     return [
-        expansion(fila, estado[fila.id], retirada.get(fila.id) if estado[fila.id] == "retired" else None, titulos, previas_de(filas, fila))
+        expansion(fila, estado[fila.id], retirada.get(fila.id) if estado[fila.id].status == "retired" else None, titulos, previas_de(filas, fila))
         for fila in reversed(filas)
         if fila.origen == "expansion"
     ]
@@ -219,10 +245,10 @@ def retirar(conn: psycopg.Connection, id: int, motivo: str, persona: Persona, di
         fila = next((fila for fila in filas if fila.id == id and fila.origen == "expansion"), None)
         if fila is None:
             raise ExpansionDesconocida(id)
-        if estados(filas)[id] == "retired":
+        if estados(filas)[id].status == "retired":
             raise YaRetirada(id)
         arbol = vigente(conn, grounds, growth, dia)
-        if estados(versiones(conn))[id] != "active":
+        if estados(versiones(conn))[id].status != "active":
             raise RetiroRechazado([f"version {id} no longer holds in the tree"])
         cambio = MOVE.validate_python(fila.movimiento)
         movimiento = Retire(nodo=entry_of(cambio), motivo=motivo.strip())
@@ -230,6 +256,6 @@ def retirar(conn: psycopg.Connection, id: int, motivo: str, persona: Persona, di
         if problemas:
             raise RetiroRechazado(problemas)
         autor = {"name": persona.name, "role": persona.role}
-        insertar(conn, padre=arbol.version, origen="retiro", arbol=apply_move(arbol, movimiento), base=grounds.base, dia=dia, autor=autor, movimiento=movimiento.model_dump(mode="json"), retira=id)
+        insertar(conn, padre=arbol.version, origen="retiro", arbol=apply_move(arbol, movimiento), grounds=grounds, growth=growth, dia=dia, autor=autor, movimiento=movimiento.model_dump(mode="json"), retira=id)
         bitacora.registrar(conn, None, "arbol", ActorPerson(**autor), f"Retiró el cambio del árbol «{describir(cambio, previas_de(filas, fila))}»: {motivo.strip()}", dia)
     return next(expansion for expansion in expansiones(versiones(conn), titulos) if expansion.id == str(id))

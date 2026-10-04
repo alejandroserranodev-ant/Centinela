@@ -78,7 +78,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day and `ultimoDia`, the last day with data, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of an alert starts and as it ends, opening with the detection, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of an alert starts and as it ends, opening with the detection, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay`, `newAlerts`, the alerts that remain to decide, and `failure`, in Spanish when the day's analysis did not finish, null otherwise | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk; without `estado`, every alert but the merged ones, which `estado=unida` lists | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`, when its graph no longer waits for a decision, or while another decision resumes it; 422 for a failed check | `decide` |
@@ -88,7 +88,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 | GET | `/configuracion` | the `Settings`: watched metrics, their thresholds and owners, autonomy per action type | | `getSettings` |
 | PUT | `/configuracion` | saves the `Settings` whole and returns them as stored | 403 unless analista or gerente; 422 for a failed check | `saveSettings` |
-| GET | `/arbol/expansiones` | the expansions of the tree, newest first, as `TreeExpansion`: the agent, the change in Spanish, the alerts behind it, and its status, `active`, `retired` or `inactive`, with who retired it and why | | `listExpansions` |
+| GET | `/arbol/expansiones` | the expansions of the tree, newest first, as `TreeExpansion`: the agent, the change in Spanish, the alerts behind it, and its status, `active`, `retired` or `inactive`, with who retired it and why, or with `inactiveReason` | | `listExpansions` |
 | POST | `/arbol/expansiones/{id}/retiro` | retires an expansion with a `RetireExpansion` reason and returns it | 403 unless analista or gerente; 404 for an unknown expansion; 409 for one already retired; 422 for a blank reason, an `inactive` expansion, or one the validator refuses | `retireExpansion` |
 
 **`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, quien, conn)`
@@ -219,10 +219,15 @@ a move is, what refuses it and what the drafter returns is
 | `descartada` | a draft the criteria refused, which carries its move and its evidence; or a move a merged base refuses, which carries its move and names, in `retira`, the row it drops, whose evidence stays on that row. No run walks it |
 
 - **A merged base replays the client's moves.** `src/centinela_api/arboles.py:vigente(conn, grounds, growth, dia)`
-  returns the newest version while the base it was built on is the base in the tree; otherwise it
-  replays every `expansion` and `retiro` in order over the new base, writes a `base` row, and writes
-  each move the new base refuses once as `descartada`, with a warning in the log and an `arbol` row
-  of the `bitácora`. A move written so is never replayed on a later base and its evidence stays
+  returns the newest version while its stored hash equals
+  `src/centinela_api/arboles.py:huella(grounds, growth)`, which covers everything the validator and
+  the replay read: the base, the registry, the metrics, the KPI catalogue,
+  `packages/agents/arbol/crecimiento.yaml` and the skills, `packages/agents/skills/estratega/acciones.md`
+  among them; a hash stored over fewer inputs differs, so the column `base_hash` needs no
+  migration. Otherwise it replays every `expansion` and `retiro` in order over the new base, writes
+  a `base` row, and writes each move the new base refuses once as `descartada`, with a warning in
+  the log and an `arbol` row of the `bitácora`; a retirement of an expansion dropped in the same
+  pass writes nothing, and the expansion stays `retired`. A move written so is never replayed on a later base and its evidence stays
   consumed, which departs from replaying every move on every base, because a refused move would
   otherwise be logged again on every day run, and a move that came back on a later base could share
   a node id the drafter has since given another split. Who merged a base is in the commit log, not
@@ -235,13 +240,15 @@ a move is, what refuses it and what the drafter returns is
   consumed and it is neither drafted again, replayed nor listed. It returns the newest version. A
   failure of the drafter is logged and the day runs on the version in force; a failure to read or
   rebuild the stored version is not caught there, and lands in the day run's `Detection phase
-  failed` handler: an ERROR in the log with its traceback, a day that ends with no alerts, and a
-  clock that has advanced.
+  failed` handler: an ERROR in the log, a clock that has advanced, and an `end` whose `failure`
+  says the day's analysis did not finish, so it does not read as a quiet day.
 - **`api.rechazos` keeps each rejection the classifier targeted**, with the alert's metric, the
   ids of the actions it rejected and the reason, written by the decision route after the resume;
   a rejection recorded with no paused graph has no target and keeps nothing.
 - **An expansion is `active`, `retired` or `inactive`**, derived from the current tree: `inactive`
-  is a move a merged base dropped, or one no longer live because a move it nests under was retired.
+  is a move a merged base dropped, `inactiveReason` `dropped_by_base`, or one no longer live because
+  a move it nests under was retired, `parent_retired`. Between a merged base and the next day run
+  they describe the tree built on the old base, because a read never writes a version.
 - **A person retires an expansion**, `src/centinela_api/arboles.py:retirar(conn, id, motivo, persona, dia, titulos)`:
   under the same lock, it refuses an expansion already retired or one not `active`, the retirement
   of the expansion's first node passes the criteria, then a `retiro` row and an `arbol` row of the

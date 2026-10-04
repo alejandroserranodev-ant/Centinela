@@ -1,5 +1,5 @@
 # The endpoints of the tree's expansions: the list, newest first, and the retirement with each of
-# its refusals, over a mocked store and connection.
+# its refusals, and the session both ask for, over a mocked store and connection.
 import datetime as dt
 from unittest.mock import ANY, MagicMock
 
@@ -34,6 +34,12 @@ def con(monkeypatch):
     app.dependency_overrides[db.obtener_conexion] = conexion
     yield como
     app.dependency_overrides.clear()
+
+
+def test_sin_sesion_las_rutas_del_arbol_responden_401(con):
+    cliente = TestClient(app)
+    assert cliente.get("/arbol/expansiones").status_code == 401
+    assert cliente.post("/arbol/expansiones/2/retiro", json={"reason": "No ayudó"}).status_code == 401
 
 
 def test_la_lista_sirve_las_expansiones(con):

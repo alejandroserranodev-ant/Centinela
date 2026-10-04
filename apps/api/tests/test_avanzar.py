@@ -68,6 +68,7 @@ def test_el_dia_transmite_pasos_y_un_fin(cliente):
     for nombre, dato in eventos[:-1]:
         (AgentStep if nombre == "step" else Alert).model_validate(dato)
     assert eventos[-1][1]["newAlerts"]
+    assert eventos[-1][1].get("failure") is None
 
 
 def test_el_fin_del_dia_no_es_un_error(cliente, caplog):
@@ -177,3 +178,11 @@ def test_el_dia_corre_sobre_la_version_que_crecio_y_guarda_la_de_cada_alerta(cli
     cliente.post("/simulacion/avanzar?dias=1")
     simulacion_router.get_orchestrator().use_tree.assert_called_once_with(arbol)
     simulacion_router.alertas_repo.fijar_version.assert_called_once_with(ANY, "alerta_a", 9)
+
+
+def test_un_dia_cuya_version_del_arbol_no_carga_lo_dice_en_el_fin(cliente, monkeypatch, caplog):
+    monkeypatch.setattr(simulacion_router.arboles, "del_dia", MagicMock(side_effect=RuntimeError("roto")))
+    eventos = _eventos(cliente.post("/simulacion/avanzar?dias=1").text)
+    assert [nombre for nombre, _ in eventos] == ["end"]
+    assert eventos[0][1]["newAlerts"] == [] and eventos[0][1]["failure"] == simulacion_router.DIA_FALLIDO
+    assert "Detection phase failed" in caplog.text
