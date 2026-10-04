@@ -40,10 +40,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export async function getSimulationState(): Promise<SimulationState> {
-  // Get current simulated day
   const dia = await fetchJson<{ dia: string }>(`${API_BASE_URL}/simulacion/dia-actual`);
-  // For now, return the simulated day as both simulatedDay and user data
-  // (User is hardcoded in config, real authentication would come later)
   return {
     simulatedDay: dia.dia,
     user: { name: 'Usuario Demo', role: 'gerente' },
@@ -102,7 +99,6 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
 export async function listAlerts(filter: AlertFilter = {}): Promise<Alert[]> {
   const params = new URLSearchParams();
   if (filter.status) {
-    // Convert status to Spanish for API
     const statusMap: Record<string, string> = {
       new: 'nueva',
       analyzing: 'en_analisis',
@@ -124,7 +120,6 @@ export async function getAlert(id: string): Promise<Alert> {
 }
 
 export async function decide(id: string, decision: Decision): Promise<Alert> {
-  // Convert decision format if needed
   const payload =
     decision.kind === 'edit'
       ? { kind: 'edit', actionId: decision.actionId, parameters: decision.parameters }
@@ -189,7 +184,6 @@ export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator
 }
 
 export async function getInboxSummary(): Promise<InboxSummary> {
-  // Compute summary from alerts in 'proposed' status
   const alerts = await listAlerts({ status: 'proposed' });
   return {
     moneyAtRisk: {
@@ -281,7 +275,6 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function saveSettings(next: Settings): Promise<Settings> {
-  // Settings save not implemented in API yet
   if (Object.values(next.autonomy).some((level) => level === 'execute')) {
     throw new ApiError(422, 'Ninguna acción puede ejecutarse sola durante el piloto: el máximo es Propone');
   }
@@ -299,6 +292,5 @@ export async function listBitacora(filter: LogFilter = {}): Promise<LogEvent[]> 
 }
 
 export async function getQuery(_id: string): Promise<Query> {
-  // Query storage not implemented in API yet
   throw new ApiError(404, 'No existe esa consulta');
 }
