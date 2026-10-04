@@ -1,7 +1,9 @@
 # Spec 7: masking personal data before it reaches a model (Ley 1581)
 
 **Status:** pending its plan. **Runs after** the specs that edit the prompt builders, `orchestrator-runtime`
-(bug spec 1) and `tree-expansion` (spec 3), so it masks the final prompts once. **Depends on:** nothing unbuilt. It touches the prompt builders of
+(bug spec 1) and `tree-expansion` (spec 3), so it masks the final prompts once; spec 3 is executed, its
+decisions are on [`packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md) and
+[`apps/api/AGENTS.md`](../../apps/api/AGENTS.md), and it added no prompt, since an expansion is drafted in code. **Depends on:** nothing unbuilt. It touches the prompt builders of
 `packages/agents`, the tool boundary of `packages/tools` and the `bitácora` of `apps/api`, all built.
 Executed specs are deleted, and a reference to one reads as a reference to the page that now states it.
 

@@ -5,9 +5,10 @@ one entry of a registry, whose leaves are the decisions of an agent. This page d
 a leaf and an end are written, what the validator refuses, and where each kind of change lands.
 What runs: the base below is parsed, validated, walked in `detectar` and compiled to the two
 LangGraph graphs, the alert's and the chat's, and `uv run pytest` holds all four. The leaves the compiled graph calls are the model
-functions `centinela_agents/orchestrator.py:CentinelaOrchestrator` hands it. What is decided, not built: a client's own version of
-the tree, its growth by self-expansion, the caps on that growth, and the impact formulas; each
-section that states one opens with the marker. How the compiled graph runs an alert is [`../AGENTS.md`](../AGENTS.md).
+functions `centinela_agents/orchestrator.py:CentinelaOrchestrator` hands it. What runs too: the
+three moves of self-expansion, their criteria and caps, and `Estratega`'s draft. What is decided,
+not built: the drafts of `Vigía` and `Analista`, the cap on approved KPIs, and the impact formulas;
+each section that states one opens with the marker. How the compiled graph runs an alert is [`../AGENTS.md`](../AGENTS.md).
 
 ## Why each file exists
 
@@ -15,6 +16,7 @@ section that states one opens with the marker. How the compiled graph runs an al
 |---|---|
 | `base.yaml` | the base every client shares: the laws, `leyes`, and every node, leaf and end the orchestrator walks. A change to it is a pull request, and the validator compares every version with it |
 | `fundamentos.yaml` | the registry: every clause of a standard and every policy section a node or a law may rest on, each with its `cita` and what it `funda`. Only a person adds to it |
+| `crecimiento.yaml` | the settings of growth: how many repetitions draft each agent's expansion, and the caps on a version's longest path and on the nodes of one stage, each with its `fuente` |
 
 ## The tree
 
@@ -37,10 +39,10 @@ free text, and no ISO clause the registry holds names the controls against promp
 text is public at genai.owasp.org, so the reviewer checks the strategy's number there. Like an ISO
 clause, it founds structure, never a threshold.
 
-> **Decided, not built.** A client's version of the tree is not a file: `apps/api` keeps it and
-> hands it to each run, because no agent writes anywhere.
-> `centinela_agents/graph.py:Compiler` caches a graph per version and content, so two
-> clients may hold different trees under one version number.
+**A client's version of the tree is not a file**: `apps/api` keeps it as the moves of its
+expansions replayed over this base and hands it to each run, because no agent writes anywhere
+([`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions)).
+`centinela_agents/graph.py:Compiler` caches a graph per version and content.
 
 ## The stages
 
@@ -88,6 +90,9 @@ names, and it is decided, not built.
 | `si`, `no` | both required, each a node, a leaf or an end |
 | `hoja` | `agente`, a `decision` of that agent's closed list, `centinela_agents/schema.py:AGENT_DECISIONS`, and `skill`, the file under [`../skills/`](../skills/AGENTS.md) the step starts from |
 | `sigue` | on a leaf only, required: where the walk continues once the agent returns |
+| `divide` | on a split node only: the leaf it splits; its `no` leads back to that leaf and its `si` to a new leaf of the same agent and decision, and the validator reads every reference to the node as one to the leaf |
+| `retirado` | the reason a node was retired; a retired node always takes `no`, and stays so the `bitácora` of past alerts still names it |
+| `hoja.excluye` | on a `proponer` leaf of `Estratega` only: the action ids, `act-<metric>-r<k>`, of rows of `skills/estratega/acciones.md` the leaf does not offer |
 
 **The atomicity test.** A node is atomic when its predicate holds one operand, one operator and no
 `and`, `or` or `not`, and its `fundamento` names one entry of the registry. A node that splits into
@@ -231,22 +236,24 @@ that never fires fails there, and the base itself must pass with no problem. Its
   read where the candidate may be another metric;
 - an `umbral` that names no threshold for its column, or one of no admitted shape;
 - a leaf whose agent, decision or `skill` is unknown;
-- a metric of `data/metricas.yaml` with no L3 branch in `detectar`, no `skills/analista/<metric>.md`,
-  or no row in [`skills/estratega/acciones.md`](../skills/estratega/acciones.md), which
+- a split node that does not lead back to its leaf on `no` or takes no new leaf of its kind on
+  `si`; an `excluye` outside a `proponer` leaf of `Estratega`, or one that names no row of
+  `skills/estratega/acciones.md`;
+- a metric of `data/metricas.yaml` with no live L3 branch in `detectar`, one no retired node hides,
+  no `skills/analista/<metric>.md`, or no row in
+  [`skills/estratega/acciones.md`](../skills/estratega/acciones.md), which
   `centinela_agents/validator.py:coverage_problems(tree, grounds)` reads;
-- L0, an L1 node or a leaf of the base that differs from the base, or an L1 node the base lacks.
+- L0, an L1 node or a leaf of the base that differs from the base, reading every reference to a
+  split node as one to its leaf, or an L1 node the base lacks.
 
 The catalogue is an input: the validator checks each `lee` on a KPI against the catalogue it is
 handed, never against a database.
 
 ## How the tree grows
 
-> **Decided, not built.** No code grows the tree; the leaf `expandir` is in each agent's closed
-> list and in no node of the base.
-
 | What grows | By | Who | Bound | Before it takes effect |
 |---|---|---|---|---|
-| L2 and L3 | self-expansion | any agent, inside its own stage | the registry, the laws, the validator | nothing; it is recorded, versioned and retirable |
+| L2 and L3 | self-expansion | the stage's own agent, drafted in code | the registry, the laws, the validator, the caps | nothing; it is recorded, versioned and retirable |
 | any level | a pull request against `base.yaml` | a person | the validator and `uv run pytest` | review |
 | the registry | a new clause or policy section | a person, by pull request | the clause exists in its standard or in `data/policies/` | review |
 
@@ -254,25 +261,103 @@ handed, never against a database.
 the closed decisions of each agent, and the dataset. Each bounds what does grow, and a bound that
 moves with what it bounds is no bound.
 
-- **An agent expands the tree only inside its own stage**, with leaves of its own label: `Vigía` in
-  `detectar` and `medir`, `Analista` in `explicar`, `Estratega` in `proponer`, `Ejecutor` in
-  `ejecutar`. `aprobar` and `cerrar` have no agent and grow by pull request only, because each stage
-  has one owner and an agent that rewrites another's stage would decide what that one does.
-  `conversar` holds L1 nodes alone, so `Chat` expands nothing.
+- **An agent expands the tree only inside its own stage**, `centinela_agents/schema.py:AGENT_STAGE`,
+  with leaves of its own label: `Vigía` in `detectar`, `Analista` in `explicar`, `Estratega` in
+  `proponer`, `Ejecutor` in `ejecutar`. `aprobar` and `cerrar` have no agent, and `medir`, whose
+  `Vigía` is decided and not built, is a stage `AGENT_STAGE` gives no agent, so the three grow by
+  pull request only, because each stage has one owner and an agent that rewrites another's stage
+  would decide what that one does. `conversar` holds L1 nodes alone, so `Chat` expands
+  nothing.
 - **An expansion rests only on what the tree already holds**: its `fundamento` is a registry entry,
   its operand a KPI of the catalogue or a declared state field, its threshold an `umbral`. An agent
   cannot introduce a standard, a policy section or a threshold, which is why only a person grows
-  the registry.
+  the registry. An expansion that needs a measure the catalogue lacks is refused.
 - **No person approves an expansion before it runs**, because every path to an `Ejecutor` leaf
   still passes `aprobar.decision` and `ejecutar.vigente`, which the validator holds: an expansion
   changes which leaf decides and on what, never what reaches the world.
-- **An expansion is an output, never a write.** The agent returns it, the orchestrator validates
-  it, and `apps/api` persists it as a new version, writes it to the `bitácora`, and lets the
-  administrator retire it at any time.
-- **Growth is capped by settings sized to the machine**, as the model is: the depth of a path, the
-  nodes per stage, and the active approved KPIs per client, because a walk and its skill must fit
-  the context of a 4 to 8 billion parameter model, and a tree no model can read is a tree no agent
-  uses.
+- **An expansion is drafted in code and is an output, never a write.**
+  `centinela_agents/growth.py:grow(tree, grounds, growth, rejections, consumed)` returns each move
+  it drafted with the alerts that drafted it and either the version it yields or the problems that
+  refused it, and writes nothing; `apps/api` persists it
+  ([`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions)).
+  Code drafts it, never a model, because the counted evidence fixes every field of the move, and a
+  model would only add a way to break the criteria. No agent drafts a retirement, because no
+  evidence names one; a person's retirement is the same move with no agent.
+
+**An expansion is one of three moves**, `centinela_agents/expansion.py:Move`, which
+`centinela_agents/expansion.py:apply_move(tree, move)` applies. A move never edits or deletes a
+node in place, because an edit is a delete plus an add with no record that the old path existed;
+the rewrites in place each move makes, below, only point the walk at what the move adds or mark
+what it retires.
+
+| Move | What it does | Rewrites in place | Why it is safe |
+|---|---|---|---|
+| `dividir_hoja` | an L2 or L3 node of the agent's stage, carrying `divide`, takes the place of a leaf of the agent's label: the old leaf on `no`, a new leaf of the same agent and decision on `si` | every `si`, `no` and `sigue` that named the leaf now names the split node | the old behaviour survives on `no`, and the validator reads the references through the node, so L1 is unchanged |
+| `agregar_rama` | new L3 nodes at the end of an L2 family of the agent's stage; a new family is a pull request, because `centinela_agents/schema.py:FAMILIES` is code | the `no` of the family chain's last node now names the new branch, and the family's `en` list gains the new metric | only the new metric's candidate reaches the new nodes |
+| `retirar` | an L2 or L3 node, never a leaf, gains `retirado`, with its reason, and always takes `no` | the node's `retirado` | the node stays, so the `bitácora` of past alerts still names it |
+
+**The fixed criteria.**
+`centinela_agents/expansion.py:expansion_problems(parent, move, grounds, caps)` refuses a move
+that breaks any row below, and a refused move never becomes a version a run walks:
+
+| Criterion | Held by |
+|---|---|
+| the move is one of the three, inside the agent's stage, and each new leaf is of its label, taking a decision and a route a base leaf of that agent takes, so it keeps its tools | `centinela_agents/expansion.py:move_problems(parent, move, grounds)` |
+| a new `umbral` names a `data/metricas.yaml` entry whose `fuente_umbral` quotes a document | `move_problems` |
+| each new node's `fundamento`, atomicity, operand and `umbral`; every path to `Ejecutor` through `aprobar.decision` and `ejecutar.vigente`; L0 and L1 as the base holds them | `centinela_agents/validator.py:problems(data, grounds)`, on the version the move yields |
+| a split's excluded rows are rows of the metric its node tests | `centinela_agents/expansion.py:exclusion_metric_problems(move)` |
+| the version's longest path and the nodes of each stage stay under the caps of `crecimiento.yaml`; a retirement is not held to them, because it only removes live nodes and a cap must never keep a person from retiring | `centinela_agents/expansion.py:cap_problems(tree, caps)` |
+| the evidence reached its count | `centinela_agents/growth.py:grow(tree, grounds, growth, rejections, consumed)` |
+
+A refused draft is never drafted again with the criterion named, because a drafter handed the same
+evidence drafts the same move; how `apps/api` records it is
+[`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions).
+
+**`Estratega` drafts a split when one action row keeps being rejected.** When the alerts of one
+metric whose rejection the classifier sent to a target of
+`centinela_agents/growth.py:COUNTED_TARGETS` name the same row, `act-<metric>-r<k>`, as many times
+as `crecimiento.yaml` sets for `estratega`, the drafter splits the leaf an alert of that metric
+reaches with a node reading `estado.detection.metric`, and gives the new leaf that row in its
+`excluye`. A second row of the same metric splits that new leaf, so the exclusions accumulate and
+retiring the second restores the first. An alert counts once: the drafter skips every alert a
+version already names, so a retired expansion is drafted again only when new rejections reach the
+count.
+
+- **The count is three**, `repeticiones.estratega.valor`, because one rejection is one person's
+  judgement of one alert and two can coincide, while each one past three is another alert a person
+  rejects by hand. It decides when a split is drafted, never whether an alert fires.
+- **Only the target `propuesta` counts**, because only a rejection of the proposal alone says the
+  row is wrong. `ambos` also sends the reason to `Estratega`, but it rejects the cause too, and a
+  proposal built on a wrong cause says nothing of its rows; `causa` and `ninguno` say nothing of
+  them either.
+- **The split node rests on `iso31000.6.5.2`**, `centinela_agents/growth.py:SPLIT_GROUND`, the
+  selection of treatment options, because the split changes which options `proponer` offers and
+  nothing else.
+- **A split may exclude every row of its metric.** That leaf proposes nothing and calls no model,
+  so the alert reaches `revision_manual` and one manual-review `task`: a metric whose every action
+  keeps being rejected has no action people accept, and a person reviewing it is the honest
+  answer, where refusing the evidence would keep offering rows people reject.
+
+> **Decided, not built.** `Vigía`'s `agregar_rama` for an approved KPI no `detectar` node reads,
+> which waits for approved KPIs and for an operator per threshold in their catalogue;
+> `Analista`'s split for a hypothesis confirmed across alerts, which waits for a cause that records
+> its hypothesis; and a count of an action type ending in `nota_manual`, which no alert reaches
+> while `ejecutar.automatizable` lists every action type. The cap on the active approved KPIs per
+> client waits for approved KPIs too.
+
+**The caps are settings sized to the machine**, as the model is, because a walk and its skill must
+fit the context of a 4 to 8 billion parameter model, and a tree no model can read is a tree no
+agent uses. `topes` sets 40 nodes on a version's longest path and 64 nodes in one stage: each sits
+above the base's own figure, so the base leaves room to grow, and each stays a walk and a stage a
+small model reads whole. From `packages/agents`, this prints the base's figures:
+
+```bash
+uv run python -c "from collections import Counter; from pathlib import Path; from centinela_agents.expansion import depth; from centinela_agents.schema import Tree, index; from centinela_agents.yaml_loader import load_yaml; t = Tree.model_validate(load_yaml(Path('arbol/base.yaml'))); print(depth(index(t)), Counter(n.id.split('.')[0] for n in t.nodos if n.hoja is None))"
+```
+
+**Each version records** its parent, the client, the move, the agent or the person, the alerts
+that drafted it, the hash of L0 and L1, `centinela_agents/expansion.py:layer_hash(tree)`, and the
+simulated and real dates; `apps/api` keeps it ([`../../../apps/api/AGENTS.md`](../../../apps/api/AGENTS.md#the-trees-versions)).
 
 ## Adding to the tree
 
@@ -300,7 +385,9 @@ Each list is in the order the change is made. `uv run pytest`, from `packages/ag
 writes it; a derived field also joins `centinela_agents/state.py:DERIVED_FIELDS` and
 `centinela_agents/walk.py:read(state, path, ctx)`. Its `fundamento` is an entry the registry
 already holds, or a pull request adds one. An L1 node changes only by a pull request against
-`base.yaml`.
+`base.yaml`. A node a move may add rests on the same rules, and a move's own rule changes
+`centinela_agents/expansion.py:move_problems(parent, move, grounds)` and its planted case in
+`tests/test_expansion.py:PLANTED_MOVES`.
 
 **An end.** `centinela_agents/schema.py:ENDS`, what it does in
 `centinela_agents/graph.py:end_node(end_id, classify)`, and, when it proposes a state, the lifecycle

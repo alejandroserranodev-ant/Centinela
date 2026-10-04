@@ -5,10 +5,12 @@ let a node enter the tree; spec 5, `current-kpis-in-kernel`, because the kernel 
 the current metrics; spec 4, `kpi-kernel`, for the approved kind of KPI, held as frozen SQL in
 `apps/api`'s catalogue.
 
-**Executed specs.** Specs 1, 2, 4 and 5 are executed and deleted, and a reference below to one of them
+**Executed specs.** Specs 1, 2, 3, 4 and 5 are executed and deleted, and a reference below to one of them
 reads as a reference to the page that now states it: spec 1, the foundations and the scope of growth,
 is [`packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md); spec 2, the tree, is
-the same page; spec 4, the kernel, is the language in [`data/AGENTS.md`](../../data/AGENTS.md) and the
+the same page; spec 3, how the tree grows, is that page's *How the tree grows*, which holds the move
+`agregar_rama` this spec's `Vigía` drafts on, and *The tree's versions* of
+[`apps/api/AGENTS.md`](../../apps/api/AGENTS.md); spec 4, the kernel, is the language in [`data/AGENTS.md`](../../data/AGENTS.md) and the
 tools in [`packages/tools/AGENTS.md`](../../packages/tools/AGENTS.md); spec 5, the base KPIs, is
 [`data/AGENTS.md`](../../data/AGENTS.md).
 

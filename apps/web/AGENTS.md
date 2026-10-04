@@ -151,11 +151,18 @@ and what each shows is
   ten rows and resets the page whenever a criterion changes. A chat row asked from no alert stays
   in the list, its alert cell an unlinked `src/logEvent.ts:withoutAlert(type)`, because a
   question is a step of the log as much as a decision is.
-- **The settings screen has one save action for all its tabs.** A change in any tab is a draft
-  until "Guardar cambios", so no tab saves half a configuration. Only a threshold that is one
-  number is an input; the others read as their rule. "Ejecuta" is disabled in every autonomy
-  group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md#the-settings)). A
-  person `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
+- **The settings screen has one save action for all its tabs but the tree's.** A change in any
+  other tab is a draft until "Guardar cambios", so no tab saves half a configuration; the tab
+  "Árbol de decisión", `src/screens/Expansions.tsx:Expansions({ allowed })`, retires an expansion
+  at once, through `src/screens/ReasonDialog.tsx:ReasonDialog()`, because a retirement is a
+  decision with its reason, not a setting. Only a threshold that is one number is an input; the
+  others read as their rule. "Ejecuta" is disabled in every autonomy group, and the API refuses it
+  as well ([`../api/AGENTS.md`](../api/AGENTS.md#the-settings)). A person
+  `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
+- **The tree's tab shows each expansion "Activo", "Inactivo", or "Retirado por" its person with
+  the reason**, and offers "Retirar" only on an active one to a person who configures, because an
+  inactive change no longer walks and the API refuses its retirement. It reloads the list after a
+  retirement, so a change that nested under the retired one reads inactive at once.
 - **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
   leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta", naming its
   `mergedInto` by title with the action that opens it, and one with no cause of its own,
