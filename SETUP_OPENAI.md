@@ -18,9 +18,8 @@ reads them when `apps/api` first builds the orchestrator, in
 | `OPENAI_API_KEY` | `packages/agents/centinela_agents/openai_provider.py:OpenAIProvider` | required with `openai`; a key that does not start with `sk-` is logged as a warning, and the provider lists the account's models at construction, so a key OpenAI refuses fails there |
 | `OLLAMA_API_URL`, then `OLLAMA_BASE_URL` | `packages/agents/centinela_agents/ollama_provider.py:OllamaProvider` | Ollama's address, `http://localhost:11434` when neither is set |
 
-**`openai` is installed by `apps/api`'s manifest, not by `packages/agents`'s**, so the provider
-imports only in the environment `apps/api` runs in; how that shows in the tests is
-[`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#commands).
+**`openai` and `requests` are dependencies of `packages/agents`**, declared in its manifest, so
+both providers import wherever the package is installed, `uv sync` alone included.
 
 **With `openai`, the data leaves the machine.** Every prompt, with the figures and entity names of
 the alert, goes to OpenAI's servers unmasked; the decision it departs from is in

@@ -34,8 +34,7 @@ catch every exception themselves ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)).
   `openai` client with `OPENAI_API_KEY` and calls `models.list()` on construction unless told to
   skip it. A structured request asks for `response_format` `json_object` with the schema in the
   prompt, not a strict JSON schema. Its timeout messages name `self.timeout`, which the class
-  never sets. Importing the module raises `ImportError` when `openai` is not installed, and
-  `pyproject.toml` does not declare `openai`. This provider sends the prompt off the machine,
+  never sets. This provider sends the prompt off the machine,
   against the level's rule that models run locally ([`AGENTS.md`](./AGENTS.md)).
 
 ## The factory
@@ -43,11 +42,12 @@ catch every exception themselves ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)).
 `centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` reads
 `LLM_PROVIDER` (default `ollama`) and `LLM_MODEL` (required, `ValueError` without it) unless the
 arguments override them, and returns the matching provider. `anthropic` raises
-`NotImplementedError`. The module imports both implementations at load time, so `openai` must be
-installed even to use Ollama. `apps/api` calls it once to build the orchestrator
+`NotImplementedError`. The module imports both implementations at load time, and `pyproject.toml`
+declares both clients, `openai` and `requests`. `apps/api` calls it once to build the orchestrator
 ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)).
 
 ## Tests
 
-`uv run pytest tests/test_providers.py` runs the provider tests with mocked HTTP. Collection fails
-unless `openai` is installed in the environment, because the manifest does not declare it.
+`uv run pytest tests/test_providers.py` runs the provider tests with mocked HTTP.
+`tests/test_manifest.py` fails when a module of the package imports a distribution the manifest
+does not declare.

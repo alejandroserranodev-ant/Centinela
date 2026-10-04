@@ -54,12 +54,8 @@ development machine has no `ensurepip` and uv builds the environment without it:
 | `uv sync` | installs the package and its dependencies into `.venv` |
 | `uv run pytest` | validates the base tree, runs the routing cases on the compiled graph with stub leaves, and the unit tests of the leaves with a mocked provider; no model is called |
 
-> **Limit.** `centinela_agents/openai_provider.py` imports `openai`, which `pyproject.toml` does not declare, so
-> `uv run pytest` stops collecting at `tests/test_providers.py`, and `centinela_agents/provider_factory.py`, which
-> imports it, fails in an environment built by `uv sync` alone. With the package supplied,
-> `uv run --with openai --with requests pytest` collects every test, and some unit tests of the
-> leaves, the providers, `centinela_agents/security.py`, `centinela_agents/output_validator.py` and the tool stubs fail; that command
-> lists them.
+> **Limit.** Some unit tests of the leaves, the providers, `centinela_agents/security.py`,
+> `centinela_agents/output_validator.py` and the tool stubs fail; `uv run pytest` lists them.
 
 ## Decisions
 
