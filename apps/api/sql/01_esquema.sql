@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS api.consultas (
   creado_en timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE api.consultas ADD COLUMN IF NOT EXISTS fuente text NOT NULL DEFAULT 'kernel';
+ALTER TABLE api.consultas DROP CONSTRAINT IF EXISTS consultas_fuente_check;
+ALTER TABLE api.consultas ADD CONSTRAINT consultas_fuente_check CHECK (fuente IN ('kernel', 'alertas'));
+
 CREATE TABLE IF NOT EXISTS api.configuracion (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),
   cuerpo jsonb NOT NULL,

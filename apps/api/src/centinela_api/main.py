@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import alertas, auth, bitacora, chat, configuracion, consultas, interno, simulacion
+from .routers import alertas, auth, bandeja, bitacora, chat, configuracion, consultas, interno, simulacion
 
 app = FastAPI(title="Centinela API")
 
@@ -12,6 +12,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(simulacion.router)
 app.include_router(alertas.router)
+app.include_router(bandeja.router)
 app.include_router(chat.router)
 app.include_router(bitacora.router)
 app.include_router(consultas.router)

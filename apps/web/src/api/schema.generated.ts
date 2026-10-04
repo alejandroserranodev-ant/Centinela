@@ -94,6 +94,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bandeja/resumen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Totales
+         * @description The inbox totals over the proposed alerts, each with the query that produced it.
+         */
+        get: operations["totales_bandeja_resumen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bitacora": {
         parameters: {
             query?: never;
@@ -997,6 +1017,18 @@ export interface components {
             period: "month" | "once";
         };
         /**
+         * InboxSummary
+         * @description The three totals of the inbox, computed over the proposed alerts.
+         */
+        InboxSummary: {
+            /** @description Pesos at risk summed over the proposed alerts */
+            moneyAtRisk: components["schemas"]["Figure"];
+            /** @description Proposed alerts awaiting a decision */
+            pendingDecisions: components["schemas"]["Figure"];
+            /** @description Pesos recoverable per month summed over the proposed alerts */
+            recoverablePerMonth: components["schemas"]["Figure"];
+        };
+        /**
          * LogEvent
          * @description Audit log entry for alert lifecycle event.
          */
@@ -1486,6 +1518,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Persona"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totales_bandeja_resumen_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxSummary"];
                 };
             };
             /** @description Validation Error */

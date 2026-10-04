@@ -1290,6 +1290,31 @@
         "title": "Impact",
         "type": "object"
       },
+      "InboxSummary": {
+        "additionalProperties": false,
+        "description": "The three totals of the inbox, computed over the proposed alerts.",
+        "properties": {
+          "moneyAtRisk": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Pesos at risk summed over the proposed alerts"
+          },
+          "pendingDecisions": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Proposed alerts awaiting a decision"
+          },
+          "recoverablePerMonth": {
+            "$ref": "#/components/schemas/Figure",
+            "description": "Pesos recoverable per month summed over the proposed alerts"
+          }
+        },
+        "required": [
+          "moneyAtRisk",
+          "recoverablePerMonth",
+          "pendingDecisions"
+        ],
+        "title": "InboxSummary",
+        "type": "object"
+      },
       "LogEvent": {
         "additionalProperties": false,
         "description": "Audit log entry for alert lifecycle event.",
@@ -2181,6 +2206,56 @@
         "summary": "Sesion",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/bandeja/resumen": {
+      "get": {
+        "description": "The inbox totals over the proposed alerts, each with the query that produced it.",
+        "operationId": "totales_bandeja_resumen_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totales",
+        "tags": [
+          "inbox"
         ]
       }
     },

@@ -215,6 +215,13 @@ class Query(Esquema):
     description: str = Field(..., description="The KPI and the simulated day it was read on")
 
 
+class InboxSummary(Esquema):
+    """The three totals of the inbox, computed over the proposed alerts."""
+    money_at_risk: Figure = Field(..., description="Pesos at risk summed over the proposed alerts")
+    recoverable_per_month: Figure = Field(..., description="Pesos recoverable per month summed over the proposed alerts")
+    pending_decisions: Figure = Field(..., description="Proposed alerts awaiting a decision")
+
+
 class SimulatedDay(Esquema):
     """Current simulated day in ISO 8601 format."""
     dia: str = Field(..., description="Current simulated day (YYYY-MM-DD)", example="2026-10-03")

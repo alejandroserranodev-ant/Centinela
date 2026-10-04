@@ -13,7 +13,7 @@ implement.
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas`, `api.configuracion` |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
 | `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
@@ -26,12 +26,13 @@ implement.
 | `src/centinela_api/decisiones.py` | `aplicar(alerta, decision, autonomia)`, the pure check of a person's decision |
 | `src/centinela_api/alertas.py` | reads and upserts `api.alertas` |
 | `src/centinela_api/bitacora.py` | appends to and lists `api.bitacora` |
-| `src/centinela_api/consultas.py` | records and reads `api.consultas`, the kernel call behind each `queryId` an agent cited |
+| `src/centinela_api/consultas.py` | records and reads `api.consultas`, the call behind each `queryId`: a kernel call an agent cited, or a total of the inbox |
+| `src/centinela_api/resumen.py` | computes the inbox totals over `api.alertas` and records the query of each |
 | `src/centinela_api/simulacion.py` | reads and advances the clock |
 | `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
-| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `configuracion`, `interno` |
+| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `bandeja`, `configuracion`, `interno` |
 | `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py`, `tests/test_permisos.py` and `tests/test_configuracion.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
@@ -80,7 +81,8 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
-| GET | `/consultas/{queryId}` | the kernel call behind a figure, as `Query` | 404 for an unknown query | `getQuery` |
+| GET | `/bandeja/resumen` | the inbox totals, as `InboxSummary` | | `getInboxSummary` |
+| GET | `/consultas/{queryId}` | the call behind a figure, as `Query`, whose `source` is `kernel` or `alertas` | 404 for an unknown query | `getQuery` |
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 | GET | `/configuracion` | the `Settings`: watched metrics, their thresholds and owners, autonomy per action type | | `getSettings` |
 | PUT | `/configuracion` | saves the `Settings` whole and returns them as stored | 403 unless analista or gerente; 422 for a failed check | `saveSettings` |
@@ -104,13 +106,6 @@ lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `P
 `X-Agent-Key` against `AGENT_SECRET_KEY` (401), `X-Agent` against the stage (400) and the
 transition (409). The agents run in this process, so they cost a second write path to keep
 consistent with the first, paid when they are wired or removed.
-
-> **Decided, not built.** This row; its path is chosen with the code, in Spanish like the
-> brief's.
-
-| Method | Path | Serves | Refuses | Web function |
-|---|---|---|---|---|
-| GET | undecided | the inbox totals | | `getInboxSummary` |
 
 **The KPI catalogue's endpoints**, which list the base and approved KPIs and let the administrator
 decide a proposed KPI or retire one, are decided by the pending work on a new KPI's lifecycle, and
@@ -313,12 +308,14 @@ reads goes through it, in this level or in `packages/tools`, whose page owns mas
 
 ## The inbox totals
 
-> **Decided, not built.**
-
-**The API computes the inbox totals**: pesos at risk today and recoverable per month, each a sum
-over the alerts in `propuesta`, and the count of decisions pending. They are sums over alerts
-rather than a `v_*` view, so the API sends each as a figure whose query reads its own alerts
-table, and the screen computes none.
+**The API computes the inbox totals**: `src/centinela_api/resumen.py:calcular(conn)` runs three
+statements over `api.alertas` where `status` is `proposed`, and `GET /bandeja/resumen` serves them.
+They are pesos at risk and recoverable per month, each a sum, and the count of decisions pending.
+They are sums over alerts rather than a `v_*` view, so each figure's query is recorded in
+`api.consultas` with the source `alertas`, its SQL and the simulated day, under a `queryId`
+derived from the SQL, the day and the value: the same value read again records nothing new, and
+`/consultas/{queryId}` opens the query with a Spanish description of the sum. The screen computes
+none.
 
 ## The `bitácora`
 

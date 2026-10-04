@@ -152,20 +152,7 @@ export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator
 }
 
 export async function getInboxSummary(): Promise<InboxSummary> {
-  const alerts = await listAlerts({ status: 'proposed' });
-  return {
-    moneyAtRisk: {
-      value: alerts.reduce((sum, a) => sum + a.pesosAtRisk.value, 0),
-      unit: 'COP',
-      queryId: 'q-summary-risk',
-    },
-    pendingDecisions: { value: alerts.length, unit: 'units', queryId: 'q-summary-pending' },
-    recoverablePerMonth: {
-      value: alerts.reduce((sum, a) => sum + (a.recoverablePerMonth?.value ?? 0), 0),
-      unit: 'COP',
-      queryId: 'q-summary-recoverable',
-    },
-  };
+  return fetchJson<InboxSummary>(`${API_BASE_URL}/bandeja/resumen`);
 }
 
 export async function getSettings(): Promise<Settings> {

@@ -72,9 +72,8 @@ and what each shows is
   `detail` as it comes, the first `msg` of a validation list, otherwise the body or the status
   text. The SSE calls throw the same error before their stream starts, so a screen shows the API's
   own Spanish, such as the 409 of a second day run.
-- **`getInboxSummary` answers inside the client**, because the API serves no endpoint for it: it
-  sums the alerts in `proposed`. `getQuery` gets 404 for a total's id, so the query dialog of a
-  total shows its error state.
+- **`getInboxSummary` reads `GET /bandeja/resumen`**, so the three totals arrive as `Figure`s
+  whose `queryId` `getQuery` answers with the query over the alerts table.
 - **A person signs in before any screen.** `/ingresar` is the one route outside the shell; every
   other route sits behind `src/state/Session.tsx:RequireSession()`, which sends a visitor with no
   session there and back to the requested path after it. The token lives in `sessionStorage`, so
@@ -127,11 +126,8 @@ and what each shows is
   figure cites an example query against a real `v_*` view; the queries are not run.
 - **The screen computes no figure.** The inbox totals are `Figure`s the API computes
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
-  table, which is why `src/api/types.ts:QuerySource` also takes `alertas`; a query of the kernel
-  is `kernel`. A sum taken on screen
-  would be a figure with no query behind it. Until the API serves the totals,
-  `src/api/http-client.ts:getInboxSummary()` takes those sums in the browser, under query ids no
-  query answers.
+  table, which is why `src/api/types.ts:QuerySource` is `kernel` or `alertas`, and a view's name
+  is never a source. A sum taken on screen would be a figure with no query behind it.
 - **A notice closes after five seconds, with or without an action**, where Arena's own queue waits
   4.2 s, or 7 s for a notice that carries an action. The demo lasts five minutes, and a stack of
   notices covers the reading column. A danger notice still stays until it is closed, by Arena's

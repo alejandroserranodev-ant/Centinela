@@ -35,18 +35,10 @@ export type WatchedMetric = Schemas['WatchedMetric'];
 export type Threshold = Schemas['Threshold'];
 export type AutonomyLevel = Settings['autonomy'][string];
 
-export type QuerySource = SemanticView | Query['source'];
+export type QuerySource = Query['source'];
+export type InboxSummary = Schemas['InboxSummary'];
 export type AdvanceEnd = Schemas['AdvanceEnd'];
 export type ApiDecision = Schemas['DecisionApprove'] | Schemas['DecisionEdit'] | Schemas['DecisionReject'];
-
-export type SemanticView =
-  | 'v_ventas'
-  | 'v_margen_semanal_linea'
-  | 'v_cartera_cliente'
-  | 'v_dias_pago_mensual'
-  | 'v_cobertura_inventario'
-  | 'v_descuentos_fuera_politica'
-  | 'v_actividad_cliente';
 
 export interface SseEvent<E extends string, D> {
   event: E;
@@ -71,10 +63,4 @@ export interface AlertFilter {
 export interface LogFilter {
   alertId?: string;
   type?: LogEventType;
-}
-
-export interface InboxSummary {
-  moneyAtRisk: Figure;
-  pendingDecisions: Figure;
-  recoverablePerMonth: Figure;
 }
