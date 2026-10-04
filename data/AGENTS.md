@@ -34,6 +34,11 @@ the kit delivers the dataset free to use for the challenge.
 
 ## Rules of this level
 
+- **A metric's severity is its `severidad` block**: `por_defecto` is `high` for every metric, by
+  the assumption its `fuente` states, and each higher level cites the document that raises it, as
+  `cobertura_dias` cites `OPE-POL-007` §2. A level holds when all its conditions hold on the KPI
+  row, or when the row falls in the `tramo` it names. *The validator of `packages/agents` refuses a
+  metric with no block, a column its KPI does not build, and tranches that overlap or leave a gap.*
 - **The semantic layer is the only definition of a metric.** A base metric is an entry in
   `metricas.yaml` whose `kernel:` block compiles to `centinela.k_<metric>(dia)` in
   `sql/05_kpis.generated.sql`; the `v_*` views are the kit's reference and the cause views. An

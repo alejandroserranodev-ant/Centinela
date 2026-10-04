@@ -384,6 +384,13 @@ class TestChatRouting:
         assert chat_end(recorder, question(), intent("dato"))["fin"] == "fin.chat_sin_evidencia"
         assert recorder.count("chat", "responder") == 0
 
+    def test_a_data_question_on_another_period_ends_without_answering(self):
+        recorder = Recorder()
+        other = {("chat", "clasificar"): lambda state: {"chat": {**state["chat"], "intent": "dato", "kpi": "saldo_vencido", "periodo": "agosto de 2026"}}}
+        state = chat_end(recorder, question(), other)
+        assert state["fin"] == "fin.chat_otro_periodo"
+        assert recorder.count("chat", "responder") == 0
+
     def test_an_anchored_why_reads_the_alert_cause(self):
         recorder = Recorder()
         assert chat_end(recorder, question(alert=ANCHOR, cause=IDENTIFIED), intent("explicar"))["fin"] == "fin.chat_respondida"
@@ -399,7 +406,7 @@ class TestChatRouting:
 
         state = chat_end(Recorder(), question(), {("chat", "responder"): boom})
         assert state["fin"] == "fin.chat_sin_evidencia"
-        assert state["failures"] == [{"step": "hoja.chat.responder", "kind": "error"}]
+        assert state["failures"] == [{"step": "hoja.chat.responder", "kind": "timeout", "attempts": 0}]
 
     def test_a_classifier_that_fails_ends_out_of_scope(self):
         def boom(state):
@@ -478,11 +485,25 @@ class TestChatInjections:
         assert [cost["step"] for cost in reply["costs"]] == ["clasificar", "responder"]
 
 
+def test_a_question_on_another_period_answers_that_only_the_simulated_day_is_read():
+    from centinela_agents.agents.chat import other_period
+
+    provider = obedient_model()
+    provider.generate_structured.return_value = LLMStructuredResponse(
+        text="{}", parsed={"intent": "dato", "kpi": "saldo_vencido", "entity": "CLI-001", "periodo": "agosto de 2026"}, stop_reason="stop", usage={}, model="m"
+    )
+    reply = orchestrator(provider).ask("¿Cuánto debía CLI-001 en agosto de 2026?", "2026-03-02")
+    assert reply["fin"] == "fin.chat_otro_periodo"
+    assert reply["answer"]["text"] == other_period(reply["chat"], "2026-03-02", load_metrics(METRICAS))
+    assert "Cartera vencida de CLI-001 al 2026-03-02" in reply["answer"]["text"]
+    assert provider.generate_structured.call_count == 1
+
+
 def test_a_model_outage_answers_that_the_model_failed_not_that_the_data_is_silent():
     from centinela_agents.agents.chat import FAILED
 
     provider = MagicMock()
     provider.generate_structured.side_effect = TimeoutError("slow")
     reply = orchestrator(provider).ask("¿Cuánto debe CLI-001?", "2026-03-02")
-    assert reply["failures"] == [{"step": "hoja.chat.clasificar", "kind": "error"}]
+    assert reply["failures"] == [{"step": "hoja.chat.clasificar", "kind": "timeout", "attempts": 2}]
     assert reply["answer"]["text"] == FAILED

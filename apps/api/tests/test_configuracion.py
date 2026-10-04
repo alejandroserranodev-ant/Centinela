@@ -13,7 +13,7 @@ from centinela_api.auth import persona_actual
 from centinela_api.main import app
 from centinela_api.modelos import Persona, Settings
 from centinela_agents.metrics import Metrics
-from centinela_agents.walk import Context, Detection
+from centinela_agents.walk import Context
 
 ANALISTA = Persona(email="analista@andina.test", name="Camila", role="analista")
 AUDITOR = Persona(email="auditoria@andina.test", name="Jorge", role="auditor")
@@ -190,39 +190,9 @@ def test_el_422_trae_el_mensaje_en_espanol(cliente):
     assert (respuesta.status_code, respuesta.json()["detail"]) == (422, configuracion.PILOTO)
 
 
-def deteccion(metric: str, pesos: float) -> Detection:
-    return Detection(metric, (metric,), "e", (), {"pesos_en_riesgo": pesos})
-
-
-def test_el_dia_descarta_las_metricas_que_no_se_vigilan():
-    detecciones = [deteccion("margen_pct", 10), deteccion("saldo_vencido", 5), deteccion("variacion_costo_pct", 50)]
+def test_el_dia_vigila_solo_las_metricas_vigiladas_que_el_api_conoce():
     ajustes = con(configuracion.semilla(), "margen_pct", watched=False)
-    elegidas = agentes.prioritized(detecciones, set(), configuracion.vigiladas(ajustes))
-    assert [d.metric for d in elegidas] == ["saldo_vencido"]
-
-
-def de(metric: str, entidad: str, pesos: float) -> Detection:
-    return Detection(metric, (entidad,), "e", (), {"pesos_en_riesgo": pesos})
-
-
-def test_cada_metrica_tiene_su_alerta_antes_que_los_pesos(monkeypatch):
-    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "3")
-    detecciones = [de("saldo_vencido", "C1", 900), de("saldo_vencido", "C2", 800), de("veces_intervalo_habitual", "C3", 700), de("margen_pct", "Hogar", 5)]
-    elegidas = agentes.prioritized(detecciones, set(), agentes.API_METRICS)
-    assert [(d.metric, d.entity) for d in elegidas] == [("saldo_vencido", ("C1",)), ("veces_intervalo_habitual", ("C3",)), ("margen_pct", ("Hogar",))]
-
-
-def test_el_cupo_sobrante_va_por_pesos(monkeypatch):
-    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "4")
-    detecciones = [de("margen_pct", "Hogar", 5), de("saldo_vencido", "C1", 900), de("saldo_vencido", "C2", 800), de("saldo_vencido", "C3", 100), de("margen_pct", "Aseo", 300)]
-    elegidas = agentes.prioritized(detecciones, set(), agentes.API_METRICS)
-    assert [d.entity for d in elegidas] == [("C1",), ("Aseo",), ("C2",), ("C3",)]
-
-
-def test_si_hay_mas_metricas_que_cupo_ganan_las_de_mas_pesos(monkeypatch):
-    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "1")
-    detecciones = [de("margen_pct", "Hogar", 5), de("saldo_vencido", "C1", 900)]
-    assert [d.metric for d in agentes.prioritized(detecciones, set(), agentes.API_METRICS)] == ["saldo_vencido"]
+    assert agentes.metricas_del_dia(ajustes) == agentes.API_METRICS - {"margen_pct"}
 
 
 def test_los_umbrales_editados_reemplazan_a_los_del_yaml_y_el_resto_queda():

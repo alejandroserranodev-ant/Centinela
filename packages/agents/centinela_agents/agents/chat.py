@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 from centinela_agents.evidence import Sources, cited, merged_queries, placeholders, stray_digits, unit_of
 from centinela_agents.llm_provider import LLMProvider, LLMStructuredRequest
+from centinela_agents.metrics import Metrics
 from centinela_agents.schema import ROOT, ChatAnswer
 from centinela_agents.security import SENSITIVE_PATTERNS, SecurePrompt, check_prompt_injection
 from centinela_agents.skills import skill
@@ -39,6 +40,7 @@ MASKED = ("email", "api_key", "token", "password", "credit_card")
 REFUSAL = "No proceso esa pregunta: trae instrucciones. Pregunta por los datos o las alertas."
 OUT_OF_SCOPE = "Solo respondo sobre los datos de la operación, sus alertas y el árbol de decisión. Aprobar, rechazar o ejecutar se hace en la bandeja."
 NO_EVIDENCE = "Los datos del día no responden esa pregunta."
+WINDOWS = {"semana": "en la última semana cerrada al {day}", "mes": "en el último mes cerrado al {day}"}
 NO_POLICY = "Todavía no consulto las políticas desde el chat."
 FAILED = "No pude responder: falló el modelo o la conexión. Vuelve a preguntar en un momento."
 ARBOL = Path(__file__).resolve().parents[2] / "arbol"
@@ -107,8 +109,9 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
             "intent": {"type": "string", "enum": list(INTENTS)},
             "kpi": {"type": "string", "enum": [*kpis, ""]},
             "entity": {"type": "string"},
+            "periodo": {"type": "string"},
         },
-        "required": ["intent", "kpi", "entity"],
+        "required": ["intent", "kpi", "entity", "periodo"],
     }
     alerta = f"{metric} de {entity}, estado {(state.get('alert') or {}).get('status')}" if metric else "ninguna"
     system, user = (
@@ -129,10 +132,12 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
     kpi = parsed.get("kpi") if parsed.get("kpi") in sources.catalog.kpis else None
     named = str(parsed.get("entity") or "")
     chosen = named if ENTITY.match(named) and named.lower() in question.lower() else None
+    period = str(parsed.get("periodo") or "").strip()
+    spelled = period if period and period.lower() in question.lower() else None
     if metric and kpi is None and chosen is None:
         kpi, chosen = metric, entity
-    logger.info("Chat: intent %s, kpi %s, entity %s", intent, kpi, chosen)
-    return {"chat": {**chat, "intent": intent, "kpi": kpi, "entity": chosen}, "costs": [cost]}
+    logger.info("Chat: intent %s, kpi %s, entity %s, periodo %s", intent, kpi, chosen, spelled)
+    return {"chat": {**chat, "intent": intent, "kpi": kpi, "entity": chosen, "periodo": spelled}, "costs": [cost]}
 
 
 def figure_of(raw: Any) -> dict[str, Any] | None:
@@ -276,7 +281,17 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
     return {"chat": {**chat, "figuras": reply["figures"]}, "answer": reply, "queries": queries, "costs": [cost]}
 
 
-def closing(state: Mapping[str, Any]) -> dict[str, Any]:
+def other_period(chat: Mapping[str, Any], day: str, metrics: Metrics) -> str:
+    said = f"No consulto {chat['periodo']}: solo leo los indicadores del día simulado, {day}."
+    kpi = chat.get("kpi")
+    if not kpi:
+        return f"{said} Pregunta sin la fecha para leer un indicador al {day}."
+    subject = metrics.labels.get(kpi, kpi) + (f" de {chat['entity']}" if chat.get("entity") else "")
+    window = WINDOWS.get(metrics.periods.get(kpi, ""), "al {day}").format(day=day)
+    return f"{said} Puedo responder {subject} {window}: pregunta sin la fecha."
+
+
+def closing(state: Mapping[str, Any], metrics: Metrics) -> dict[str, Any]:
     end = state.get("fin")
     if state.get("failures") and end != "fin.chat_respondida":
         return ChatAnswer(text=FAILED, enough_evidence=False).model_dump()
@@ -286,6 +301,8 @@ def closing(state: Mapping[str, Any]) -> dict[str, Any]:
         return ChatAnswer(text=REFUSAL, enough_evidence=False).model_dump()
     if end == "fin.chat_fuera_de_alcance":
         return ChatAnswer(text=OUT_OF_SCOPE, enough_evidence=False).model_dump()
+    if end == "fin.chat_otro_periodo":
+        return ChatAnswer(text=masked(other_period(state["chat"], state["day"], metrics)), enough_evidence=False).model_dump()
     if (state.get("chat") or {}).get("intent") == "politica":
         return ChatAnswer(text=NO_POLICY, enough_evidence=False).model_dump()
     return ChatAnswer(text=NO_EVIDENCE, enough_evidence=False).model_dump()

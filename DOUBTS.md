@@ -69,3 +69,24 @@ not say what a page holds, and a route the router does not budget for the `PHASE
 paid when the team agrees to fold each page into its level or rename it. Re-derive it with
 `ls *.md packages/agents/PHASE_*.md | grep -v 'AGENTS\|README\|CLAUDE\|DOUBTS\|GENERATED\|docs_guide'`.
 
+**`Vigía`'s contract states an input its leaf does not send.**
+[`packages/agents/skills/vigia/contrato.md`](./packages/agents/skills/vigia/contrato.md) lists
+`regla` as the metric's `umbral_alerta` text, `fuente_umbral` and `tramo` as input, while
+`packages/agents/centinela_agents/agents/vigia.py:redact_title(provider, state, sources)` sends the
+metric's `descripcion` as `regla` and neither `fuente_umbral` nor `tramo` to the model. It costs a
+contract a reader trusts for what the model sees, and a title that cannot name the rule's source.
+It is paid when the leaf sends what the contract lists, or the contract lists what the leaf sends.
+Re-derive it with `grep -n "regla\|fuente_umbral\|tramo" packages/agents/centinela_agents/agents/vigia.py packages/agents/skills/vigia/contrato.md`.
+
+**`api.alertas.costos` defaults to a shape nothing writes.** `apps/api/sql/01_esquema.sql` declares
+it `DEFAULT '[]'`, while `apps/api/src/centinela_api/alertas.py:fijar_costo(conn, id, costo)`
+writes an object by agent, so a row the day run never costed holds a list and a costed one an
+object. Nothing reads the column yet; it costs the first reader a check of both shapes. It is paid
+when the default becomes `'{}'`. Re-derive it with
+`grep -n "costos" apps/api/sql/01_esquema.sql apps/api/src/centinela_api/alertas.py`.
+
+**A model output its schema refuses is not retried.** `packages/agents/centinela_agents/metered.py:RETRIED` lists
+the provider's own errors, and a leaf's `SchemaRefused`, raised after the provider returns, goes
+straight to the fallback, so one malformed answer costs a step its model result where a second
+call might have passed. It is paid when the meter, or the leaf, retries once on `SchemaRefused`.
+Re-derive it with `grep -n "RETRIED\|SchemaRefused" packages/agents/centinela_agents/metered.py packages/agents/centinela_agents/agents/*.py`.

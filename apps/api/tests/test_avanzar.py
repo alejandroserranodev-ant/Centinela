@@ -6,6 +6,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from centinela_agents.day import Step
+from corridas import corrida, deteccion, dia_con
+
 from centinela_api import db
 from centinela_api.auth import persona_actual
 from centinela_api.main import app
@@ -40,13 +43,9 @@ def conn():
 
 @pytest.fixture
 def cliente(conn, monkeypatch):
-    orquestador = MagicMock()
-    orquestador.start.side_effect = lambda detection, *, alert_id, day, **_: {
-        "status": "propuesta",
-        "transitions": [[alert_id, "nueva"], [alert_id, "en análisis"], [alert_id, "propuesta"]],
-        "actions": [],
-    }
-    monkeypatch.setattr(simulacion_router, "get_orchestrator", lambda: orquestador)
+    detection = deteccion()
+    detectada = Step("alerta_a", "vigia", "detectar", "done", "Detectada anomalía", False, detection.metric, detection.entity)
+    dia_con(monkeypatch, detectada, corrida("alerta_a", detection, "nueva", "en análisis", "propuesta"))
     monkeypatch.setattr(simulacion_router.alertas_repo, "guardar", MagicMock(side_effect=lambda conn, alerta: alerta))
     monkeypatch.setattr(simulacion_router.bitacora, "registrar", MagicMock())
 
@@ -69,6 +68,11 @@ def test_el_dia_transmite_pasos_y_un_fin(cliente):
     for nombre, dato in eventos[:-1]:
         (AgentStep if nombre == "step" else Alert).model_validate(dato)
     assert eventos[-1][1]["newAlerts"]
+
+
+def test_el_fin_del_dia_no_es_un_error(cliente, caplog):
+    cliente.post("/simulacion/avanzar?dias=1")
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]
 
 
 def test_un_segundo_dia_en_curso_se_rechaza_con_409(cliente):
@@ -96,19 +100,23 @@ def test_el_dia_actual_dice_hasta_donde_llegan_los_datos(cliente):
     assert cliente.get("/simulacion/dia-actual").json() == {"dia": "2026-01-15", "ultimoDia": "2026-09-30"}
 
 
-def test_el_dia_transmite_un_paso_por_agente_con_la_etiqueta_de_la_metrica(cliente, monkeypatch):
-    def start(detection, *, alert_id, day, on_step, **_):
-        for agente in ("vigia", "analista", "estratega"):
-            on_step(agente, f"hoja.{agente}")
-        return {"status": "propuesta", "transitions": [[alert_id, "nueva"], [alert_id, "en análisis"], [alert_id, "propuesta"]], "actions": []}
+def test_el_dia_transmite_cada_paso_con_la_etiqueta_de_la_metrica(cliente, monkeypatch):
+    detection = deteccion()
 
-    orquestador = MagicMock()
-    orquestador.start.side_effect = start
-    monkeypatch.setattr(simulacion_router, "get_orchestrator", lambda: orquestador)
+    def paso(agente, nodo, estado, descripcion):
+        return Step("alerta_a", agente, nodo, estado, descripcion, False, detection.metric, detection.entity)
+
+    dia_con(
+        monkeypatch,
+        paso("vigia", "detectar", "done", "Detectada anomalía"),
+        paso("analista", "hoja.analista.explicar", "running", "Buscando la causa"),
+        paso("analista", "hoja.analista.explicar", "done", "Buscando la causa"),
+        corrida("alerta_a", detection, "nueva", "en análisis", "propuesta"),
+    )
     pasos = [dato for nombre, dato in _eventos(cliente.post("/simulacion/avanzar?dias=1").text) if nombre == "step"]
-    assert [(p["agent"], p["status"]) for p in pasos[:3]] == [("vigia", "running"), ("analista", "running"), ("estratega", "running")]
-    assert pasos[1]["description"].startswith("Buscando la causa de ")
-    assert not any("_" in p["description"].split(" de ", 1)[-1].split(" · ")[0] for p in pasos)
+    assert [(p["agent"], p["status"]) for p in pasos[:3]] == [("vigia", "done"), ("analista", "running"), ("analista", "done")]
+    assert pasos[1]["description"] == "Buscando la causa de Cartera vencida · CLI-001"
+    assert pasos[2]["end"] and pasos[2]["start"] == pasos[1]["start"]
 
 
 def test_el_candado_se_libera_tras_un_dia(cliente):
@@ -135,8 +143,8 @@ def test_el_evento_alert_lleva_la_alerta_guardada(cliente):
     dato = eventos[primera][1]
     Alert.model_validate(dato)
     assert dato["id"] == guardada.id
-    assert (dato["decidedBy"], dato["canDecide"]) == ("Gerencia", False)
-    assert dato == {**guardada.model_dump(by_alias=True, mode="json"), "decidedBy": "Gerencia", "canDecide": False}
+    assert (dato["decidedBy"], dato["canDecide"]) == ("Analista de cartera", False)
+    assert dato == {**guardada.model_dump(by_alias=True, mode="json"), "decidedBy": "Analista de cartera", "canDecide": False}
 
 
 @pytest.mark.parametrize("dias, esperado", [(None, dt.date(2026, 8, 31)), ("5", dt.date(2026, 9, 25))])

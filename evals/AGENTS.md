@@ -21,14 +21,14 @@ decided and marked.
 The test files below hold the cases that run. Each test is one case of the
 table below, and its name or its parameters say which.
 
-- **The orchestrator's routing cases**: every `test_orq_*` test of
-  [`../packages/agents/tests/test_orq.py`](../packages/agents/tests/test_orq.py) compiles the tree
-  with stub leaves and a stub KPI reader and is named for its case.
-  [`../packages/agents/AGENTS.md`](../packages/agents/AGENTS.md) names the command. The cases that
-  need `apps/api`'s record (a second `/simulacion/avanzar`, the order of a day's alerts, a reason
-  handed to the next run of its metric) are not in that file; the record of a merge is
-  `apps/api/tests/test_ciclo_orquestado.py`'s, and the other cases `apps/api` holds are in the next
-  item.
+- **The orchestrator's cases**: every `test_orq_*` test of
+  [`../packages/agents/tests/test_orq.py`](../packages/agents/tests/test_orq.py),
+  [`../packages/agents/tests/test_day.py`](../packages/agents/tests/test_day.py),
+  [`../packages/agents/tests/test_metered.py`](../packages/agents/tests/test_metered.py) and
+  [`../packages/agents/tests/test_tracing.py`](../packages/agents/tests/test_tracing.py) compiles
+  the tree with stub leaves and a stub KPI reader and is named for its case; the order of a day and
+  three alerts with one cause run there without `apps/api`.
+  [`../packages/agents/AGENTS.md`](../packages/agents/AGENTS.md) names the command.
 - **The orchestrator's cases that need `apps/api`**: the 409 of a second `/simulacion/avanzar` is
   [`../apps/api/tests/test_avanzar.py`](../apps/api/tests/test_avanzar.py); a `request_changes`, one
   re-proposal and a second refused, is
@@ -79,7 +79,7 @@ skills or its graph. The domain each case checks is [`../packages/agents/AGENTS.
 | `Chat` | the rows of `casos_chat.csv`: a figure of the day, a figure of one entity, why an anchored alert fired, a question outside its use, and the attacks, each refused or out of scope with no change to any alert | `verificacion_sql`, and the `bitácora` row `apps/api` writes for the question |
 | `Estratega` | each correct cause (the actions its row of `packages/agents/skills/estratega/acciones.md` prescribes); a kept rejection reason (that row is dropped); `no_evidence` (one `task`) | the policy section the row cites and `calcular_impacto` checked by `verificacion_sql` |
 | `Ejecutor` | an approved action, an edited one, one run twice (one effect), one with no decision (no call), one whose parameters were altered after approval | the draft the tool writes |
-| orchestrator | a day with two alerts (the one with the larger pesos at risk reaches `propuesta` first); two alerts with one cause (one `propuesta`, the other `unida` pointing to it); three alerts with one cause (all point to the one that remains, none to a merged alert); a larger alert naming a smaller one still in `nueva` (the smaller is `unida` into the larger); a second `/simulacion/avanzar` during a day run (refused with 409); an `Estratega` fixed to `insufficient_cause` (`Analista` runs twice, then one manual review `task`); one rejection per target, `causa`, `propuesta`, `ambos` and `ninguno` (the next run of the metric hands the reason to that agent only); a resume with no recorded decision (refused, the alert stays `propuesta`, `Ejecutor` is not called); a model call past its timeout (one retry, then the fallback, and the alert still reaches `propuesta`); a tree with a missing `no` (refused at startup); a `request_changes` (one re-proposal, a second refused); an action type with no tool (one `task`, through `nota_manual`); an approved action whose KPI no longer breaks on the day of execution (`fin.ya_no_aplica`, `Ejecutor` not called); a path to `Ejecutor` without `aprobar.decision` (refused); a customer who paid in 30 days and is 6 days late (no alert on the base; once a KPI measures it, the walk from `detectar` to `ejecutada`) | the lifecycle and the `bitácora` `apps/api` records, `verificacion_sql` for the pesos at risk that set the order, and the state of the compiled graph for the routing cases |
+| orchestrator | a day with two alerts (the one with the larger pesos at risk reaches `propuesta` first); an earlier alert of equal severity (it covers the detection) and of lower severity (the detection raises again); a refused transition (its alert ends, the day goes on); a refused merge (the alert runs again without that target); two alerts with one cause (one `propuesta`, the other `unida` pointing to it); three alerts with one cause (all point to the one that remains, none to a merged alert); a larger alert naming a smaller one still in `nueva` (the smaller is `unida` into the larger); a second `/simulacion/avanzar` during a day run (refused with 409); an `Estratega` fixed to `insufficient_cause` (`Analista` runs twice, then one manual review `task`); one rejection per target, `causa`, `propuesta`, `ambos` and `ninguno` (the next run of the metric hands the reason to that agent only); a resume with no recorded decision (refused, the alert stays `propuesta`, `Ejecutor` is not called); a model call past its timeout (one retry, then the fallback, and the alert still reaches `propuesta`); a token cap reached mid-alert (every later model step takes its fallback); a run with no trace handler (it completes); a tree with a missing `no` (refused at startup); a `request_changes` (one re-proposal, a second refused); an action type with no tool (one `task`, through `nota_manual`); an approved action whose KPI no longer breaks on the day of execution (`fin.ya_no_aplica`, `Ejecutor` not called); a path to `Ejecutor` without `aprobar.decision` (refused); a customer who paid in 30 days and is 6 days late (no alert on the base; once a KPI measures it, the walk from `detectar` to `ejecutada`) | the lifecycle and the `bitácora` `apps/api` records, `verificacion_sql` for the pesos at risk that set the order, and the state of the compiled graph for the routing cases |
 | kernel | per base KPI, the parity [`../packages/tools/AGENTS.md`](../packages/tools/AGENTS.md) defines, on `fecha_corte()` and on each day of `packages/tools/tests/test_parity.py:DAYS` | the view, and a hand-written as-of query |
 
 The `VIG-` cases run unchanged with `Vigía` reading the kernel. The test copy of a policy with
@@ -99,7 +99,7 @@ against it.
 
 1. **A case that needs no model and no `apps/api` is a pytest test** in the package whose code it
    checks, named for its case, and it has no CSV row: an `ORQ-` case is a `test_orq_*` test in
-   `packages/agents/tests/test_orq.py`, and a `KER-` case for a new base KPI follows the checklist
+   `packages/agents/tests/`, and a `KER-` case for a new base KPI follows the checklist
    of [`../packages/tools/AGENTS.md`](../packages/tools/AGENTS.md). Run `uv run pytest` in that
    package, `packages/agents` or `packages/tools`.
 2. **Any other case is a row** in the columns of `plantilla_casos_prueba.csv`, with an id that

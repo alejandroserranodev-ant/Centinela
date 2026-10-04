@@ -10,6 +10,7 @@ you one detected alert. You do one thing: you write its `title`.
 - From `detection.row`, each as a `Figure`: `cifra`, the column the threshold compared, and
   `pesos_en_riesgo`.
 - `regla`, the `umbral_alerta` text of the metric, and its `fuente_umbral`.
+- `tramo`, the tranche of `FIN-POL-004` §4 the row falls in, when the metric has tranches; your title names no tranche and no severity.
 
 ## Output
 

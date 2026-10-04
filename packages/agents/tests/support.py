@@ -93,7 +93,7 @@ def reader_from(rows_by_day):
     return lambda metric, day: list(rows_by_day.get(day, {}).get(metric, []))
 
 
-def compiled(recorder, *, overrides=None, rows=None, classify=None, tree=None, catalog=KERNEL_CATALOG, owners=None):
+def compiled(recorder, *, overrides=None, rows=None, classify=None, tree=None, catalog=KERNEL_CATALOG, owners=None, token_cap=None):
     return compile_tree(
         tree or base_tree(),
         leaves=leaves(recorder, overrides),
@@ -103,6 +103,7 @@ def compiled(recorder, *, overrides=None, rows=None, classify=None, tree=None, c
         classify=classify or (lambda state: "propuesta"),
         checkpointer=InMemorySaver(),
         owners=owners,
+        token_cap=token_cap,
     )
 
 

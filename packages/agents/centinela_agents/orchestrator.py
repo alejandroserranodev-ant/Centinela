@@ -29,6 +29,7 @@ Usage:
 """
 
 import logging
+import uuid
 from dataclasses import replace
 from typing import Any, Mapping
 
@@ -41,9 +42,11 @@ from .agents.estratega import propose_actions
 from .agents.orquestador import classify_rejection
 from .agents.vigia import redact_title
 from .catalog import KernelCall
+from .day import run_day
 from .evidence import Sources, call_from_reader
-from .graph import Compiler, StepListener, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
+from .graph import Compiler, awaiting_decision, compile_chat, manual_owners, manual_review, resume, start_alert, thread
 from .llm_provider import LLMProvider
+from .metered import MeteredProvider
 from .metrics import Metrics
 from .schema import Tree, index
 from .skills import skill
@@ -51,6 +54,7 @@ from .tools import ToolRegistry
 from .walk import Context, Detection
 
 logger = logging.getLogger(__name__)
+TOKEN_CAP = 50_000
 
 
 def rejection_target(provider: LLMProvider, state: Mapping[str, Any]) -> str:
@@ -81,6 +85,8 @@ class CentinelaOrchestrator:
         owners: Mapping[str, str] | None = None,
         kernel: KernelCall | None = None,
         reasoning_provider: LLMProvider | None = None,
+        token_cap: int | None = TOKEN_CAP,
+        tracer: Any = None,
     ):
         """
         Initialize orchestrator.
@@ -96,8 +102,13 @@ class CentinelaOrchestrator:
             owners: Manual review owners by metric, read from acciones.md when absent
             kernel: the kernel's call; the leaves consult kpi_consultar through it
             reasoning_provider: the provider of Analista and Estratega, when it differs
+            token_cap: the tokens one alert may spend across its model calls
         """
+        provider = MeteredProvider(provider)
+        reasoning_provider = MeteredProvider(reasoning_provider) if reasoning_provider is not None else None
         self.provider = provider
+        self.token_cap = token_cap
+        self.tracer = tracer
         self.tools = tools
         self.tree = tree
         self._thresholds = {name: dict(values) for name, values in metrics.thresholds.items()}
@@ -136,6 +147,7 @@ class CentinelaOrchestrator:
             classify=lambda state: rejection_target(provider, state),
             checkpointer=checkpointer,
             owners=owners,
+            token_cap=token_cap,
         )
 
         self.graph = self.compiler.graph(tree)
@@ -153,7 +165,6 @@ class CentinelaOrchestrator:
         alert_briefs: Mapping[str, Mapping[str, Any]] | None = None,
         cause_rejections: list[dict] | None = None,
         proposal_rejections: list[dict] | None = None,
-        on_step: StepListener | None = None,
     ) -> dict[str, Any]:
         """
         Start processing an alert.
@@ -166,7 +177,6 @@ class CentinelaOrchestrator:
             alert_briefs: Metric, entity and cause of each earlier alert, by id, which Analista reads as data
             cause_rejections: Rejection reasons about causes (from API)
             proposal_rejections: Rejection reasons about proposals (from API)
-            on_step: Called with the agent and the node id as each leaf starts
 
         Returns:
             Alert state after reaching first human decision point (or end)
@@ -189,7 +199,7 @@ class CentinelaOrchestrator:
                 alert_briefs=alert_briefs or {},
                 cause_rejections=cause_rejections or [],
                 proposal_rejections=proposal_rejections or [],
-                on_step=on_step,
+                tracer=self.tracer,
             )
 
             if awaiting_decision(self.graph, alert_id):
@@ -244,7 +254,7 @@ class CentinelaOrchestrator:
         )
 
         try:
-            state = resume(self.graph, alert_id, decision)
+            state = resume(self.graph, alert_id, decision, tracer=self.tracer)
 
             if awaiting_decision(self.graph, alert_id):
                 logger.info(f"Alert {alert_id} awaits next decision")
@@ -282,7 +292,7 @@ class CentinelaOrchestrator:
             fin, the steps the walk took, the ChatAnswer, the queries it ran and the screen's result
         """
         if self._chat_graph is None:
-            self._chat_graph = compile_chat(self.tree, leaves=self.leaves, metrics=self.metrics, catalog=self.catalog, reader=self.reader)
+            self._chat_graph = compile_chat(self.tree, leaves=self.leaves, metrics=self.metrics, catalog=self.catalog, reader=self.reader, token_cap=self.token_cap)
         anchored, cause, actions = None, None, None
         if alert is not None:
             known = self.graph.get_state(thread(alert["id"])).values or {}
@@ -302,10 +312,10 @@ class CentinelaOrchestrator:
             "alert": anchored,
             "cause": cause,
             "actions": actions,
-            "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "figuras": None},
+            "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "periodo": None, "figuras": None},
             "queries": [],
         }
-        state = self._chat_graph.invoke(initial)
+        state = self._chat_graph.invoke(initial, dict(self.tracer.config(f"chat_{uuid.uuid4().hex[:12]}")) if self.tracer else None)
         nodes = index(self.tree)
         steps = [
             {"node": node_id, "branch": branch, "agent": nodes[node_id].hoja.agente if node_id in nodes and nodes[node_id].hoja else None}
@@ -315,10 +325,13 @@ class CentinelaOrchestrator:
         return {
             "fin": state.get("fin"),
             "steps": steps,
-            "answer": closing(state),
+            "answer": closing(state, self.metrics),
             "chat": state.get("chat"),
             "queries": state.get("queries") or [],
             "screen": screened,
             "failures": state.get("failures") or [],
             "costs": state.get("costs") or [],
         }
+
+    def run_day(self, ctx: Context, day: str, *, earlier=(), watched=None, limit: int = 3, cause_rejections=None, proposal_rejections=None):
+        return run_day(self.graph, ctx, day, earlier=earlier, watched=watched, limit=limit, cause_rejections=cause_rejections, proposal_rejections=proposal_rejections, tracer=self.tracer)

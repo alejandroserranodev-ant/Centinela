@@ -6,25 +6,24 @@ over the kernel's KPIs, which centinela_agents.catalog.connect_kernel reaches wi
 root .env, using LangGraph with InMemorySaver (state is per-process).
 """
 
-import hashlib
 from functools import cache
 import logging
 import os
-import re
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
 from centinela_agents.action_tools import EmailDraftStub, PriceChangeDraftStub, PurchaseOrderDraftStub, TaskStub
 from centinela_agents.buscar_politica import BuscarPoliticaStub
 from centinela_agents.calcular_impacto import CalcularImpactoStub
-from centinela_agents.catalog import Catalog, KernelAccess, connect_kernel
-from centinela_agents.evidence import Ledger
-from centinela_agents.metrics import Metrics, load_metrics
+from centinela_agents.catalog import KernelAccess, connect_kernel
+from centinela_agents.day import Earlier, entity_labels, labels
+from centinela_agents.metrics import load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.provider_factory import get_provider, get_reasoning_provider
 from centinela_agents.schema import Tree
 from centinela_agents.tools import ToolRegistry
+from centinela_agents.tracing import langfuse_tracer
 from centinela_agents.walk import Context, Detection
 from centinela_agents.yaml_loader import load_yaml
 from langgraph.checkpoint.memory import InMemorySaver
@@ -82,7 +81,7 @@ def get_context() -> Context:
     global _context
     if _context is None:
         kernel = get_kernel()
-        _context = Context.of(_load_tree(), load_metrics(METRICAS), kernel.catalog, kernel.reader)
+        _context = Context.of(_load_tree(), load_metrics(METRICAS), kernel.catalog, kernel.reader, call=kernel.call)
     return _context
 
 
@@ -115,6 +114,7 @@ def _build_orchestrator() -> CentinelaOrchestrator:
         checkpointer=InMemorySaver(),
         kernel=kernel.call,
         reasoning_provider=get_reasoning_provider(),
+        tracer=langfuse_tracer(),
     )
 
 
@@ -129,30 +129,6 @@ def etiqueta(kpi: str) -> str:
 
 def detalle_de_consulta(query: Mapping[str, Any]) -> str:
     return f"Consulta de {etiqueta(query['kpi'])} del {query['dia']}"
-
-
-def alert_id_of(detection: Detection) -> str:
-    """One alert per metric and entity: the id is derived from both."""
-    key = "|".join([detection.metric, *map(str, detection.entity)])
-    return "alerta_" + hashlib.sha256(key.encode()).hexdigest()[:16]
-
-
-def pesos_of(detection: Detection) -> float:
-    value = detection.row.get("pesos_en_riesgo")
-    return float(value) if isinstance(value, (int, float)) else 0.0
-
-
-def prioritized(detections: list[Detection], known: set[str], watched: Collection[str]) -> list[Detection]:
-    """The day's new detections of the API's watched metrics, at most CENTINELA_ALERTAS_POR_DIA: the largest of each metric first, then the rest, each by pesos at risk."""
-    fresh = sorted(
-        (d for d in detections if d.metric in API_METRICS and d.metric in watched and alert_id_of(d) not in known),
-        key=pesos_of,
-        reverse=True,
-    )
-    largest = list({d.metric: d for d in reversed(fresh)}.values())
-    first = sorted(largest, key=pesos_of, reverse=True)
-    rest = [d for d in fresh if all(d is not f for f in first)]
-    return [*first, *rest][: int(os.environ.get(ALERTS_PER_DAY, "3"))]
 
 
 _STATUS_MAP: dict[str, str] = {
@@ -174,24 +150,6 @@ _UNIT_MAP: dict[str, str] = {
 
 def _safe_unit(unit: str | None) -> str:
     return _UNIT_MAP.get(unit or "units", "units")
-
-
-def _derive_severity(metric: str, row: dict) -> str:
-    if metric == "saldo_vencido":
-        dias = float(row.get("max_dias_vencido") or 0)
-        if dias > 60:
-            return "critical"
-        if dias > 30:
-            return "high"
-        return "medium"
-    if metric == "cobertura_dias":
-        cobertura = float(row.get("cobertura_dias") or 10)
-        if cobertura < 2:
-            return "critical"
-        if cobertura < 5:
-            return "high"
-        return "medium"
-    return "high"
 
 
 def _convert_figures(raw: list | None) -> list[Figure]:
@@ -289,21 +247,6 @@ def status_path(alert_id: str, state: dict) -> list[str]:
     ]
 
 
-def consulta_del_kpi(metric: str, day: str) -> dict[str, Any]:
-    """The kernel's call for a KPI on a day, under the queryId the leaves would record for it."""
-    kernel = get_kernel()
-    ledger = Ledger(kernel.call, kernel.catalog)
-    qid, _ = ledger.consult(metric, day)
-    return ledger.queries[qid]
-
-
-def con_consulta(state: dict, metric: str, day: str) -> dict:
-    """The state with its alert's KPI among its queries, read from the kernel when no leaf recorded it."""
-    if detection_query(state, metric):
-        return state
-    return {**state, "queries": [*(state.get("queries") or []), consulta_del_kpi(metric, day)]}
-
-
 def nombre(alerta: Alert) -> str:
     return " · ".join(alerta.labels) or alerta.id
 
@@ -316,25 +259,15 @@ def detection_query(state: dict, metric: str) -> str | None:
     return None
 
 
-def _labels(metric: str, entity: tuple, metrics: Metrics, catalog: Catalog) -> list[str]:
-    """The metric's short name and its entity as `<dimension> <value>`, skipping the time bucket."""
-    kpi = catalog.kpis.get(metric)
-    head = [metrics.labels[metric]] if metric in metrics.labels else []
-    return head + [
-        f"{metrics.dimension_labels.get(column, column)} {value}"
-        for column, value in zip(kpi.entity if kpi else (), entity)
-        if value is not None and not re.match(r"\d{4}-\d{2}-\d{2}", str(value))
-    ]
 def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: str) -> Alert:
     """Convert a LangGraph alert state to an API Alert model."""
     metric = detection.metric
-    row = detection.row
-
     ctx = get_context()
-    labels = _labels(metric, detection.entity, ctx.metrics, ctx.catalog)
+    alert_labels = labels(metric, detection.entity, ctx.metrics, ctx.catalog)
 
     status = _STATUS_MAP.get(state.get("status", "nueva"), "new")
-    severity = _derive_severity(metric, row)
+    severity = detection.severity
+    pesos = detection.pesos or {"value": 0, "queryId": (detection.query or {}).get("queryId") or detection_query(state, metric) or f"kpi_consultar:{metric}:{day_str}"}
 
     title_data = state.get("title") or {}
     title = Sentence(
@@ -365,13 +298,9 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
         status=status,
         severity=severity,
         metric=metric,
-        labels=labels,
+        labels=alert_labels,
         title=title,
-        pesos_at_risk=Figure(
-            value=pesos_of(detection),
-            unit="COP",
-            query_id=detection_query(state, metric) or f"kpi_consultar:{metric}:{day_str}",
-        ),
+        pesos_at_risk=Figure(value=float(pesos["value"]), unit="COP", query_id=pesos["queryId"]),
         recoverable_per_month=None,
         confidence=confidence,
         simulated_date=day_str,
@@ -382,22 +311,12 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
     )
 
 
-def _entity_labels(metric: str, entity: tuple) -> list[str]:
-    ctx = get_context()
-    return _labels(metric, entity, ctx.metrics, ctx.catalog)[1 if metric in ctx.metrics.labels else 0:]
-
-
 def brief_of_alert(alerta: Alert) -> dict[str, Any]:
     """What Analista reads of an earlier alert: its metric, its entity and the sentence of its cause."""
     ctx = get_context()
     skip = 1 if alerta.metric in ctx.metrics.labels and alerta.labels[:1] == [ctx.metrics.labels[alerta.metric]] else 0
     cause = alerta.cause.sentence.model_dump(by_alias=True) if isinstance(alerta.cause, CauseIdentified) else None
     return {"metric": alerta.metric, "entity": alerta.labels[skip:], "cause": cause}
-
-
-def brief_of_detection(detection: Detection) -> dict[str, Any]:
-    """What Analista reads of a detection of the day not yet run: its metric and its entity, no cause."""
-    return {"metric": detection.metric, "entity": _entity_labels(detection.metric, detection.entity), "cause": None}
 
 
 def merged_summary(alerta: Alert) -> MergedAlert:
@@ -414,14 +333,30 @@ def merged_summary(alerta: Alert) -> MergedAlert:
 ABSORBIDA = "La explica la causa de la alerta que queda."
 
 
-def absorbed_alert(alert_id: str, detection: Detection, into: str, day_str: str, consulta: Mapping[str, Any]) -> Alert:
-    """A detection of the day another alert's cause absorbed before its run: stored merged, never run, citing its KPI's call."""
-    description = get_context().metrics.descriptions.get(detection.metric, detection.metric)
+def absorbed_alert(alert_id: str, detection: Detection, into: str, day_str: str) -> Alert:
+    ctx = get_context()
+    description = ctx.metrics.descriptions.get(detection.metric, detection.metric)
+    consulta = dict(detection.query or {})
     state = {
         "status": "unida",
         "merged_into": into,
-        "queries": [dict(consulta)],
-        "title": {"text": ": ".join([description, ", ".join(_entity_labels(detection.metric, detection.entity))]), "figures": []},
-        "cause": {"kind": "no_evidence", "reason": ABSORBIDA, "queriesReviewed": [consulta["queryId"]]},
+        "queries": [consulta] if consulta else [],
+        "title": {"text": ": ".join([description, ", ".join(entity_labels(detection.metric, detection.entity, ctx.metrics, ctx.catalog))]), "figures": []},
+        "cause": {"kind": "no_evidence", "reason": ABSORBIDA, "queriesReviewed": [consulta["queryId"]] if consulta else []},
     }
     return state_to_alert(alert_id, state, detection, day_str)
+
+
+def metricas_del_dia(ajustes) -> frozenset[str]:
+    return API_METRICS & frozenset(m.metric for m in ajustes.metrics if m.watched)
+
+
+def earlier_of(alerta: Alert, entidad: list | None) -> Earlier:
+    return Earlier(
+        alerta.id,
+        alerta.metric,
+        None if entidad is None else tuple(entidad),
+        alerta.severity,
+        STATUS_A_ESTADO[alerta.status],
+        brief_of_alert(alerta) if alerta.status == "proposed" else {},
+    )

@@ -20,6 +20,8 @@ ALTER TABLE api.alertas ADD CONSTRAINT alertas_status_check
 
 CREATE INDEX IF NOT EXISTS idx_alertas_status ON api.alertas (status);
 
+ALTER TABLE api.alertas ADD COLUMN IF NOT EXISTS entidad jsonb;
+
 CREATE TABLE IF NOT EXISTS api.bitacora (
   id bigserial PRIMARY KEY,
   alerta_id text REFERENCES api.alertas (id),

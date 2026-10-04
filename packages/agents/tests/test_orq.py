@@ -1,12 +1,12 @@
 # The orchestrator's cases of evals/AGENTS.md that need no apps/api and no model: the tree is
-# compiled with stub leaves and a stub KPI reader, and each test names its case. The cases that
-# need apps/api's record (a second avanzar, the order of a day, a reason handed to the next run)
-# are not here.
+# compiled with stub leaves and a stub KPI reader, and each test names its case. The order of a
+# day, the coverage by earlier alerts and the verdicts are in tests/test_day.py; a second
+# avanzar and a reason handed to the next run need apps/api's record and are not here.
 import pytest
 
 from centinela_agents.catalog import Catalog, Kpi
 from centinela_agents.failures import StepTimeout
-from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, manual_owners, resume, start_alert
+from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, manual_owners, resume, start_alert, stream_alert
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import Tree
 from centinela_agents.validator import InvalidTree, checked_base, load_registry, problems
@@ -25,14 +25,29 @@ def started(recorder, alert_id="A1", earlier=None, **options):
     return graph, state
 
 
-def test_orq_start_reports_each_agent_as_it_runs():
-    entered = []
+def test_orq_each_leaf_of_an_alert_starts_and_ends_on_the_stream_in_order():
     graph = compiled(Recorder())
-
-    start_alert(graph, saldo_detection(), alert_id="A1", day=DAY, on_step=lambda agent, node: entered.append(agent))
-
-    assert entered == ["vigia", "analista", "estratega"]
+    steps = list(stream_alert(graph, saldo_detection(), alert_id="A1", day=DAY))
+    assert [(step["agent"], step["node"], step["status"]) for step in steps] == [
+        ("vigia", "hoja.vigia.titular", "running"),
+        ("vigia", "hoja.vigia.titular", "done"),
+        ("analista", "hoja.analista.explicar", "running"),
+        ("analista", "hoja.analista.explicar", "done"),
+        ("estratega", "hoja.estratega.proponer", "running"),
+        ("estratega", "hoja.estratega.proponer", "done"),
+    ]
+    assert steps[2]["description"] == "Buscando la causa" and steps[2]["alert_id"] == "A1"
+    assert not any(step.get("failed") for step in steps)
     assert awaiting_decision(graph, "A1")
+
+
+def test_orq_a_failed_leaf_ends_its_step_as_failed():
+    def broken(state):
+        raise RuntimeError("sin datos")
+
+    graph = compiled(Recorder(), overrides={("analista", "explicar"): broken})
+    ends = [step for step in stream_alert(graph, saldo_detection(), alert_id="A1", day=DAY) if step["status"] == "done"]
+    assert [step["failed"] for step in ends] == [False, True, False]
 
 
 def test_orq_a_tree_with_a_missing_no_is_refused_at_startup():
@@ -171,7 +186,7 @@ def test_orq_a_model_call_past_its_timeout_takes_the_fallback_and_still_reaches_
     graph, state = started(recorder, overrides={("analista", "explicar"): timeout})
     assert state["cause"]["kind"] == "no_evidence"
     assert state["cause"]["reason"] == REASONS["timeout"]
-    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "timeout"}]
+    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "timeout", "attempts": 0}]
     assert recorder.count("estratega", "revision_manual") == 1
     assert statuses(state)[-1] == "propuesta"
 
@@ -183,7 +198,7 @@ def test_orq_a_tool_or_connection_error_gives_its_own_reason_not_the_schema_one(
 
     graph, state = started(Recorder(), overrides={("analista", "explicar"): broken})
     assert state["cause"]["reason"] == "El análisis no terminó: no se pudo consultar la información necesaria."
-    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error"}]
+    assert state["failures"] == [{"step": "hoja.analista.explicar", "kind": "error", "attempts": 0}]
 
 
 def test_orq_a_failed_manual_review_still_proposes_its_task_to_its_owner():
@@ -196,7 +211,7 @@ def test_orq_a_failed_manual_review_still_proposes_its_task_to_its_owner():
     owners = manual_owners((SKILLS / "estratega" / "acciones.md").read_text(encoding="utf-8"))
     graph, state = started(Recorder(), overrides={("analista", "explicar"): timeout, ("estratega", "revision_manual"): broken}, owners=owners)
     assert state["actions"] == [{"id": "act-revision-manual", "title": "Revisión manual de la alerta", "type": "task", "impact": None, "parameters": {"owner": "Analista de cartera"}}]
-    assert {"step": "hoja.estratega.revision_manual", "kind": "error"} in state["failures"]
+    assert {"step": "hoja.estratega.revision_manual", "kind": "error", "attempts": 0} in state["failures"]
     assert awaiting_decision(graph, "A1")
 
 

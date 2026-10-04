@@ -150,10 +150,11 @@ classify)` is what the interpreter does on reaching each.
 | `fin.fallo_ejecucion` | records the failure; the alert stays `aprobada` |
 | `fin.chat_respondida` | ends a question whose every sentence cites a figure |
 | `fin.chat_sin_evidencia` | ends a question the data, the alert or the tree cannot answer |
+| `fin.chat_otro_periodo` | ends a question on another period, offering the KPI and its window on the simulated day |
 | `fin.chat_fuera_de_alcance` | ends a question outside the chat's use, or one that asks to act |
 | `fin.chat_rechazada` | ends a question the screen flagged, before any model reads it |
 
-The chat's ends write only `fin`; `centinela_agents/agents/chat.py:closing(state)` turns each into
+The chat's ends write only `fin`; `centinela_agents/agents/chat.py:closing(state, metrics)` turns each into
 the answer a person reads.
 
 ## The orchestrator's writes
@@ -190,7 +191,8 @@ family names them, so it changes by pull request only.
 
 `conversar.raiz` ends a flagged question at `fin.chat_rechazada`; `conversar.fuera_de_alcance` and
 `conversar.accion` end a question outside the chat's use or one asking to act at
-`fin.chat_fuera_de_alcance`; `conversar.politica` ends a policy question without evidence; an
+`fin.chat_fuera_de_alcance`; `conversar.politica` ends a policy question without evidence, and
+`conversar.periodo` one naming another period, since the chat reads only the simulated day; an
 anchored question goes on to `conversar.alerta.*`, which read the alert's cause or actions, and
 any other to `conversar.dato`, which needs a KPI; `conversar.con_evidencia` ends the walk answered
 only when a figure survived. Each rests on the registry entry `base.yaml` names.

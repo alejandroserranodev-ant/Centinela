@@ -280,6 +280,11 @@ nodos:
     fundamento: iso31000.6.4.3
     predicado: { lee: estado.chat.intent, op: "=", valor: politica }
     si: fin.chat_sin_evidencia
+    no: conversar.periodo
+  - id: conversar.periodo
+    fundamento: iso31000.6.4.3
+    predicado: { lee: estado.chat.periodo, op: existe }
+    si: fin.chat_otro_periodo
     no: conversar.anclada
   - id: conversar.anclada
     fundamento: iso31000.6.2

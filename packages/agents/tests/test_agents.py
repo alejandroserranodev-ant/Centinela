@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from centinela_agents.agents.analista import explain_cause
-from centinela_agents.agents.chat import ACTION_WORDS, NO_EVIDENCE, answer, classify, screen
+from centinela_agents.agents.chat import ACTION_WORDS, NO_EVIDENCE, answer, classify, other_period, screen
 from centinela_agents.agents.ejecutor import execute_action
 from centinela_agents.agents.estratega import IMPACT_ASSUMPTION, described, propose_actions
-from centinela_agents.agents.orquestador import classify_rejection
+from centinela_agents.agents.orquestador import classify_rejection, classifier_input
 from centinela_agents.agents.vigia import redact_title
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse, ModelConfig
 from centinela_agents.evidence import Sources, query_id
@@ -461,6 +461,20 @@ class TestOrquestador:
         assert result["error"] is not None
         assert result["destino"] == "ninguno"
 
+    def test_the_classifier_reads_reason_cause_and_actions_with_each_figure_in_place(self):
+        cause = {
+            "kind": "identified",
+            "sentence": {"text": "Debe {0} desde enero.", "figures": [{"value": 800000, "unit": "COP", "queryId": "q1"}]},
+            "evidence": [{"claim": {"text": "Lleva {0} vencido.", "figures": [{"value": 20, "unit": "days", "queryId": "q1"}]}}],
+        }
+        actions = [{"id": "a1", "title": "Recordatorio", "type": "email_draft", "impact": {"value": 800000, "unit": "COP", "queryId": "q1"}, "parameters": {"recipient": "CLI-001"}}]
+        assert classifier_input("No es ese cliente", cause, actions) == {
+            "motivo": "No es ese cliente",
+            "causa": {"kind": "identified", "sentence": "Debe 800000 COP desde enero.", "evidence": ["Lleva 20 days vencido."]},
+            "acciones": [{"title": "Recordatorio", "impact": "800000 COP", "parameters": {"recipient": "CLI-001"}}],
+        }
+        assert classifier_input("x", {"kind": "no_evidence", "reason": "Sin datos"}, None) == {"motivo": "x", "causa": {"kind": "no_evidence", "reason": "Sin datos"}, "acciones": []}
+
 
 ALERT = {"id": "A1", "metric": "saldo_vencido", "entity": ["C1"], "status": "propuesta"}
 
@@ -511,6 +525,32 @@ class TestChat:
 
         assert result["chat"]["kpi"] is None
         assert result["chat"]["entity"] is None
+
+    def test_classify_keeps_a_period_the_question_spells_and_drops_one_it_does_not(self):
+        provider = MagicMock()
+        provider.generate_structured.return_value = structured({"intent": "dato", "kpi": "margen_pct", "entity": "Aseo", "periodo": "agosto de 2026"})
+        named = classify(provider, chat_state("¿Cuál fue el margen de la línea Aseo en agosto de 2026?"), sources())
+        unnamed = classify(provider, chat_state("¿Cuál es el margen de la línea Aseo?"), sources())
+
+        assert (named["chat"]["intent"], named["chat"]["periodo"]) == ("dato", "agosto de 2026")
+        assert unnamed["chat"]["periodo"] is None
+        assert "periodo" in provider.generate_structured.call_args.args[0].schema["required"]
+
+    @pytest.mark.parametrize(
+        ("kpi", "entity", "offer"),
+        [
+            ("margen_pct", "Aseo", "Puedo responder Margen de Aseo en la última semana cerrada al 2026-09-30: pregunta sin la fecha."),
+            ("dias_pago_prom", None, "Puedo responder Días de pago en el último mes cerrado al 2026-09-30: pregunta sin la fecha."),
+            ("saldo_vencido", "C1", "Puedo responder Cartera vencida de C1 al 2026-09-30: pregunta sin la fecha."),
+            (None, None, "Pregunta sin la fecha para leer un indicador al 2026-09-30."),
+        ],
+    )
+    def test_another_period_names_the_day_and_offers_the_question_the_chat_answers(self, kpi, entity, offer):
+        chat = {"kpi": kpi, "entity": entity, "periodo": "agosto de 2026"}
+
+        text = other_period(chat, "2026-09-30", load_metrics(METRICAS))
+
+        assert text == f"No consulto agosto de 2026: solo leo los indicadores del día simulado, 2026-09-30. {offer}"
 
     def test_classify_refuses_an_intent_outside_the_list(self):
         provider = MagicMock()
