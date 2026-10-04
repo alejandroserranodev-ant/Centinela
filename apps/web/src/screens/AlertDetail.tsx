@@ -212,7 +212,7 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
             </span>
           ) : null}
         </p>
-        <div className="arena-row" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="arena-row">
           <ArenaButton variant="ghost" size="sm" icon="ph-bold ph-chat-circle-text" onClick={() => openChat(alert.id)}>
             Preguntar sobre esta alerta
           </ArenaButton>
@@ -290,7 +290,7 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
         </>
       )}
 
-      {alert && <AgentPhasesModal alert={alert} isOpen={phasesModalOpen} onClose={() => setPhasesModalOpen(false)} />}
+      {alert && <AgentPhasesModal alert={alert} open={phasesModalOpen} onClose={() => setPhasesModalOpen(false)} />}
     </article>
   );
 }

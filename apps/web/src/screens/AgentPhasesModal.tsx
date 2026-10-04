@@ -1,372 +1,217 @@
-import { useState } from 'react';
-import { ArenaButton } from '@dravensoft/arena-react';
+import type { ReactNode } from 'react';
+import { ArenaAlert, ArenaButton, ArenaDialog, ArenaTab, ArenaTabs, ArenaTag } from '@dravensoft/arena-react';
 import type { Alert } from '../api/types';
-import { SentenceWithFigures, LinkedFigure } from '../common/SentenceWithFigures';
-import { Confidence } from '../common/Badges';
+import { Confidence, Labels } from '../common/Badges';
+import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
+import { explainedByRemaining } from '../alert';
 import { formatDate } from '../format';
-import '../styles/agent-phases.css';
+import { TYPE } from './ProposedActions';
 
-interface AgentPhase {
-  agent: 'vigia' | 'analista' | 'estratega' | 'ejecutor';
-  name: string;
-  icon: string;
-  color: string;
-}
-
-const PHASES: AgentPhase[] = [
-  {
-    agent: 'vigia',
-    name: 'Vigía - Detección',
-    icon: 'ph-bold ph-eye',
-    color: 'var(--color-vigia, #6366f1)',
-  },
-  {
-    agent: 'analista',
-    name: 'Analista - Causa Raíz',
-    icon: 'ph-bold ph-magnifying-glass',
-    color: 'var(--color-analista, #8b5cf6)',
-  },
-  {
-    agent: 'estratega',
-    name: 'Estratega - Propuesta',
-    icon: 'ph-bold ph-lightbulb',
-    color: 'var(--color-estratega, #d946ef)',
-  },
-  {
-    agent: 'ejecutor',
-    name: 'Ejecutor - Acción',
-    icon: 'ph-bold ph-check-circle',
-    color: 'var(--color-ejecutor, #ec4899)',
-  },
-];
-
-function PhaseContent({ alert, phase }: { alert: Alert; phase: AgentPhase }) {
-  switch (phase.agent) {
-    case 'vigia':
-      return (
-        <div className="agent-phase__content arena-stack arena-stack--group">
-          <div className="agent-phase__field">
-            <label className="agent-phase__label">
-              <i className="ph-bold ph-chart-bar" />
-              Métrica Detectada
-            </label>
-            <p className="agent-phase__value font-semibold">{alert.metric}</p>
-          </div>
-
-          <div className="agent-phase__field">
-            <label className="agent-phase__label">
-              <i className="ph-bold ph-text-t" />
-              Descripción
-            </label>
-            <div className="agent-phase__value">
-              <SentenceWithFigures text={alert.title.text} figures={alert.title.figures} />
-            </div>
-          </div>
-
-          <div className="agent-phase__field">
-            <label className="agent-phase__label">
-              <i className="ph-bold ph-calendar" />
-              Fecha de Detección
-            </label>
-            <p className="agent-phase__value">{formatDate(alert.simulatedDate)}</p>
-          </div>
-
-          <div className="agent-phase__field">
-            <label className="agent-phase__label">
-              <i className="ph-bold ph-warning" />
-              Exposición en Riesgo
-            </label>
-            <div className="agent-phase__money">
-              <LinkedFigure figure={alert.pesosAtRisk} />
-            </div>
-          </div>
-
-          {alert.labels && alert.labels.length > 0 && (
-            <div className="agent-phase__field">
-              <label className="agent-phase__label">
-                <i className="ph-bold ph-tag" />
-                Identidad
-              </label>
-              <div className="agent-phase__labels">
-                {alert.labels.map((label) => (
-                  <span key={label} className="arena-badge arena-badge--neutral">
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="agent-phase__status">
-            <i className="ph-bold ph-check-circle" />
-            <p>Detección completada: análisis de datos brutos</p>
-          </div>
-        </div>
-      );
-
-    case 'analista':
-      return (
-        <div className="agent-phase__content arena-stack arena-stack--group">
-          {alert.cause.kind === 'identified' ? (
-            <>
-              <div className="agent-phase__field">
-                <label className="agent-phase__label">
-                  <i className="ph-bold ph-magnifying-glass" />
-                  Causa Identificada
-                </label>
-                <div className="agent-phase__value font-semibold">
-                  <SentenceWithFigures text={alert.cause.sentence.text} figures={alert.cause.sentence.figures} />
-                </div>
-              </div>
-
-              {alert.cause.evidence && alert.cause.evidence.length > 0 && (
-                <div className="agent-phase__field">
-                  <label className="agent-phase__label">
-                    <i className="ph-bold ph-list-checks" />
-                    Evidencia ({alert.cause.evidence.length} consulta{alert.cause.evidence.length !== 1 ? 's' : ''})
-                  </label>
-                  <ul className="agent-phase__evidence">
-                    {alert.cause.evidence.map((e, i) => (
-                      <li key={e.queryId} className="agent-phase__evidence-item">
-                        <span className="agent-phase__evidence-num">{i + 1}</span>
-                        <div className="arena-stack">
-                          <p>
-                            <SentenceWithFigures text={e.claim.text} figures={e.claim.figures} />
-                          </p>
-                          <p className="text-muted text-sm">Query ID: {e.queryId}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {alert.confidence.assumptions && alert.confidence.assumptions.length > 0 && (
-                <div className="agent-phase__field">
-                  <label className="agent-phase__label">
-                    <i className="ph-bold ph-info" />
-                    Supuestos
-                  </label>
-                  <ul className="agent-phase__assumptions">
-                    {alert.confidence.assumptions.map((assumption, i) => (
-                      <li key={i}>
-                        <span className="text-muted">•</span> {assumption}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="agent-phase__field">
-                <label className="agent-phase__label">
-                  <i className="ph-bold ph-gauge" />
-                  Confianza del Análisis
-                </label>
-                <div className="agent-phase__confidence">
-                  <Confidence level={alert.confidence.level} />
-                  <p className="text-muted text-sm">
-                    {alert.confidence.level === 'high'
-                      ? 'Alta confianza en la causa identificada'
-                      : alert.confidence.level === 'medium'
-                        ? 'Confianza moderada en la causa identificada'
-                        : 'Baja confianza - revisar manualmente'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="agent-phase__status">
-                <i className="ph-bold ph-check-circle" />
-                <p>Análisis completado: causa raíz identificada</p>
-              </div>
-            </>
-          ) : (
-            <div className="agent-phase__no-result">
-              <i className="ph-bold ph-warning" />
-              <div>
-                <h4>Causa No Identificada</h4>
-                <p>{alert.cause.reason}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-
-    case 'estratega':
-      return (
-        <div className="agent-phase__content arena-stack arena-stack--group">
-          {alert.actions && alert.actions.length > 0 ? (
-            <>
-              <div className="agent-phase__field">
-                <label className="agent-phase__label">
-                  <i className="ph-bold ph-lightning" />
-                  Acciones Propuestas ({alert.actions.length})
-                </label>
-                <ul className="agent-phase__actions">
-                  {alert.actions.map((action, i) => (
-                    <li key={action.id} className="agent-phase__action-item">
-                      <div className="agent-phase__action-header">
-                        <span className="agent-phase__action-num">{i + 1}</span>
-                        <span className="font-semibold">{action.title}</span>
-                        <span className="arena-badge arena-badge--secondary text-xs">{action.type}</span>
-                      </div>
-                      {typeof action.description === 'string' && action.description && (
-                        <p className="text-sm">{action.description}</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="agent-phase__field">
-                <label className="agent-phase__label">
-                  <i className="ph-bold ph-trending-up" />
-                  Impacto Recuperable
-                </label>
-                {alert.recoverablePerMonth ? (
-                  <div className="agent-phase__recoverable">
-                    <LinkedFigure figure={alert.recoverablePerMonth} />
-                    <span>por mes</span>
-                  </div>
-                ) : (
-                  <p className="text-muted">No calculado</p>
-                )}
-              </div>
-
-              <div className="agent-phase__status">
-                <i className="ph-bold ph-check-circle" />
-                <p>Estrategia completada: acciones diseñadas según políticas</p>
-              </div>
-            </>
-          ) : (
-            <div className="agent-phase__no-result">
-              <i className="ph-bold ph-hand-pointing" />
-              <div>
-                <h4>Decisión Manual Requerida</h4>
-                <p>El sistema determinó que esta alerta requiere decisión manual del usuario.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-
-    case 'ejecutor':
-      return (
-        <div className="agent-phase__content arena-stack arena-stack--group">
-          {alert.executedAction ? (
-            <>
-              <div className="agent-phase__field">
-                <label className="agent-phase__label">
-                  <i className="ph-bold ph-check-circle" />
-                  Acción Ejecutada
-                </label>
-                <p className="agent-phase__value font-semibold">{alert.executedAction.actionId}</p>
-              </div>
-
-              {alert.executedAction.result && (
-                <div className="agent-phase__field">
-                  <label className="agent-phase__label">
-                    <i className="ph-bold ph-note-pencil" />
-                    Resultado
-                  </label>
-                  <p className="agent-phase__value text-sm">{alert.executedAction.result}</p>
-                </div>
-              )}
-
-              <div className="agent-phase__status">
-                <i className="ph-bold ph-check-circle" />
-                <p>Ejecución completada exitosamente</p>
-              </div>
-            </>
-          ) : (
-            <div className="agent-phase__no-result">
-              <i className="ph-bold ph-clock" />
-              <div>
-                <h4>Pendiente de Aprobación</h4>
-                <p>Esperando que el usuario apruebe una de las acciones propuestas por el estratega.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-
-    default:
-      return null;
-  }
-}
-
-export function AgentPhasesModal({ alert, isOpen, onClose }: { alert: Alert; isOpen: boolean; onClose: () => void }) {
-  const [expandedIndex, setExpandedIndex] = useState(0);
-
-  if (!isOpen) return null;
-
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="agent-phases-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="agent-phases-modal-wrapper arena-stack" role="dialog" aria-labelledby="phases-title">
-        <div className="agent-phases-header">
-          <div className="arena-stack arena-stack--group" style={{ gap: '0.5rem' }}>
-            <h2 id="phases-title" style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
-              <i className="ph-bold ph-flow-arrow" />
-              Fases del Análisis
-            </h2>
-            <p className="text-muted" style={{ margin: 0, fontSize: '0.875rem' }}>
-              Flujo del análisis a través de cada agente del sistema
-            </p>
+    <div className="arena-stack arena-stack--group">
+      <span className="eyebrow">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Detection({ alert }: { alert: Alert }) {
+  return (
+    <div className="arena-stack">
+      <Field label="Qué detectó">
+        <p>
+          <SentenceWithFigures text={alert.title.text} figures={alert.title.figures} />
+        </p>
+      </Field>
+      {alert.labels.length > 0 ? (
+        <Field label="Sobre">
+          <div className="arena-row">
+            <Labels labels={alert.labels} />
           </div>
-          <button
-            className="agent-phases-close"
-            onClick={onClose}
-            aria-label="Cerrar"
-            type="button"
-          >
-            <i className="ph-bold ph-x" />
-          </button>
-        </div>
+        </Field>
+      ) : null}
+      <Field label="Detectada el">
+        <p>{formatDate(alert.simulatedDate)}</p>
+      </Field>
+      <Field label="En riesgo">
+        <p>
+          <LinkedFigure figure={alert.pesosAtRisk} />
+        </p>
+      </Field>
+    </div>
+  );
+}
 
-        <div className="agent-phases-timeline">
-          <div className="agent-phases-timeline__track" />
-          {PHASES.map((phase) => (
-            <div key={phase.agent} className="agent-phases-timeline__step">
-              <div
-                className="agent-phases-timeline__dot"
-                style={{ backgroundColor: phase.color }}
-                title={phase.name}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="agent-phases-accordion arena-stack">
-          {PHASES.map((phase, index) => (
-            <div key={phase.agent} className="agent-phases-accordion__item">
-              <button
-                className={`agent-phases-accordion__trigger ${expandedIndex === index ? 'is-open' : ''}`}
-                onClick={() => setExpandedIndex(expandedIndex === index ? -1 : index)}
-                aria-expanded={expandedIndex === index}
-              >
-                <span className="agent-phases-accordion__icon" style={{ color: phase.color }}>
-                  <i className="ph-bold ph-caret-down" />
-                </span>
-                <span className="agent-phases-accordion__title">{phase.name}</span>
-              </button>
-              {expandedIndex === index && (
-                <div className="agent-phases-accordion__content">
-                  <PhaseContent alert={alert} phase={phase} />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="agent-phases-footer arena-stack arena-stack--group">
-          <p className="text-muted text-sm">
-            <i className="ph-bold ph-lightbulb" />
-            <span>Cada fase construye sobre la anterior. Revisa los detalles en orden para entender las decisiones.</span>
-          </p>
-          <ArenaButton onClick={onClose}>
-            Cerrar
-          </ArenaButton>
-        </div>
+function Analysis({ alert }: { alert: Alert }) {
+  if (alert.cause.kind !== 'identified') {
+    if (explainedByRemaining(alert.cause, alert.status === 'merged')) {
+      return <p>La causa está en la alerta que queda, que la explica con su evidencia.</p>;
+    }
+    return (
+      <ArenaAlert tone="warning" icon="ph-bold ph-question" title="No encontramos evidencia suficiente para explicar la causa">
+        {alert.cause.reason}
+      </ArenaAlert>
+    );
+  }
+  return (
+    <div className="arena-stack">
+      <Field label="Causa">
+        <p className="detail__cause">
+          <SentenceWithFigures text={alert.cause.sentence.text} figures={alert.cause.sentence.figures} />
+        </p>
+      </Field>
+      {alert.cause.evidence.length > 0 ? (
+        <Field label="Evidencia">
+          <ul className="arena-stack arena-stack--group evidence-list">
+            {alert.cause.evidence.map((e) => (
+              <li key={e.queryId + e.claim.text}>
+                <SentenceWithFigures text={e.claim.text} figures={e.claim.figures} />
+              </li>
+            ))}
+          </ul>
+        </Field>
+      ) : null}
+      {alert.confidence.assumptions.length > 0 ? (
+        <Field label="Supone que">
+          <ul className="assumptions">
+            {alert.confidence.assumptions.map((assumption) => (
+              <li key={assumption}>{assumption}</li>
+            ))}
+          </ul>
+        </Field>
+      ) : null}
+      <div className="arena-row">
+        <Confidence level={alert.confidence.level} />
       </div>
     </div>
+  );
+}
+
+function Strategy({ alert }: { alert: Alert }) {
+  if (alert.actions.length === 0 && alert.status === 'merged') {
+    return <p>Esta alerta se unió a otra con la misma causa, y sus acciones se proponen allí.</p>;
+  }
+  if (alert.actions.length === 0) {
+    return (
+      <ArenaAlert tone="info" title="Sin acciones propuestas">
+        Ninguna acción encaja con esta causa, así que la alerta queda para revisión manual.
+      </ArenaAlert>
+    );
+  }
+  return (
+    <div className="arena-stack">
+      <Field label={alert.actions.length === 1 ? 'Acción propuesta' : `${alert.actions.length} acciones propuestas`}>
+        <ol className="arena-stack evidence-list">
+          {alert.actions.map((action) => (
+            <li key={action.id} className="arena-stack arena-stack--group">
+              <div className="arena-row">
+                <strong>{action.title}</strong>
+                <ArenaTag>{TYPE[action.type]}</ArenaTag>
+              </div>
+              <p>
+                <SentenceWithFigures text={action.description.text} figures={action.description.figures} />
+              </p>
+              <p className="text-muted">
+                {action.impact ? (
+                  <>
+                    Impacto estimado: <LinkedFigure figure={action.impact.figure} />{' '}
+                    {action.impact.period === 'month' ? 'al mes' : 'una sola vez'}
+                  </>
+                ) : (
+                  'Sin impacto en pesos estimado'
+                )}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </Field>
+      {alert.recoverablePerMonth ? (
+        <Field label="Recuperable">
+          <p>
+            <LinkedFigure figure={alert.recoverablePerMonth} /> al mes
+          </p>
+        </Field>
+      ) : null}
+    </div>
+  );
+}
+
+function Execution({ alert }: { alert: Alert }) {
+  if (alert.executedAction) {
+    const executed = alert.executedAction;
+    const action = alert.actions.find((a) => a.id === executed.actionId);
+    return (
+      <div className="arena-stack">
+        <Field label="Acción ejecutada">
+          <p>{action ? action.title : executed.actionId}</p>
+        </Field>
+        <Field label="Resultado">
+          <p>{executed.result}</p>
+        </Field>
+      </div>
+    );
+  }
+  if (alert.status === 'rejected') {
+    return (
+      <ArenaAlert tone="info" title="Sin ejecución">
+        La propuesta fue rechazada, así que no se ejecutó ninguna acción.
+      </ArenaAlert>
+    );
+  }
+  if (alert.status === 'merged') {
+    return (
+      <ArenaAlert tone="info" title="Sin ejecución">
+        Esta alerta se unió a otra con la misma causa, y la acción se decide allí.
+      </ArenaAlert>
+    );
+  }
+  if (alert.status === 'approved') {
+    return (
+      <ArenaAlert tone="info" title="Aprobada, sin resultado todavía">
+        La alerta muestra por qué la acción no se ha ejecutado.
+      </ArenaAlert>
+    );
+  }
+  return (
+    <ArenaAlert tone="info" icon="ph-bold ph-clock" title="Pendiente de aprobación">
+      Ninguna acción se ejecuta hasta que una persona apruebe una de las propuestas.
+    </ArenaAlert>
+  );
+}
+
+export function AgentPhasesModal({ alert, open, onClose }: { alert: Alert; open: boolean; onClose: () => void }) {
+  return (
+    <ArenaDialog
+      open={open}
+      eyebrow="Cómo trabajaron los agentes"
+      title="Fases del análisis"
+      width="calc(var(--sp-1) * 180)"
+      fillBelow="sm"
+      onClose={onClose}
+      footer={
+        <ArenaButton variant="secondary" onClick={onClose}>
+          Cerrar
+        </ArenaButton>
+      }
+    >
+      <div className="arena-stack">
+        <p className="text-muted">Vigía detecta, Analista explica la causa, Estratega propone y Ejecutor actúa solo después de que una persona aprueba.</p>
+        <ArenaTabs defaultValue="vigia">
+          <ArenaTab value="vigia" label="Vigía">
+            <Detection alert={alert} />
+          </ArenaTab>
+          <ArenaTab value="analista" label="Analista">
+            <Analysis alert={alert} />
+          </ArenaTab>
+          <ArenaTab value="estratega" label="Estratega">
+            <Strategy alert={alert} />
+          </ArenaTab>
+          <ArenaTab value="ejecutor" label="Ejecutor">
+            <Execution alert={alert} />
+          </ArenaTab>
+        </ArenaTabs>
+      </div>
+    </ArenaDialog>
   );
 }
