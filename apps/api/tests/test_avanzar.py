@@ -68,7 +68,7 @@ def test_el_dia_transmite_pasos_y_un_fin(cliente):
     for nombre, dato in eventos[:-1]:
         (AgentStep if nombre == "step" else Alert).model_validate(dato)
     assert eventos[-1][1]["newAlerts"]
-    assert eventos[-1][1].get("failure") is None
+    assert "failure" in eventos[-1][1] and eventos[-1][1]["failure"] is None
 
 
 def test_el_fin_del_dia_no_es_un_error(cliente, caplog):
