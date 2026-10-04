@@ -1091,10 +1091,10 @@ export interface components {
             simulatedDay: string;
             /**
              * Type
-             * @description Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion
+             * @description Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion, arbol
              * @enum {string}
              */
-            type: "alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion";
+            type: "alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion" | "arbol";
         };
         /**
          * MergedAlert
@@ -1608,7 +1608,7 @@ export interface operations {
                 /** @description Filter by alert ID (UUID-like identifier) */
                 alertId?: string | null;
                 /** @description Filter by event type */
-                type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion") | null;
+                type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal" | "configuracion" | "arbol") | null;
             };
             header?: {
                 authorization?: string | null;

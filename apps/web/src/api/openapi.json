@@ -1415,7 +1415,7 @@
             "type": "string"
           },
           "type": {
-            "description": "Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion",
+            "description": "Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion, arbol",
             "enum": [
               "alert",
               "evidence",
@@ -1426,7 +1426,8 @@
               "question",
               "answer",
               "refusal",
-              "configuracion"
+              "configuracion",
+              "arbol"
             ],
             "title": "Type",
             "type": "string"
@@ -2369,7 +2370,8 @@
                     "question",
                     "answer",
                     "refusal",
-                    "configuracion"
+                    "configuracion",
+                    "arbol"
                   ],
                   "type": "string"
                 },

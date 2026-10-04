@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, configuracion, consultas, permisos, simulacion
+from .. import arboles, bitacora, ciclo_vida, configuracion, consultas, permisos, simulacion
 from ..agentes import (
     ALERTS_PER_DAY,
     STATUS_A_ESTADO,
@@ -137,6 +137,7 @@ def _registrar(conn, corrida: AlertRun, dia: datetime.date, day_str: str, nota: 
             alerta, unidas = _absorber(conn, alerta, corrida.absorbed, day_str, dia)
         alertas_repo.fijar_entidad(conn, alert_id, detection.entity)
         alertas_repo.fijar_costo(conn, alert_id, state.get("cost") or {})
+        alertas_repo.fijar_version(conn, alert_id, state.get("arbol_version"))
         consultas.registrar(conn, state.get("queries") or [])
         for query in state.get("queries") or []:
             bitacora.registrar(conn, alert_id, "evidence", ANALISTA, detalle_de_consulta(query), dia, query["queryId"])
@@ -200,9 +201,11 @@ async def avanzar(
                 ajustes = configuracion.leer(conn)
                 anteriores = alertas_repo.anteriores(conn)
             umbrales = configuracion.umbrales(ajustes)
+            arbol = arboles.del_dia(conn, nuevo_dia)
             ctx = with_thresholds(get_context(), umbrales)
             orq = get_orchestrator()
             orq.use_thresholds(umbrales)
+            orq.use_tree(arbol)
             dia_en_curso = orq.run_day(
                 ctx, day_str,
                 earlier=[earlier_of(alerta, entidad) for alerta, entidad in anteriores],

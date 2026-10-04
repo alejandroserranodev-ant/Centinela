@@ -314,3 +314,21 @@ def test_listar_sin_estado_excluye_las_unidas_y_unida_las_lista(monkeypatch, gua
     monkeypatch.setattr(alertas_router.permisos, "vistas", lambda conn, persona, alertas: alertas)
     assert TestClient(app).get("/alertas", params={"estado": "unida"}).status_code == 200
     assert pedidos == ["merged"]
+
+
+def test_un_rechazo_guarda_su_destino_y_las_acciones_que_rechazo(monkeypatch, guardadas):
+    _con_orquestador(monkeypatch, return_value={"rejection_target": "propuesta"})
+    registrar = MagicMock()
+    monkeypatch.setattr(alertas_router.rechazos, "registrar", registrar)
+    TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "reject", "reason": " No aplica "})
+    registrar.assert_called_once_with(ANY, "alerta_1", "saldo_vencido", "propuesta", ["accion_1"], "No aplica", DIA)
+
+
+@pytest.mark.parametrize("en_pausa, estado", [(True, {}), (False, {"rejection_target": "propuesta"})], ids=["no target", "no paused graph"])
+def test_un_rechazo_que_el_clasificador_no_dirigio_no_guarda_evidencia(monkeypatch, guardadas, en_pausa, estado):
+    orquestador = _con_orquestador(monkeypatch, return_value=estado)
+    orquestador.is_awaiting_decision.return_value = en_pausa
+    registrar = MagicMock()
+    monkeypatch.setattr(alertas_router.rechazos, "registrar", registrar)
+    TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "reject", "reason": "No aplica"})
+    registrar.assert_not_called()

@@ -32,6 +32,7 @@ const EVENT: Record<LogEventType, string> = {
   answer: 'Respuesta',
   refusal: 'Pregunta rechazada',
   configuracion: 'Configuración',
+  arbol: 'Árbol de decisión',
 };
 
 const STAGE: Record<Agent, string> = {
