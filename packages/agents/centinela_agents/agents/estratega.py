@@ -75,7 +75,10 @@ def propose_actions(provider: LLMProvider, state: Mapping[str, Any], cause: Mapp
     if cause.get("kind") != "identified":
         return {"actions": None, "insufficient_cause": True}
     detection = state["detection"]
-    rows = {row.ref: row for row in action_rows(metric)}
+    excluded = set(state.get("excluye") or ())
+    rows = {row.ref: row for row in action_rows(metric) if f"act-{metric}-{row.ref}" not in excluded}
+    if not rows:
+        return {"actions": None, "insufficient_cause": None}
     ledger = sources.ledger()
     qid, row = ledger.alert_row(metric, detection["entity"], day)
     kpi_row = dict(row or detection["row"])

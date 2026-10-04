@@ -68,7 +68,9 @@ def walk_from(start: str, state: Mapping[str, Any], row: Mapping[str, Any], ctx:
     while current in ctx.nodes and ctx.nodes[current].hoja is None:
         node = ctx.nodes[current]
         predicate = node.predicado
-        if is_kpi(predicate.lee):
+        if node.retirado is not None:
+            passed = False
+        elif is_kpi(predicate.lee):
             metric, _ = kpi_column(predicate.lee)
             if metric != state["candidato"]["metrica"]:
                 raise ValueError(f"{node.id} reads {metric} on a row of {state['candidato']['metrica']}")

@@ -164,7 +164,7 @@ def leaf_node(node: Node, function: LeafFunction, ctx: Context, token_cap: int |
         given = (
             {"alert_id": state["alert_id"], "action": approved_action(state), "decision": state.get("decision")}
             if leaf.agente == "ejecutor"
-            else state
+            else {**state, "excluye": list(leaf.excluye)} if leaf.excluye else state
         )
         cleared = {key: None for key in LEAF_OUTPUTS.get((leaf.agente, leaf.decision), ())}
         with metering(leaf.agente, spent(state.get("cost")), token_cap) as meter:
@@ -189,7 +189,7 @@ def predicate_node(node: Node, ctx: Context):
             if decision["kind"] in DECIDED_STATUS:
                 recorded["status"] = DECIDED_STATUS[decision["kind"]]
             state = {**state, **recorded}
-        passed = state_holds(node.predicado, state, ctx)
+        passed = node.retirado is None and state_holds(node.predicado, state, ctx)
         branch = "si" if passed else "no"
         target = node.si if passed else node.no
         change = merge(recorded, effects(node.id, branch, state))

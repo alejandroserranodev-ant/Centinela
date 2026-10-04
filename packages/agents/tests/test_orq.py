@@ -4,16 +4,20 @@
 # avanzar and a reason handed to the next run need apps/api's record and are not here.
 import pytest
 
+from unittest.mock import MagicMock
+
+from centinela_agents.agents.estratega import propose_actions
 from centinela_agents.catalog import Catalog, Kpi
+from centinela_agents.evidence import Sources
 from centinela_agents.failures import StepTimeout
 from centinela_agents.graph import REASONS, ResumeRefused, awaiting_decision, manual_owners, resume, start_alert, stream_alert
 from centinela_agents.metrics import load_metrics
-from centinela_agents.schema import Tree
+from centinela_agents.schema import Tree, index
 from centinela_agents.validator import InvalidTree, checked_base, load_registry, problems
 from centinela_agents.walk import Context, detect
 from support import (
     ARBOL, DAY, DECISION_DAY, EMAIL, MANUAL_TASK, METRICAS, SALDO_ROW, SKILLS, KERNEL_CATALOG,
-    Recorder, approve, base_data, base_tree, compiled, grounds, node_of, reader_from, saldo_detection, statuses,
+    Recorder, approve, base_data, base_tree, compiled, grounds, node_of, reader_from, saldo_detection, split_data, split_tree, statuses,
 )
 
 CALL = {"id": "act-call", "title": "Llamada al cliente", "type": "llamada", "impact": None, "parameters": {"cliente_id": "CLI-001"}}
@@ -271,3 +275,55 @@ def test_orq_walkthrough_a_customer_who_paid_in_30_days_is_6_days_late():
     assert recorder.calls == [("vigia", "titular"), ("analista", "explicar"), ("estratega", "proponer"), ("ejecutor", "ejecutar")]
     assert recorder.received[("ejecutor", "ejecutar")]["action"] == EMAIL
     assert statuses(final) == ["nueva", "en análisis", "propuesta", "ejecutada"]
+
+
+DIVISION = "proponer.cartera.saldo_vencido.division_1"
+
+
+def test_orq_a_split_leaf_whose_predicate_is_false_produces_the_unsplit_output():
+    plain = start_alert(compiled(Recorder()), saldo_detection(), alert_id="A1", day=DAY)
+    tree = split_tree(metric="cobertura_dias", family="inventario", excluye=("act-cobertura_dias-r1",))
+    split = start_alert(compiled(Recorder(), tree=tree), saldo_detection(), alert_id="A1", day=DAY)
+    assert {key: value for key, value in split.items() if key != "camino"} == {key: value for key, value in plain.items() if key != "camino"}
+    assert ["proponer.inventario.cobertura_dias.division_1", "no"] in split["camino"]
+    assert [step for step in split["camino"] if step[0] != "proponer.inventario.cobertura_dias.division_1"] == plain["camino"]
+
+
+def test_orq_a_split_leaf_hands_estratega_the_rows_it_excludes():
+    recorder = Recorder()
+    state = start_alert(compiled(recorder, tree=split_tree()), saldo_detection(), alert_id="A1", day=DAY)
+    assert recorder.received[("estratega", "proponer")]["excluye"] == ["act-saldo_vencido-r1"]
+    assert [DIVISION, "si"] in state["camino"] and state["status"] == "propuesta"
+
+
+def test_orq_a_retired_split_walks_the_leaf_it_split():
+    data = split_data(base_data())
+    node_of(data, DIVISION)["retirado"] = "No ayudó"
+    recorder = Recorder()
+    state = start_alert(compiled(recorder, tree=Tree.model_validate(data)), saldo_detection(), alert_id="A1", day=DAY)
+    assert [DIVISION, "no"] in state["camino"]
+    assert "excluye" not in recorder.received[("estratega", "proponer")]
+
+
+def test_orq_a_split_leaf_that_excludes_every_row_reaches_one_manual_review():
+    provider = MagicMock()
+    provider.generate_structured.side_effect = AssertionError("the model was called")
+    rows = {"saldo_vencido": [SALDO_ROW]}
+    kernel = lambda name, arguments: {"kpi": arguments["kpi"], "dia": arguments["dia"], "consulta": "SELECT 1", "filas": rows.get(arguments["kpi"], [])}
+    sources = Sources(kernel, KERNEL_CATALOG, load_metrics(METRICAS), index(base_tree()))
+    every = tuple(f"act-saldo_vencido-r{n}" for n in range(1, 6))
+    nothing = {("estratega", "proponer"): lambda state: propose_actions(provider, state, state.get("cause"), sources)}
+    recorder = Recorder()
+    state = start_alert(compiled(recorder, tree=split_tree(excluye=every), overrides=nothing), saldo_detection(), alert_id="A1", day=DAY)
+    provider.generate_structured.assert_not_called()
+    assert [DIVISION, "si"] in state["camino"]
+    assert state["actions"] == [MANUAL_TASK]
+    assert recorder.count("estratega", "revision_manual") == 1
+    assert recorder.count("analista", "explicar") == 1
+
+
+def test_orq_a_retired_detectar_node_takes_its_no_branch():
+    data = base_data()
+    node_of(data, "detectar.cartera.saldo_vencido.dias")["retirado"] = "No aplica"
+    ctx = Context.of(Tree.model_validate(data), load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: {"saldo_vencido": [SALDO_ROW]}}))
+    assert detect(ctx, DAY) == []
