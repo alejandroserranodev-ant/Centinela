@@ -99,8 +99,8 @@ as a refusal.
 
 **`/consultas/{queryId}` serves the call, never runs it**: `api.consultas` holds each
 `kpi_consultar` a leaf ran, with its KPI and day, written by the day run and by the chat, so a figure
-opens its source after the process that cited it is gone. A KPI no leaf read gets its call from
-`src/centinela_api/agentes.py:consulta_del_kpi(metric, day)`.
+opens its source after the process that cited it is gone. An alert's own KPI is the call its
+detection carries.
 
 **The internal endpoints `/interno/*` have no caller.** `src/centinela_api/routers/interno.py`
 lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `PUT .../causa`
@@ -150,18 +150,18 @@ transport and its secret, and is the answer to whether the agents run here or as
   only in this process: after a restart its graph waits for nothing, so the decision route refuses
   its approval, edit or request for changes and records only its rejection, as decisions and roles
   states.
-- **A day raises the alerts `src/centinela_api/agentes.py:prioritized(detections, known, watched)` keeps**:
-  the detections of the watched metrics of `API_METRICS` whose alert does not exist, the largest
-  `pesos_en_riesgo` of each metric first, then the rest, each by pesos, at
-  most `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. An alert's id is
-  `src/centinela_api/agentes.py:alert_id_of(detection)`, a hash of metric and entity, so one alert
-  per metric and entity holds by the primary key. Why the cap and the order is
+- **`avanzar` drives the day run of `packages/agents`**: it hands `run_day` every stored alert as
+  an `Earlier`, through `src/centinela_api/agentes.py:earlier_of(alerta, entidad)`, the metrics
+  `src/centinela_api/agentes.py:metricas_del_dia(ajustes)` names and the cap
+  `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. It records each
+  `AlertRun` with `src/centinela_api/routers/simulacion.py:_registrar(conn, corrida, dia, day_str, nota)`
+  and sends back the verdict: not recorded when the lifecycle refuses a transition, the refused
+  merge target, and the absorbed alerts it stored. Why the order, the cap and the id is
   [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#the-day-run).
 - **`state_to_alert(alert_id, state, detection, day_str)` reads the graph's state**: the title,
-  the cause and the actions with the figures the leaves cited, pesos at risk from the KPI's
-  `pesos_en_riesgo` under the `queryId` the leaves recorded, and the cause's confidence. A figure
-  with no `queryId` is dropped, never given one. Severity alone is a heuristic over the detected
-  row, because nothing in the tree defines it.
+  the cause and the actions with the figures the leaves cited, and the cause's confidence. A figure
+  with no `queryId` is dropped, never given one. Severity and pesos at risk come from the
+  detection, the pesos under the `queryId` of the detection's KPI call.
 - **Only the metrics `API_METRICS` names become alerts**, because the `Alert` model's `Metric`
   accepts no other.
 
@@ -214,8 +214,8 @@ response's background task frees it for a stream that never starts.
 **`avanzar` hands each run the alerts its `Analista` may name as the same cause**: every stored
 alert in `proposed`, the one status whose graph waits for a person, by id, with its Spanish state,
 its metric, its entity and its cause's sentence, `src/centinela_api/agentes.py:brief_of_alert(alerta)`, and each detection of the day not
-yet run as `nueva`, `src/centinela_api/agentes.py:brief_of_detection(detection)`. Each alert the
-run records joins the list for the next.
+yet run as `nueva`, which the day run itself briefs. Each alert the run records joins the list for
+the next.
 
 > **Decided, not built.** The API also hands each run the severity of every earlier alert and the
 > rejection reasons kept for the alert's metric, each with the target the orchestrator classified

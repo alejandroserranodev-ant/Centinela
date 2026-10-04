@@ -1,7 +1,8 @@
+import json
+
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .ciclo_vida import FINALES
 from .modelos import Alert, AlertStatus, MergedAlert
 
 
@@ -20,17 +21,17 @@ def listar(conn: psycopg.Connection, status: AlertStatus | None) -> list[Alert]:
     return [_a_alerta(fila) for fila in filas]
 
 
-def ids(conn: psycopg.Connection) -> set[str]:
-    return {fila[0] for fila in conn.execute("SELECT id FROM api.alertas").fetchall()}
+def anteriores(conn: psycopg.Connection) -> list[tuple[Alert, list | None]]:
+    filas = conn.execute("SELECT id, status, cuerpo, entidad FROM api.alertas").fetchall()
+    return [(_a_alerta(fila[:3]), fila[3]) for fila in filas]
 
 
-def abiertas(conn: psycopg.Connection) -> list[Alert]:
-    filas = conn.execute(
-        "SELECT id, status, cuerpo FROM api.alertas WHERE status <> ALL(%s) "
-        "ORDER BY (cuerpo->'pesosAtRisk'->>'value')::numeric DESC",
-        (sorted(FINALES),),
-    ).fetchall()
-    return [_a_alerta(fila) for fila in filas]
+def fijar_entidad(conn: psycopg.Connection, id: str, entidad) -> None:
+    conn.execute("UPDATE api.alertas SET entidad = %s WHERE id = %s", (Jsonb(json.loads(json.dumps(list(entidad), default=str))), id))
+
+
+def fijar_costo(conn: psycopg.Connection, id: str, costo) -> None:
+    conn.execute("UPDATE api.alertas SET costos = %s WHERE id = %s", (Jsonb(dict(costo)), id))
 
 
 def obtener(conn: psycopg.Connection, id: str, *, bloquear: bool = False) -> Alert | None:

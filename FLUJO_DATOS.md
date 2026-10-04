@@ -28,8 +28,8 @@ steps.
    anything detects.
 2. Detection runs in the API's process.
    The router reads the settings first, with
-   `apps/api/src/centinela_api/configuracion.py:leer(conn)`, together with the ids of the stored
-   alerts and the open ones. `apps/api/src/centinela_api/configuracion.py:umbrales(ajustes)` turns
+   `apps/api/src/centinela_api/configuracion.py:leer(conn)`, together with every stored
+   alert and its entity, `apps/api/src/centinela_api/alertas.py:anteriores(conn)`. `apps/api/src/centinela_api/configuracion.py:umbrales(ajustes)` turns
    them into the thresholds the day uses, which
    `apps/api/src/centinela_api/agentes.py:with_thresholds(ctx, umbrales)` lays over the context and
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.use_thresholds(thresholds)` hands to the orchestrator, so a change saved by
@@ -39,30 +39,34 @@ steps.
    [`data/metricas.yaml`](./data/metricas.yaml), and the kernel's catalogue and reader, which
    `apps/api/src/centinela_api/agentes.py:get_kernel()` reaches through
    `packages/agents/centinela_agents/catalog.py:connect_kernel(env)` with the DSNs of the root `.env`.
-   `packages/agents/centinela_agents/walk.py:detect(ctx, day)` walks the detection nodes over the
-   rows `kpi_consultar` returns for the simulated day.
-   `apps/api/src/centinela_api/agentes.py:prioritized(detections, known, vigiladas)` keeps the
-   detections whose metric is in `API_METRICS`, because the API's `Alert` model accepts no other, and
-   in `apps/api/src/centinela_api/configuracion.py:vigiladas(ajustes)`, the metrics the settings
-   leave watched, drops those whose alert already exists, and keeps `CENTINELA_ALERTAS_POR_DIA`: the largest `pesos_en_riesgo` of each metric first, then the rest by pesos.
-3. For each detection the stream sends a `step` event, an `AgentStep` of `vigia`. Then
-   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, on_step)`
-   runs the graph in a worker thread, and each agent whose leaf starts reaches the stream as one more `step`, through `asyncio.to_thread`, so the event loop keeps
-   serving the stream. It runs until the approval interrupt or an end. The orchestrator comes from
+   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.run_day(ctx, day, earlier, watched, limit, cause_rejections, proposal_rejections)`
+   returns the day's run, a generator the router drives through `asyncio.to_thread`, so the event
+   loop keeps serving the stream. It hands the run every stored alert as an `Earlier`, through
+   `apps/api/src/centinela_api/agentes.py:earlier_of(alerta, entidad)`, the metrics
+   `apps/api/src/centinela_api/agentes.py:metricas_del_dia(ajustes)` names, those of `API_METRICS`,
+   because the API's `Alert` model accepts no other, that the settings leave watched, and the cap
+   `CENTINELA_ALERTAS_POR_DIA`. The run detects with
+   `packages/agents/centinela_agents/walk.py:detect(ctx, day)`, drops what an earlier alert
+   covers, orders the rest and runs each alert in series.
+3. Each step the run yields reaches the stream as a `step` event, an `AgentStep`: the detection's,
+   then each leaf's start and end. The orchestrator comes from
    `apps/api/src/centinela_api/agentes.py:get_orchestrator()`, which builds it once per process
-   with the model provider, the kernel's call, the four action stubs and an in-memory checkpointer.
-   Each leaf reads `kpi_consultar` in code and records each query in the state's `queries`. The
-   router passes the open alerts and the day's detections not yet run, each with its state,
-   metric, entity and cause, for `Analista` to name one as the same cause, and no rejection reasons.
+   with the model provider, the kernel's call, the four action stubs, an in-memory checkpointer
+   and the tracer. Each leaf reads `kpi_consultar` in code and records each query in the state's
+   `queries`. The run passes each alert the earlier alerts in `propuesta` and the day's
+   detections not yet run, for `Analista` to name one as the same cause. When an alert's graph
+   pauses or ends, the run yields its result, and the router answers with the verdict of what it
+   recorded before the next alert runs.
 4. `apps/api/src/centinela_api/agentes.py:state_to_alert(alert_id, state, detection, day_str)`
    turns the graph's state into the API's `Alert`.
    `apps/api/src/centinela_api/ciclo_vida.py:recorrer(estados)` checks the statuses the graph took
    it through, which `apps/api/src/centinela_api/agentes.py:status_path(alert_id, state)` reads
    from its `transitions`: a path that does not start at `new` or skips a transition is refused,
-   and the alert is logged and skipped. One transaction then stores it with
+   and the alert is logged and skipped. One transaction, in
+   `apps/api/src/centinela_api/routers/simulacion.py:_registrar(conn, corrida, dia, day_str, nota)`, then stores it with
    `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)` and writes one `alert` row, actor `vigia`, with
    `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id, figures)`,
-   under the KPI's `queryId` and with the title's figures, then one `evidence` row per query in `queries`.
+   under the KPI's `queryId` and with the title's figures, its entity and its cost, then one `evidence` row per query in `queries`.
    An alert the graph ends `unida` is stored `merged` into the alert that remains, and a detection
    it absorbed is stored `merged` without running, as the lifecycle in
    [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle) states.
