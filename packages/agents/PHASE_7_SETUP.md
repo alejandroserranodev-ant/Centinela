@@ -9,11 +9,10 @@ Only `centinela_agents/orchestrator_v2.py` uses this module, and nothing uses th
 
 ## What it holds
 
-- `TOKEN_COSTS`: a rate for input and output tokens per provider and model it knows; Ollama, and
-  a model missing from the table, cost zero.
+- `TOKEN_COSTS`: the providers' prices in dollars per thousand input and output tokens, per
+  provider and model it knows; Ollama, and a model missing from the table, cost zero.
 - `centinela_agents/observability.py:TokenUsage` holds one call's tokens; `cost()` multiplies each
-  count by its rate. The rates are the providers' prices per thousand tokens, applied per token, so
-  a priced call comes out a thousand times its real cost.
+  count by its rate and divides by `TOKENS_PER_RATE`, the thousand tokens a rate prices.
 - `AgentMetrics` and `AlertMetrics` add calls, retries, failures, tokens and latency per agent and
   per alert; `AlertMetrics.to_dict()` returns them as one record.
 - `centinela_agents/observability.py:MetricsCollector(alert_id, metric, entity, day)` is what a

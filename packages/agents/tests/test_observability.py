@@ -37,16 +37,20 @@ class TestTokenUsage:
         usage = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="llama2", provider="ollama")
         assert usage.cost() == 0.0
 
+    def test_cost_applies_the_rate_per_thousand_tokens(self):
+        usage = TokenUsage(prompt_tokens=1000, completion_tokens=1000, model="gpt-4o-mini", provider="openai")
+        assert usage.cost() == pytest.approx(0.00015 + 0.0006)
+
     def test_cost_openai_gpt4o_mini(self):
         """OpenAI gpt-4o-mini cost calculation."""
         usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4o-mini", provider="openai")
-        expected = (100 * 0.00015) + (50 * 0.0006)
+        expected = ((100 * 0.00015) + (50 * 0.0006)) / 1000
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_openai_gpt4_turbo(self):
         """OpenAI gpt-4-turbo cost calculation."""
         usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4-turbo", provider="openai")
-        expected = (100 * 0.01) + (50 * 0.03)
+        expected = ((100 * 0.01) + (50 * 0.03)) / 1000
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_anthropic_opus(self):
@@ -57,7 +61,7 @@ class TestTokenUsage:
             model="claude-opus-5-5",
             provider="anthropic"
         )
-        expected = (100 * 0.003) + (50 * 0.015)
+        expected = ((100 * 0.003) + (50 * 0.015)) / 1000
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_anthropic_sonnet(self):
@@ -68,7 +72,7 @@ class TestTokenUsage:
             model="claude-sonnet-5-5",
             provider="anthropic"
         )
-        expected = (100 * 0.003) + (50 * 0.015)
+        expected = ((100 * 0.003) + (50 * 0.015)) / 1000
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_anthropic_haiku(self):
@@ -79,7 +83,7 @@ class TestTokenUsage:
             model="claude-haiku-4-5",
             provider="anthropic"
         )
-        expected = (100 * 0.00008) + (50 * 0.0004)
+        expected = ((100 * 0.00008) + (50 * 0.0004)) / 1000
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_unknown_model_defaults_to_zero(self):

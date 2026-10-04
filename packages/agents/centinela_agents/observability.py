@@ -19,6 +19,8 @@ from typing import Any, Mapping, Optional
 logger = logging.getLogger(__name__)
 
 
+TOKENS_PER_RATE = 1000
+
 TOKEN_COSTS = {
     "ollama": {"input": 0.0, "output": 0.0},
     "openai": {
@@ -59,7 +61,7 @@ class TokenUsage:
         input_rate = rates.get("input", 0.0)
         output_rate = rates.get("output", 0.0)
 
-        return (self.prompt_tokens * input_rate) + (self.completion_tokens * output_rate)
+        return ((self.prompt_tokens * input_rate) + (self.completion_tokens * output_rate)) / TOKENS_PER_RATE
 
 
 @dataclass
