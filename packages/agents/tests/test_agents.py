@@ -12,7 +12,7 @@ import pytest
 from centinela_agents.agents.analista import explain_cause
 from centinela_agents.agents.chat import ACTION_WORDS, NO_EVIDENCE, answer, classify, screen
 from centinela_agents.agents.ejecutor import execute_action
-from centinela_agents.agents.estratega import propose_actions
+from centinela_agents.agents.estratega import IMPACT_ASSUMPTION, described, propose_actions
 from centinela_agents.agents.orquestador import classify_rejection
 from centinela_agents.agents.vigia import redact_title
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse, ModelConfig
@@ -257,7 +257,13 @@ class TestEstrategA:
         assert action["type"] == "email_draft"
         assert action["parameters"] == {"recipient": "C1"}
         assert action["impact"] == {"value": 800000.0, "unit": "COP", "queryId": saldo_query()}
+        assert action["confidence"]["assumptions"] == [IMPACT_ASSUMPTION] and "pesos_en_riesgo" not in IMPACT_ASSUMPTION
         assert result["insufficient_cause"] is None
+
+    def test_a_description_cites_a_policy_code_and_never_a_note_for_the_model(self):
+        assert described("Llamar al cliente.", "FIN-POL-004 §4") == "Llamar al cliente. (FIN-POL-004 §4)"
+        note = "none; the policies prescribe no action, so description says the action is Centinela's proposal"
+        assert described("Revisar la frecuencia de compra.", note) == "Revisar la frecuencia de compra."
 
     def test_a_row_the_list_does_not_hold_is_insufficient(self):
         provider = MagicMock()
