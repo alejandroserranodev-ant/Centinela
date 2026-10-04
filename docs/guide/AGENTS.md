@@ -12,7 +12,7 @@ nothing written there, only what `publish.py` builds from this repository.
 | `chapters/` | the pages only this guide owns: the reading order, the journey of one alert, the decision tree and the KPI kernel as decided, and the status map |
 | `publish.py` | builds the zip from the manifest and imports it into Docmost as the space `centinela` |
 | `docker-compose.yml` | Docmost with its own Postgres and Redis |
-| `.env.example` | every setting the compose and `publish.py` read; the template a fresh instance starts from |
+| `.env.example` | every setting the compose and `publish.py` read, with no values: the template for an instance other than the team's, whose `APP_SECRET` comes from `openssl rand -hex 32` |
 | `.env` | the settings of the team's instance, versioned on purpose so every member signs in to Docmost with the same admin credentials; the instance listens only on localhost and holds nothing but the published guide |
 
 ## Decisions
@@ -24,9 +24,10 @@ nothing written there, only what `publish.py` builds from this repository.
   root companions are copied verbatim, so the guide repeats no fact they own. A chapter owns only
   what no level page states. The code inventory is derived from `git ls-tree` of the published
   commit, so "what is code" cannot go stale.
-- **The tree and kernel chapters own their design until the specs that build it execute.** Each
-  pending spec names the chapter section it moves into a level page, and that section then shrinks
-  to a link. A chapter never links into `docs/superpowers/`, because a spec is deleted once executed.
+- **The tree and kernel chapters own the part of their design no level page states, until the
+  specs that build it execute.** Each pending spec names the chapter section it moves into a level
+  page, and that section then shrinks to a link. A chapter never links into `docs/superpowers/`,
+  because a spec is deleted once executed.
 - **A diagram of a level page's fact lives in a chapter, captioned `Draws:` with the page and the
   heading it draws**, and `publish.py:check_draws(text, source)` refuses the build when that heading
   is gone. A diagram in a level page would cost every agent reading that route; the caption is what
@@ -48,11 +49,11 @@ nothing written there, only what `publish.py` builds from this repository.
 
 ## Commands
 
-Run from this directory, with Python 3 and Docker Compose:
+Run from this directory, with Python 3 and Docker Compose. The compose and `publish.py` read the
+tracked `.env`, so a clone needs no setup:
 
 | Command | What it does |
 |---|---|
-| `cp .env.example .env` | then fill `APP_SECRET` with `openssl rand -hex 32`, and both passwords |
 | `docker compose up -d` | starts Docmost at `APP_URL`; `curl -fsS "$APP_URL/api/health"` answers once it is ready |
 | `python publish.py` | builds the guide and replaces the space `centinela`; prints its address |
 | `python publish.py --build-only DIR` | writes the guide's Markdown tree to `DIR` and touches no Docmost |
@@ -62,8 +63,9 @@ Run from this directory, with Python 3 and Docker Compose:
 - **A correction goes into the repository and is published**, never into Docmost.
 - **A chapter states only what no level page owns**, and links the page that owns anything else.
   *No gate holds this.*
-- **A section describing a design with no code opens with `> **Decided, not implemented.**`**,
-  which `publish.py` turns into a warning box. *No gate holds this.*
+- **A section describing a design with no code opens with `> **Decided, not built.**`**, the
+  marker every level page uses. `publish.py` turns a quote that starts with
+  `publish.py:DECIDED` into a warning box. *No gate holds this.*
 - **A new page enters through `guide.json`**, and a repo page it links that the manifest does not
   import reaches the reader as a GitHub link.
 

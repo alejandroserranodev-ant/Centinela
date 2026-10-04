@@ -1,5 +1,8 @@
+import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
+
+from centinela_tools.kernel import kernel_from_env
 
 from .metrics import Metrics
 
@@ -44,3 +47,15 @@ def kernel_reader(call: KernelCall) -> KpiReader:
         return list(answer["filas"])
 
     return read
+
+
+@dataclass(frozen=True)
+class KernelAccess:
+    catalog: Catalog
+    reader: KpiReader
+    call: KernelCall
+
+
+def connect_kernel(env: Mapping[str, str] = os.environ) -> KernelAccess:
+    kernel = kernel_from_env(env)
+    return KernelAccess(catalog_from_kernel(kernel.call("kpi_catalogo", {})), kernel_reader(kernel.call), kernel.call)

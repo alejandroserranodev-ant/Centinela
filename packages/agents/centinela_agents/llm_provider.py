@@ -13,11 +13,11 @@ from typing import Any, Protocol
 @dataclass
 class ModelConfig:
     """Configuration for an LLM model."""
-    provider: str  # "ollama" | "openai" | "anthropic"
-    model: str     # model name (e.g., "qwen3:8b", "gpt-4o-mini", "claude-opus-5-5")
+    provider: str
+    model: str
     temperature: float = 0.0
     top_p: float = 1.0
-    thinking: bool = False  # extended thinking (if supported)
+    thinking: bool = False
     timeout_seconds: int = 180
 
 
@@ -37,7 +37,7 @@ class LLMStructuredRequest:
     """Request to generate structured JSON from an LLM."""
     system_prompt: str
     user_prompt: str
-    schema: dict[str, Any]  # JSON Schema for output validation
+    schema: dict[str, Any]
     temperature: float | None = None
     top_p: float | None = None
     thinking: bool = False
@@ -48,15 +48,15 @@ class LLMStructuredRequest:
 class LLMResponse:
     """Response from an LLM call."""
     text: str
-    stop_reason: str  # "stop" | "length" | "tool_use" | etc.
-    usage: dict[str, int]  # {"prompt_tokens": int, "completion_tokens": int}
+    stop_reason: str
+    usage: dict[str, int]
     model: str
 
 
 @dataclass
 class LLMStructuredResponse(LLMResponse):
     """Response from a structured LLM call."""
-    parsed: dict[str, Any]  # Parsed JSON matching schema
+    parsed: dict[str, Any]
 
 
 class LLMProvider(ABC):

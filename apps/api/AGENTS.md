@@ -1,46 +1,199 @@
 # apps/api: the API, the clock and the log
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-This level is the only door into Centinela: the web, the jury and any script reach it through
-the public endpoints; `packages/agents` reaches it through internal endpoints. It owns the alert
-lifecycle, the simulated clock, the `bitácora`, and the interface contract. This page states the
-decisions the code is written against. The endpoints it serves are
-<<<<<<< HEAD
-=======
 This level is the only door into Centinela: the web, the jury and any script reach the agents
-through it. It holds the skeleton the endpoints are built on: FastAPI, the API's own schema, the
-alert lifecycle and the `bitácora`, not yet wired to `packages/agents` or `packages/tools`. This
-page states the decisions the code is written against. The endpoints it must serve are
->>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
-=======
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-[`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its minimal API section.
+through it. What runs here is a FastAPI app over its own PostgreSQL schema `api`. It serves the
+brief's minimal endpoints, owns the simulated clock, the alert lifecycle and the `bitácora`, and
+runs the orchestrator of `packages/agents` in its own process on each day advance and each
+decision. Detection and the agents read the kernel's KPIs on the simulated day, so every alert and
+every figure comes from the dataset. The sections marked below hold decisions the code does not
+implement.
 
-## Decisions
+## Why each file exists
 
-- **Python, FastAPI and Pydantic**, REST plus SSE streaming for the chat and for agent progress.
-<<<<<<< HEAD
-- **The API owns the simulated clock.** Advancing it moves the simulated day that replaces
-  `fecha_corte()` (see [`../../data/AGENTS.md`](../../data/AGENTS.md), its clock section).
-- **The API owns the alert lifecycle: it validates every transition and persists it**, and
-  refuses one the lifecycle does not list. The orchestrator proposes the transitions an agent
-  causes, because it is the only part that sees an agent finish; the API proposes the ones a
-  person causes. The record is the API's, because it is the only part with storage and the only
-  door. How the orchestrator reaches each proposal is
-  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md), its graph section.
+| File | Why it exists |
+|---|---|
+| `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora` |
+| `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
+| `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY` and `ROLES_CON_DECISION` |
+| `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
+| `src/centinela_api/modelos.py` | the Pydantic models, the HTTP contract's source; their conventions are [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md) |
+| `src/centinela_api/ciclo_vida.py` | the lifecycle's transitions and the Spanish names it accepts at the edge |
+| `src/centinela_api/decisiones.py` | `aplicar(alerta, decision)`, the pure check of a person's decision |
+| `src/centinela_api/alertas.py` | reads and upserts `api.alertas` |
+| `src/centinela_api/bitacora.py` | appends to and lists `api.bitacora` |
+| `src/centinela_api/simulacion.py` | reads and advances the clock |
+| `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
+| `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
+| `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
+| `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `interno` |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py`, `tests/test_chat.py` and `tests/test_manifest.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py` and `tests/test_ciclo_orquestado.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
-  | Transition | Proposed by |
-  |---|---|
-  | → `nueva` | the orchestrator, when `Vigía` detects |
-  | `nueva` → `en análisis` | the orchestrator, when the title is written |
-  | `en análisis` → `propuesta` | the orchestrator, when `Estratega` proposes |
-  | `en análisis` → `unida` | the orchestrator, when it merges the alert into one analysed before it |
-  | `nueva` → `unida` | the orchestrator, when an alert of the same day, analysed first because its pesos at risk are larger, names this one as the same cause |
-  | `propuesta` → `aprobada` or `rechazada` | the API, from a person's decision |
-  | `aprobada` → `ejecutada` | the orchestrator, when `Ejecutor` returns its result |
+## Commands
+
+From this directory, with Python 3.12 or later, because `packages/agents` asks for it:
+
+```bash
+pip install -e ../../packages/tools -e ../../packages/agents -e ".[dev]"
+psql "$DSN_ADMIN" -f sql/01_esquema.sql
+uvicorn centinela_api.main:app --reload
+pytest
+pytest -m integracion
+```
+
+- **`centinela-agents`, and the `centinela-tools` it declares, are dependencies no index
+  serves**, so pip installs them only from the paths the same command names, and a plain
+  `pip install -e .` stops with no matching distribution. `uv pip install -e ".[dev]"` reads the path from `[tool.uv.sources]` and needs
+  none. `tests/test_manifest.py` fails when a module imports a distribution the manifest does not
+  declare.
+- **`sql/01_esquema.sql` runs after the dataset's SQL files**, because the clock seeds
+  itself from `centinela.fecha_corte()`. The database setup is
+  [`../../data/AGENTS.md`](../../data/AGENTS.md#setting-up-the-database).
+- **`pytest` runs every test.** `tests/test_api_integracion.py` skips itself when `DSN_ADMIN` reaches no database;
+  every test that imports `centinela_api.main` needs `centinela_agents` and LangGraph installed.
+- **`src/centinela_api/config.py` loads the root's `.env`, then `.env.local` over it**, both by
+  path, so the API reads the same values wherever it starts. The `.env` is versioned without
+  secrets, because the competition's rules ask for it; a key goes in the ignored `.env.local`. The
+  orchestrator reads `LLM_PROVIDER` and `LLM_MODEL` from it
+  ([`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md)).
+
+## Endpoints
+
+The brief's minimal API is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its
+minimal API section; its paths stay as the brief writes them. The web consumes them through
+`apps/web/src/api/http-client.ts`.
+
+| Method | Path | Serves | Refuses | Web function |
+|---|---|---|---|---|
+| GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulationState` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one | `advanceDay` |
+| GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
+| GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
+| POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject`, with headers `X-User-Name` and `X-User-Role` | 403 for a role that may not decide; 404; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
+| POST | `/chat` | a question, answered by SSE `step` and `end` events | | `chat` |
+| GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
+
+**`/chat` calls no agent.** `src/centinela_api/routers/chat.py:chat(pregunta)` takes the question
+and the optional `alertId` it is asked from, and answers a fixed "sin evidencia suficiente". It
+costs the brief's chat, and is paid when the question reaches `Analista`.
+
+**The internal endpoints `/interno/*` have no caller.** `src/centinela_api/routers/interno.py`
+lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `PUT .../causa`
+(`Analista`), `PUT .../propuesta` (`Estratega`), `POST .../ejecutar` (`Ejecutor`). Each checks
+`X-Agent-Key` against `AGENT_SECRET_KEY` (401), `X-Agent` against the stage (400) and the
+transition (409). The agents run in this process, so they cost a second write path to keep
+consistent with the first, paid when they are wired or removed.
+
+> **Decided, not built.** These rows; each path is chosen with the code, in Spanish like the
+> brief's.
+
+| Method | Path | Serves | Refuses | Web function |
+|---|---|---|---|---|
+| GET | undecided | the person signed in, with a role | | `getSimulationState` |
+| GET | undecided | the inbox totals | | `getInboxSummary` |
+| GET | undecided | the watched KPIs, thresholds, owners and autonomy per action type | | `getSettings` |
+| undecided | undecided | saves the settings whole | 422 when any action type's autonomy is `execute` | `saveSettings` |
+| GET | undecided | one query by id, for "how I got here" | 404 for an unknown query | `getQuery` |
+
+**The KPI catalogue's endpoints**, which list the base and approved KPIs and let the administrator
+decide a proposed KPI or retire one, are decided by the pending work on a new KPI's lifecycle, and
+become rows here when it is planned.
+
+### Adding an endpoint
+
+1. Add its row to the table above first: method, path, what it serves, what it refuses, and the
+   web function that consumes it.
+2. Write its models in `src/centinela_api/modelos.py`, following
+   [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md);
+   `apps/web/src/api/types.ts` follows them field for field.
+3. Write it in the router of its resource, with `response_model` set, and mount a new router in
+   `src/centinela_api/main.py`.
+4. A test beside the others: pure when the logic allows it, `integracion` when it needs Postgres.
+
+## The agents run in this process
+
+**`src/centinela_api/agentes.py` builds the orchestrator once, lazily**, in
+`get_orchestrator()`: `CentinelaOrchestrator` from `packages/agents`, with the provider of
+`get_provider()` and `get_reasoning_provider()`, the tree `packages/agents/arbol/base.yaml`, the
+thresholds of `data/metricas.yaml`, the kernel `get_kernel()` connects through
+`packages/agents/centinela_agents/catalog.py:connect_kernel(env)`, a `ToolRegistry` of the four action stubs and an
+`InMemorySaver`. The routers call
+`start` and `resume` through `asyncio.to_thread`, because the graph runs synchronously and the
+event loop keeps streaming SSE meanwhile. Running in-process saves a service boundary, its
+transport and its secret, and is the answer to whether the agents run here or as a service.
+
+- **The checkpointer is `InMemorySaver`**, the saver that needs no schema. A paused alert lives
+  only in this process: after a restart its decision is recorded but the resume finds no state, a
+  `result` row of `ejecutor` records that the approved action did not run, and the alert stays
+  `approved`.
+- **A day raises the alerts `src/centinela_api/agentes.py:prioritized(detections, known)` keeps**:
+  the detections of `API_METRICS` whose alert does not exist, the most `pesos_en_riesgo` first, at
+  most `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. An alert's id is
+  `src/centinela_api/agentes.py:alert_id_of(detection)`, a hash of metric and entity, so one alert
+  per metric and entity holds by the primary key. Why the cap and the order is
+  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#the-day-run).
+- **`state_to_alert(alert_id, state, detection, day_str)` reads the graph's state**: the title,
+  the cause and the actions with the figures the leaves cited, pesos at risk from the KPI's
+  `pesos_en_riesgo` under the `queryId` the leaves recorded, and the cause's confidence. A figure
+  with no `queryId` is dropped, never given one. Severity alone is a heuristic over the detected
+  row, because nothing in the tree defines it.
+- **Only the metrics `API_METRICS` names become alerts**, because the `Alert` model's `Metric`
+  accepts no other.
+
+## The clock
+
+**The API owns the simulated clock**, the single row of `api.simulacion`. The first read seeds
+it from `centinela.fecha_corte()`; `src/centinela_api/simulacion.py:avanzar(conn, dias)` adds
+days. The day it moves replaces `fecha_corte()` (see
+[`../../data/AGENTS.md`](../../data/AGENTS.md#the-simulated-clock)), and it reaches the
+orchestrator as the argument of each run.
+
+> **Decided, not built.** The two decisions below.
+
+**One day run at a time.** A call to `/simulacion/avanzar` while a day run is in course is refused
+with 409, because the second run would detect against earlier alerts the first has not
+recorded, and one cause would raise two alerts.
+
+**The API hands each run what the orchestrator cannot read**: the metric, entity, severity and
+state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps each
+reason with the target the orchestrator classified it to, the metric and the entity. `avanzar`
+calls `start` without them.
+
+## The alert lifecycle
+
+**The contract and the database speak English statuses**: `new`, `analyzing`, `proposed`,
+`approved`, `rejected`, `executed`. The Spanish names stay at the edge: `estado=propuesta` on
+`GET /alertas` is the brief's spelling, and
+`src/centinela_api/ciclo_vida.py:ESTADO_A_STATUS` maps it.
+
+**`src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)` refuses a transition
+`TRANSICIONES` does not list**: `new` → `analyzing` → `proposed` → `approved` or `rejected`, and
+`approved` → `executed`. A person's decision and the internal routes call it, and so do the two
+paths the orchestrator drives. `avanzar` hands
+`src/centinela_api/ciclo_vida.py:recorrer(estados)` the statuses the graph took the alert through,
+read from its `transitions` by `src/centinela_api/agentes.py:status_path(alert_id, state)`, and
+stores no alert whose path does not start at `new` or skips a transition. The resume after an
+approval writes `executed` only after `transicionar` accepts it from `approved`. The database
+keeps the last status, not the path.
+
+> **Decided, not built.** The table below and the merge it carries. The graph's `unida` reaches
+> the API as `new`, because `state_to_alert` has no entry for it.
+
+**The API validates every transition and persists it.** The orchestrator proposes the transitions
+an agent causes, because it is the only part that sees an agent finish; the API proposes the ones
+a person causes. The record is the API's, because it is the only part with storage and the only
+door. How the orchestrator reaches each proposal is
+[`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md), its graph section.
+
+| Transition | Proposed by |
+|---|---|
+| → `nueva` | the orchestrator, when `Vigía` detects |
+| `nueva` → `en análisis` | the orchestrator, when the title is written |
+| `en análisis` → `propuesta` | the orchestrator, when `Estratega` proposes |
+| `en análisis` → `unida` | the orchestrator, when it merges the alert into one analysed before it |
+| `nueva` → `unida` | the orchestrator, when an alert of the same day, analysed first because its pesos at risk are larger, names this one as the same cause |
+| `propuesta` → `aprobada` or `rechazada` | the API, from a person's decision |
+| `aprobada` → `ejecutada` | the orchestrator, when `Ejecutor` returns its result |
 
 - **`unida` is a state the brief's lifecycle does not have.** An alert whose cause `Analista` finds
   already explains another alert ends there, pointing to the alert that remains, because the brief
@@ -52,589 +205,90 @@ page states the decisions the code is written against. The endpoints it must ser
   merged alert. The inbox lists only the alert that remains, and its detail carries, beside its
   own, the detection and evidence of each alert in its `merged_alerts`. Its pesos at risk stay its
   own, because two detections of one cause would count the same pesos twice.
-- **One day run at a time.** A call to `/simulacion/avanzar` while a day run is in course is
-  refused with 409, because the second run would detect against earlier alerts the first has not
-  recorded yet, and one cause would raise two alerts.
-- **The API hands each run what the orchestrator cannot read**: the metric, entity, severity and
-  state of every earlier alert, and the rejection reasons kept for the alert's metric. It keeps
-  each reason with the target the orchestrator classified it to, the metric and the entity.
-- **The API checks a decision before it resumes an alert**: the role may make it, a rejection
-  carries a reason, an edit keeps the keys of the action's `parameters`, adding none and dropping
-  none, because `Ejecutor` passes them unchanged, and a `request_changes` carries a reason and is
-  refused on an alert that already had one, because the return to `Estratega` is capped at one.
-- **`request_changes` adds no state to the lifecycle.** The alert stays `propuesta` while
-  `Estratega` proposes again, and its reason joins the rejection reasons `Estratega` reads, because
-  a person asking for another proposal has neither approved nor rejected the alert.
-- **The API stores the graph's checkpoints in its own schema** and injects the checkpointer into
-  the graph, because no agent opens a database connection.
-- **The API owns the `bitácora`**, which is append-only: alert, evidence, proposal, decision,
-  action and result, each with who and when. Nothing updates or deletes a row of it.
-- **Roles decide who may approve.** Full enterprise authentication is out of scope; roles are not.
-=======
-  `centinela_api/sse.py:flujo()` turns an async generator of `(event, model)` pairs into
-  `text/event-stream`.
-- **The HTTP contract is English and camelCase**, mirroring `apps/web/src/api/types.ts` field for
-  field: `centinela_api/modelos.py` is the source, and `Esquema`'s `alias_generator` emits
-  `pesosAtRisk` from `pesos_at_risk` so the web's fetch client can replace its simulated one without
-  a reshape.
-- **The lifecycle's Spanish names stay at the edge.** `estado=propuesta` on `GET /alertas` is the
-  brief's spelling; `centinela_api/ciclo_vida.py:ESTADO_A_STATUS` maps it to the English `status`
-  (`proposed`) that the contract, the database and `ciclo_vida.transicionar()` use everywhere else.
-- **The API owns the simulated clock**, in `api.simulacion`, a single-row table. Advancing it moves
-  the simulated day that replaces `fecha_corte()` (see
-  [`../../data/AGENTS.md`](../../data/AGENTS.md), its clock section); the first read seeds it from
-  `centinela.fecha_corte()`.
-- **The API owns the alert lifecycle and persists it**: `nueva` → `en análisis` → `propuesta` →
-  `aprobada` or `rechazada` → `ejecutada`. A transition the lifecycle does not list is refused,
-  enforced in code by `ciclo_vida.transicionar()` ([`ciclo_vida.py`](src/centinela_api/ciclo_vida.py)).
-- **Approving stops at `aprobada`.** Reaching `ejecutada` is `Ejecutor` running the action via
-  `POST /interno/alertas/{id}/ejecutar`; the public `POST /alertas/{id}/decision` never executes.
-- **Roles decide who may approve**, read from an `X-User-Role` header against
-  `config.ROLES_CON_DECISION` (`gerente`, `lider_proceso`). Full enterprise authentication is out of
-  scope, so there is no login yet: `X-User-Name` carries the acting person's display name,
-  percent-encoded, because a raw header is ASCII-only and Colombian names are not.
-<<<<<<< HEAD
-- **This skeleton does not call `packages/agents` or `packages/tools` yet.**
-  `POST /simulacion/avanzar` only moves the clock and ends with no new alerts; `POST /chat` always
-  answers "no tengo evidencia suficiente". Wiring in `Vigía`, `Analista`, `Estratega` and `Ejecutor`
-  is the next task, and `api.alertas` has no writer until then besides a decision on an
-  already-seeded alert.
->>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
-=======
-- **Agents call `/interno/*` endpoints**, not the public ones. Each agent has a role-like identity
-  (`Vigía`, `Analista`, `Estratega`, `Ejecutor`) validated via `X-Agent` header and `X-Agent-Key`
-  secret key. Transitions are automatic: Vigía creates (new), Analista explains (analyzing),
-  Estratega proposes (proposed), decision pauses flow, then Ejecutor executes if approved.
-- **Sensitive data is masked before leaving the API**, via `centinela_api/masking.py`. Client names
-  and IDs are anonymized deterministically (same input → same hash) before reaching `packages/agents`
-  models. The bitácora stores unmasked data; only agent-bound requests mask.
 
-## Public endpoints (for `apps/web`, jury, and agents)
+## Decisions and roles
 
-| Method | Path | Headers | Purpose | Response |
-|---|---|---|---|---|
-| POST | `/simulacion/avanzar?dias=1` | none | Move simulated clock N days; emits `text/event-stream` with newAlerts detected by Vigía | `{simulatedDay, newAlerts: []}` |
-| GET | `/simulacion/dia-actual` | none | Get current simulated day (used by Vigía to know what day to filter queries by) | `{"dia": "2026-01-15"}` |
-| GET | `/alertas?estado=propuesta` | none | List alerts, optionally filtered by `estado` (nueva, en_analisis, propuesta, aprobada, rechazada, ejecutada) | `Alert[]` |
-| GET | `/alertas/{id}` | none | Retrieve one alert with cause, evidence and actions | `Alert` |
-| POST | `/alertas/{id}/decision` | `X-User-Name` (percent-encoded), `X-User-Role` (gerente, lider_proceso) | Approve (choose action), edit (change parameters), or reject (with reason) alert. Advances to approved or rejected. | `Alert` |
-| POST | `/chat` | none | Natural-language question about data; streams `AgentStep` events and final `ChatMessage` as `text/event-stream` | `ChatMessage` |
-| GET | `/bitacora?alertId=...&type=...` | none | Audit log of all decisions and actions | `LogEvent[]` |
+**The API checks a decision before it resumes an alert.**
+`src/centinela_api/decisiones.py:aplicar(alerta, decision)` requires the alert in `proposed`
+(409), a rejection to carry a reason (422), and an approval or an edit to name one of the alert's
+actions (422). The router first checks `X-User-Role` against `ROLES_CON_DECISION`, `gerente` and
+`lider_proceso`, and answers 403. `X-User-Name` arrives percent-encoded, because a header is ASCII
+and Colombian names are not. The decision and its `bitácora` row commit in one transaction before
+the orchestrator resumes, so no action runs without a recorded decision; an approval or an edit
+then resumes into `Ejecutor`, and a rejection resumes to close the graph.
 
-## Internal endpoints (for `packages/agents`)
+**Full enterprise authentication is out of scope; roles are not.** There is no login: the role is
+whatever the header says.
 
-All require headers: `X-Agent: {vigia\|analista\|estratega\|ejecutor}` and `X-Agent-Key: <secret>`.
-Transitions happen automatically. Alerts are created in `new`, flow through the lifecycle, and
-stop at `approved` for human decision. After decision, only `Ejecutor` can move to `executed`.
+> **Decided, not built.** The rules below, where the code differs as each one says.
 
-| Method | Path | Agent | Headers | Body | Purpose | Transitions | Response |
-|---|---|---|---|---|---|---|---|
-| POST | `/interno/alertas` | `vigia` | + `X-Agent: vigia` | `AgentAlertInput` | Create new alert from detected anomaly | new | `Alert` (status=new) |
-| PUT | `/interno/alertas/{id}/causa` | `analista` | + `X-Agent: analista` + optional `X-Cost-Json` | `AgentCauseInput` | Explain root cause with evidence | new → analyzing | `Alert` (status=analyzing) |
-| PUT | `/interno/alertas/{id}/propuesta` | `estratega` | + `X-Agent: estratega` + optional `X-Cost-Json` | `AgentProposalInput` | Propose 1–3 actions with impact | analyzing → proposed | `Alert` (status=proposed) |
-| POST | `/interno/alertas/{id}/ejecutar` | `ejecutor` | + `X-Agent: ejecutor` | `AgentExecutionInput` | Execute approved action (after human decision) | approved → executed | `Alert` (status=executed) |
+- **The role that decides an alert is the owner of its metric** in the settings, among the roles
+  the policies name, such as `Gerente comercial` or `Jefe de cartera`; the `administrador` role
+  decides the KPI catalogue. The code holds a fixed pair of roles for every alert.
+- **A failed role check answers 422**, like every other check of a decision. The code answers 403.
+- **An edit keeps the keys of the action's `parameters`, adding none and dropping none**, because
+  `Ejecutor` passes them unchanged. `aplicar` merges the edit into them, so a new key passes.
+- **A `request_changes` carries a reason, and is capped at one per alert**, because a person who
+  still disagrees after one new proposal has the decision in hand: an edit says what to change
+  and a rejection says why, and both close the alert. The alert stays `propuesta` while
+  `Estratega` proposes again, and the reason joins the rejection reasons `Estratega` reads. The
+  `Decision` union has no such kind.
+- **"Ejecuta" is refused for every action type**, with 422 on saving the settings, because the
+  challenge keeps every action at `Propone` ([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md),
+  its responsible AI section).
 
-### Model contracts
+**Personal data reaches the models unmasked.** `src/centinela_api/masking.py:mask_dict_for_model(data)`
+replaces client and vendor ids and names with a hash-suffixed placeholder, the same for the same
+input, but no route calls it, and `mask_text_evidence` replaces only the pairs it is handed. It
+costs the challenge's Ley 1581 requirement on every model call, and is paid when the data a model
+reads goes through it, in this level or in `packages/tools`, whose page owns masking.
 
-**Input models** (`centinela_api/modelos.py`):
+## The inbox totals
 
-- **`AgentAlertInput`**: Severity, metric, title, `pesosAtRisk`, confidence, simulated date. No actions; Estratega adds them.
-- **`AgentCauseInput`**: `cause` (identified with sentence + evidence, or no_evidence with reason) and optional evidence list.
-- **`AgentProposalInput`**: 1–3 `actions` (each with id, title, type, impact in pesos, confidence, parameters).
-- **`AgentExecutionInput`**: action_id, status (success|failed|partial), result text, optional error.
-- **`CostoAgente`**: agent, step name, model name, tokens_entrada, tokens_salida, latencia_ms. Sent as JSON in `X-Cost-Json` header.
+> **Decided, not built.**
 
-**Output model** (same for all endpoints):
+**The API computes the inbox totals**: pesos at risk today and recoverable per month, each a sum
+over the alerts in `propuesta`, and the count of decisions pending. They are sums over alerts
+rather than a `v_*` view, so the API sends each as a figure whose query reads its own alerts
+table, and the screen computes none.
 
-- **`Alert`**: Immutable snapshot with id, status, severity, metric, title, pesosAtRisk, cause, actions[], executedAction. Reflects current state after the endpoint transitions it.
+## The `bitácora`
 
-### Data masking (Ley 1581)
+**`api.bitacora` is append-only**: `src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id)`
+inserts, and no code updates or deletes a row; no grant enforces it. Each row carries its type,
+its actor, an agent or a person with name and role, its detail, the simulated day and the real
+time.
 
-Before any data reaches `packages/agents` models, it is masked via `centinela_api/masking.py`:
+| Type | Written by |
+|---|---|
+| `alert` | `avanzar`, for each alert the orchestrator returns; `POST /interno/alertas` |
+| `evidence` | `avanzar`, one row per `kpi_consultar` a leaf ran, its SQL as the detail and its `queryId`; `PUT /interno/alertas/{id}/causa` |
+| `proposal` | `PUT /interno/alertas/{id}/propuesta` |
+| `decision` | a person's decision |
+| `action` | `POST /interno/alertas/{id}/ejecutar` |
+| `result` | the resume after an approval, when `Ejecutor` returns an executed action |
 
-- `mask_cliente_id(id)` → "CLIENTE_ABCD1234" (deterministic hash of last 8 chars)
-- `mask_cliente_nombre(name)` → "Cliente ABCD1234"
-- `mask_dict_for_model(dict)` → recursively masks cliente, cliente_id, vendedor_id, producto.nombre
-- `mask_sql_result(rows)` → applies mask_dict to each row from SQL
-
-**Why**: The dataset is synthetic, but the API is built for real data. Names never reach models; only business figures and anonymized IDs. Bitácora stores unmasked for audit. *No gate holds this.*
-
-### Authentication
-
-- **Public endpoints**: None required; X-User-Name and X-User-Role optional (for /alertas/{id}/decision).
-- **Internal endpoints** (/interno/*): Require `X-Agent-Key` header matching `config.AGENT_SECRET_KEY`. Set this in `.env` (default: `insecure-dev-key`). Also require `X-Agent` header naming the agent (vigia, analista, estratega, ejecutor).
-
-### Lifecycle validation
-
-`centinela_api/ciclo_vida.py:transicionar(actual, siguiente)` enforces the state machine:
-
-```
-new → analyzing → proposed → (approved or rejected)
-approved → executed
-rejected → (terminal)
-```
-
-Any other transition raises `TransicionInvalida`. Each internal endpoint calls `transicionar()` before updating the alert.
-
-### How Vigía obtains data from the database
-
-The flow from Vigía to the database:
-
-```
-1. POST /simulacion/avanzar?dias=1
-   ↓ API advances the clock and calls Vigía
-   
-2. Vigía: GET /simulacion/dia-actual
-   ↓ Returns {"dia": "2026-01-15"}
-   
-3. Vigía calls packages/tools/SQL:
-   "Give me v_margen_semanal_linea 
-    where semana <= '2026-01-15'"
-   ↓
-   
-4. tools/SQL (MCP server) connects as tools_reader
-   ↓ Executes:
-   SELECT * FROM centinela.v_margen_semanal_linea 
-   WHERE semana <= '2026-01-15'
-   ↓
-   
-5. Returns:
-   {
-     "query": "SELECT ...",
-     "results": [
-       {"semana": "2026-01-13", "linea": "Hogar", "margen_pct": 18.5},
-       ...
-     ]
-   }
-   
-6. Vigía compares results against metricas.yaml thresholds
-   ↓ If threshold violated:
-   
-7. POST /interno/alertas (AgentAlertInput with evidence + query_id)
-   ↓ Alert created and stored
-```
-
-**Key point**: tools/SQL always receives `fecha_maxima` (the simulated day) as a parameter from Vigía.
-Some views (like `v_margen_semanal_linea`) return year-long data and rely on the caller to filter.
-Others (like `v_cartera_cliente`) embed `fecha_corte()` and would need adjustment to use simulated day
-from a Postgres session variable (future work: `SET app.simulated_day`).
-
-### Metricas and thresholds
-
-Every metric in [`../../data/metricas.yaml`](../../data/metricas.yaml) defines:
-- **vista**: which `v_*` view to query
-- **dimensiones**: what columns to group by
-- **umbral_alerta**: when to raise an alert (numerical rule or SQL condition)
-
-Example (margin detection):
-
-```yaml
-margen_pct:
-  descripcion: Margen bruto sobre ventas netas
-  formula: 1 - sum(costo_total) / sum(valor_neto)
-  vista: v_margen_semanal_linea
-  dimensiones: [semana, linea]
-  umbral_alerta: "caída > 3 puntos vs. promedio de las 8 semanas previas, 
-                  o margen bajo ref_margen_minimo_linea"
-```
-
-Vigía implements this: fetch `v_margen_semanal_linea` for the simulated week and compare with the
-8-week average or the minimum threshold from `ref_margen_minimo_linea`. If violated, create an alert.
-
-### Cost tracking (tokens and latency)
-
-Each internal endpoint accepts an optional `X-Cost-Json` header carrying a `CostoAgente` JSON object:
-
-```json
-{
-  "agent": "analista",
-  "step": "search_policies",
-  "modelo": "claude-opus-5",
-  "tokens_entrada": 1250,
-  "tokens_salida": 340,
-  "latencia_ms": 2100
-}
-```
-
-The API stores this in `api.bitacora` for audit (field `detalle`). The `api.alertas.costos` column is reserved for a full array of cost records (future: structured storage).
-
-### Bitácora and audit trail
-
-Every step — creation, cause, proposal, decision, execution — creates a `LogEvent` in `api.bitacora`:
-
-- `alert_id`: which alert
-- `tipo`: "alert" (Vigía), "evidence" (Analista), "proposal" (Estratega), "decision" (human), "action" (Ejecutor), "result" (Ejecutor result)
-- `actor`: `{kind: "agent", agent: "vigia"}` or `{kind: "person", name: "Juan Pérez", role: "gerente"}`
-- `detalle`: human-readable description (or cost JSON for agents)
-- `query_id`: optional reference to a SQL query
-- `dia_simulado`: the day the event happened (simulated clock)
-- `creado_en`: UTC timestamp
-
-Append-only; the API never updates or deletes log entries.
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
+On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
+and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL
+that returned it; an approval adds its `decision` and `result`. The graph's proposal leaves no row
+of its own.
 
 ## Rules of this level
 
-- **No decision, no action.** The API never resumes an alert past the approval interrupt without a
-  recorded decision from a role allowed to make it. *No gate holds this.*
-- **The API's state lives in its own schema** (`api`, in the same Postgres database
-  `data/docker-compose.yml` already runs): alerts, decisions and the log, never in the dataset's
-  `centinela` schema.
-- **An alert carries its cost**: tokens and model calls are recorded per alert, in `api.alertas.costos`,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-  a column reserved for a list. No code writes it until an agent runs, and it is not in the public
-  `Alert` contract because `apps/web/src/api/types.ts` does not carry it.
-- **Timeouts and retries are explicit**: `packages/agents` handles these; the API returns what it
-  receives or times out waiting.
-<<<<<<< HEAD
-- **The `bitácora` is append-only in code, not yet by a database grant**: nothing in this level
-  issues `UPDATE` or `DELETE` against `api.bitacora`. *No gate holds this.*
-- **Sensitive data is masked before reaching models**: `masking.py` anonymizes names and IDs in
-  data sent to `packages/agents`. The bitácora stores unmasked. *No gate holds this.*
-- **Each agent has one job**: `Vigía` creates, `Analista` explains, `Estratega` proposes,
-  `Ejecutor` executes (after approval). No agent can overwrite another's output.
+- **No decision, no action.** The API resumes an alert past the approval interrupt only after the
+  decision is committed with its role. *No gate holds this.*
+- **The API's state lives in its own schema `api`**, created by `sql/01_esquema.sql` with
+  `IF NOT EXISTS` and no migrations, never in the dataset's `centinela` schema. *No gate holds
+  this.*
 
-## Tests
+> **Decided, not built.** The three rules below, where the code differs as each one says.
 
-Run from this directory:
-
-| Command | What it does |
-|---|---|
-| `pytest tests/test_flujo_agentes.py` | Unitario: endpoints exist, auth works, masking is deterministic (9 tests) |
-| `pytest -m integracion` | Integración: full flow with real BD (requires DSN_ADMIN, data/docker-compose.yml running) |
-
-Tests use mocks for quick feedback (`test_flujo_agentes.py`) and real Postgres for end-to-end
-(`test_api_integracion.py`, `test_ciclo_vida.py`).
-
-## Example: Vigía detects, Analista explains, Estratega proposes, human decides
-
-```bash
-# 1. Vigía creates an alert (POST /interno/alertas)
-curl -X POST http://localhost:8000/interno/alertas \
-  -H "X-Agent: vigia" -H "X-Agent-Key: your-secret" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "severity": "high",
-    "metric": "margen_pct",
-    "title": {"text": "Margin fell 6 points", "figures": []},
-    "pesosAtRisk": {"value": 42000000, "unit": "COP", "queryId": "q_margin"},
-    "confidence": {"level": "high", "assumptions": []},
-    "simulatedDate": "2026-01-15"
-  }'
-# Returns: Alert{id: "alerta_abc123...", status: "new", ...}
-
-# 2. Analista ingests cause (PUT /interno/alertas/{id}/causa)
-curl -X PUT http://localhost:8000/interno/alertas/alerta_abc123/causa \
-  -H "X-Agent: analista" -H "X-Agent-Key: your-secret" \
-  -H "X-Cost-Json: {\"agent\":\"analista\",...}" \
-  -d '{
-    "cause": {
-      "kind": "identified",
-      "sentence": {"text": "Supplier X raised cost", "figures": [...]},
-      "evidence": [...]
-    }
-  }'
-# Returns: Alert{status: "analyzing", cause: {...}}
-
-# 3. Estratega proposes actions (PUT /interno/alertas/{id}/propuesta)
-curl -X PUT http://localhost:8000/interno/alertas/alerta_abc123/propuesta \
-  -H "X-Agent: estratega" -H "X-Agent-Key: your-secret" \
-  -d '{
-    "actions": [{
-      "id": "action_raise_price",
-      "title": {"text": "Raise price 3%", ...},
-      "type": "price_change_draft",
-      "impact": {"figure": {...}, "period": "month"},
-      ...
-    }]
-  }'
-# Returns: Alert{status: "proposed", actions: [...]}
-
-# 4. Human approves via public endpoint (POST /alertas/{id}/decision)
-curl -X POST http://localhost:8000/alertas/alerta_abc123/decision \
-  -H "X-User-Name: Juan%20Pérez" -H "X-User-Role: gerente" \
-  -d '{"kind": "approve", "action_id": "action_raise_price"}'
-# Returns: Alert{status: "approved"}
-
-# 5. Ejecutor executes (POST /interno/alertas/{id}/ejecutar)
-curl -X POST http://localhost:8000/interno/alertas/alerta_abc123/ejecutar \
-  -H "X-Agent: ejecutor" -H "X-Agent-Key: your-secret" \
-  -d '{
-    "action_id": "action_raise_price",
-    "status": "success",
-    "result": "Draft price change created and sent to approvals"
-  }'
-# Returns: Alert{status: "executed", executedAction: {...}}
-
-# 6. Audit trail (GET /bitacora)
-curl http://localhost:8000/bitacora?alertId=alerta_abc123
-# Returns: LogEvent[]{
-#   {type: "alert", actor: {kind: "agent", agent: "vigia"}, detail: "..."},
-#   {type: "evidence", actor: {kind: "agent", agent: "analista"}, detail: "..."},
-#   {type: "proposal", actor: {kind: "agent", agent: "estratega"}, detail: "..."},
-#   {type: "decision", actor: {kind: "person", name: "Juan Pérez", role: "gerente"}, detail: "..."},
-#   {type: "action", actor: {kind: "agent", agent: "ejecutor"}, detail: "..."}
-# }
-```
-=======
-  a column reserved for a list of `packages/agents/src/centinela_agents/esquemas.py:RegistroCosto`.
-  No code writes it until an agent runs, and it is not in the public `Alert` contract because
-  `apps/web/src/api/types.ts` does not carry it.
-- **Timeouts and retries are explicit**, and "not enough evidence" is a valid response, not an error.
-- **The `bitácora` is append-only in code, not yet by a database grant**: nothing in this level
-  issues `UPDATE` or `DELETE` against `api.bitacora`. *No gate holds this.*
->>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
-=======
-- **The `bitácora` is append-only in code, not yet by a database grant**: nothing in this level
-  issues `UPDATE` or `DELETE` against `api.bitacora`. *No gate holds this.*
-- **Sensitive data is masked before reaching models**: `masking.py` anonymizes names and IDs in
-  data sent to `packages/agents`. The bitácora stores unmasked. *No gate holds this.*
-- **Each agent has one job**: `Vigía` creates, `Analista` explains, `Estratega` proposes,
-  `Ejecutor` executes (after approval). No agent can overwrite another's output.
-
-## Tests
-
-Run from this directory:
-
-| Command | What it does |
-|---|---|
-| `pytest tests/test_flujo_agentes.py` | Unitario: endpoints exist, auth works, masking is deterministic (9 tests) |
-| `pytest -m integracion` | Integración: full flow with real BD (requires DSN_ADMIN, data/docker-compose.yml running) |
-
-Tests use mocks for quick feedback (`test_flujo_agentes.py`) and real Postgres for end-to-end
-(`test_api_integracion.py`, `test_ciclo_vida.py`).
-
-## Example: Vigía detects, Analista explains, Estratega proposes, human decides
-
-```bash
-# 1. Vigía creates an alert (POST /interno/alertas)
-curl -X POST http://localhost:8000/interno/alertas \
-  -H "X-Agent: vigia" -H "X-Agent-Key: your-secret" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "severity": "high",
-    "metric": "margen_pct",
-    "title": {"text": "Margin fell 6 points", "figures": []},
-    "pesosAtRisk": {"value": 42000000, "unit": "COP", "queryId": "q_margin"},
-    "confidence": {"level": "high", "assumptions": []},
-    "simulatedDate": "2026-01-15"
-  }'
-# Returns: Alert{id: "alerta_abc123...", status: "new", ...}
-
-# 2. Analista ingests cause (PUT /interno/alertas/{id}/causa)
-curl -X PUT http://localhost:8000/interno/alertas/alerta_abc123/causa \
-  -H "X-Agent: analista" -H "X-Agent-Key: your-secret" \
-  -H "X-Cost-Json: {\"agent\":\"analista\",...}" \
-  -d '{
-    "cause": {
-      "kind": "identified",
-      "sentence": {"text": "Supplier X raised cost", "figures": [...]},
-      "evidence": [...]
-    }
-  }'
-# Returns: Alert{status: "analyzing", cause: {...}}
-
-# 3. Estratega proposes actions (PUT /interno/alertas/{id}/propuesta)
-curl -X PUT http://localhost:8000/interno/alertas/alerta_abc123/propuesta \
-  -H "X-Agent: estratega" -H "X-Agent-Key: your-secret" \
-  -d '{
-    "actions": [{
-      "id": "action_raise_price",
-      "title": {"text": "Raise price 3%", ...},
-      "type": "price_change_draft",
-      "impact": {"figure": {...}, "period": "month"},
-      ...
-    }]
-  }'
-# Returns: Alert{status: "proposed", actions: [...]}
-
-# 4. Human approves via public endpoint (POST /alertas/{id}/decision)
-curl -X POST http://localhost:8000/alertas/alerta_abc123/decision \
-  -H "X-User-Name: Juan%20Pérez" -H "X-User-Role: gerente" \
-  -d '{"kind": "approve", "action_id": "action_raise_price"}'
-# Returns: Alert{status: "approved"}
-
-# 5. Ejecutor executes (POST /interno/alertas/{id}/ejecutar)
-curl -X POST http://localhost:8000/interno/alertas/alerta_abc123/ejecutar \
-  -H "X-Agent: ejecutor" -H "X-Agent-Key: your-secret" \
-  -d '{
-    "action_id": "action_raise_price",
-    "status": "success",
-    "result": "Draft price change created and sent to approvals"
-  }'
-# Returns: Alert{status: "executed", executedAction: {...}}
-
-# 6. Audit trail (GET /bitacora)
-curl http://localhost:8000/bitacora?alertId=alerta_abc123
-# Returns: LogEvent[]{
-#   {type: "alert", actor: {kind: "agent", agent: "vigia"}, detail: "..."},
-#   {type: "evidence", actor: {kind: "agent", agent: "analista"}, detail: "..."},
-#   {type: "proposal", actor: {kind: "agent", agent: "estratega"}, detail: "..."},
-#   {type: "decision", actor: {kind: "person", name: "Juan Pérez", role: "gerente"}, detail: "..."},
-#   {type: "action", actor: {kind: "agent", agent: "ejecutor"}, detail: "..."}
-# }
-```
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-
-## Commands
-
-Run from this directory, with the Postgres from [`../../data/AGENTS.md`](../../data/AGENTS.md)
-already up and `data/sql/01..03` already applied:
-
-| Command | What it does |
-|---|---|
-| `pip install -e ".[dev]"` | installs the package and test dependencies |
-| `psql "$DSN_ADMIN" -f sql/01_esquema.sql` | creates the `api` schema; safe to re-run, nothing drops |
-| `uvicorn centinela_api.main:app --reload` | runs the API on `http://127.0.0.1:8000` |
-<<<<<<< HEAD
-<<<<<<< HEAD
-| `pytest tests/test_flujo_agentes.py` | quick unit tests (no DB needed) |
-| `pytest -m integracion` | integration tests (requires DB up and DSN_ADMIN set) |
-
-**Setup**:
-
-1. Copy `.env.example` to `.env` and fill in:
-   - `DSN_ADMIN=postgresql://centinela:centinela@localhost:5432/centinela` (from `data/docker-compose.yml`)
-   - `AGENT_SECRET_KEY=your-secret-for-agents-prod` (used to authenticate `/interno/*` endpoints)
-
-2. Start database: `docker-compose -f data/docker-compose.yml up -d`
-
-3. Create API schema: `psql "$DSN_ADMIN" -f sql/01_esquema.sql`
-   (Or via Docker if no local `psql`: `cat sql/01_esquema.sql | docker exec -i centinela-db psql -U centinela -d centinela`)
-
-4. Install and run:
-   ```bash
-   pip install -e ".[dev]"
-   uvicorn centinela_api.main:app --reload
-   ```
-
-**Swagger UI**: `http://127.0.0.1:8000/docs` calls every endpoint from the browser. Try:
-- `GET /alertas` (returns empty until Vigía creates one)
-- `POST /interno/alertas` (create test alert; requires `X-Agent: vigia` + `X-Agent-Key`)
-- `GET /bitacora` (see audit log)
-
-## Key files and modules
-
-| File | Purpose |
-|---|---|
-| `src/centinela_api/main.py` | FastAPI app definition and router imports |
-| `src/centinela_api/modelos.py` | Pydantic models: Alert, Decision, AgentAlertInput, etc. (HTTP contract) |
-| `src/centinela_api/ciclo_vida.py` | State machine: transitions from new → analyzing → proposed → approved/rejected → executed |
-| `src/centinela_api/masking.py` | Data anonymization: masks cliente names and IDs before models see them |
-| `src/centinela_api/routers/alertas.py` | Public endpoints: GET /alertas, GET /alertas/{id}, POST /alertas/{id}/decision |
-| `src/centinela_api/routers/interno.py` | Internal endpoints: POST/PUT /interno/alertas/* (agent gates) |
-| `src/centinela_api/routers/simulacion.py` | POST /simulacion/avanzar (move clock, emit events) |
-| `src/centinela_api/routers/chat.py` | POST /chat (currently stub; will call packages/agents) |
-| `src/centinela_api/routers/bitacora.py` | GET /bitacora (audit trail) |
-| `src/centinela_api/db.py` | Connection pooling and dependency injection |
-| `src/centinela_api/config.py` | Environment variables: DSN_ADMIN, AGENT_SECRET_KEY, ROLES_CON_DECISION |
-| `sql/01_esquema.sql` | Tables: api.simulacion, api.alertas, api.bitacora |
-| `tests/test_flujo_agentes.py` | Unit tests for endpoints and masking (uses mocks) |
-
-## What `packages/agents` needs from this API
-
-1. **POST /interno/alertas** endpoint exists, ready to receive `AgentAlertInput` (created by Vigía orchestrator)
-2. **PUT /interno/alertas/{id}/causa**, **propuesta**, **ejecutar** endpoints ready to receive results from each agent
-3. **Masking is built in**: agents receive masked client data; send to LLMs only anonymized data
-4. **State machine enforced**: the API never allows invalid transitions; agents don't need to track state
-5. **Bitácora records everything**: costs, latencies, and decisions are all logged for audit
-6. **X-Agent-Key authentication**: set this in production; unit tests use "insecure-dev-key"
-7. **Swagger/OpenAPI at /docs**: teams can explore the contract live
-
-## What `apps/web` needs from this API
-
-1. **Public endpoints** (`/alertas`, `/alertas/{id}`, `/alertas/{id}/decision`, `/chat`, `/bitacora`) are ready
-2. **All responses are camelCase** (pesosAtRisk, not pesos_at_risk) for direct use in TypeScript
-3. **SSE streaming** for `/simulacion/avanzar` and `/chat` — the web client receives live events
-4. **User roles** (`X-User-Role: gerente|lider_proceso`) control who can approve
-5. **Open Swagger UI at /docs** for live testing
-
-## Decisions deferred to `packages/agents`
-
-- How to structure the orchestrator graph (LangGraph, custom, etc.)
-- Which models for each step (claude-opus for Analista/Estratega, claude-haiku for routing, etc.)
-- How to handle retries and timeouts (circuit breaker logic)
-- How to embed policies in pgvector and retrieve them
-- Whether to call agents in-process or as a microservice
-=======
-| `pytest` | the unit tests, always; `pytest -m integracion` also needs this level's schema applied and `DSN_ADMIN` set |
-=======
-| `pytest tests/test_flujo_agentes.py` | quick unit tests (no DB needed) |
-| `pytest -m integracion` | integration tests (requires DB up and DSN_ADMIN set) |
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
-
-**Setup**:
-
-<<<<<<< HEAD
-With the server running, `http://127.0.0.1:8000/docs` is a Swagger UI that calls every endpoint
-from the browser; `GET /alertas` and `POST /alertas/{id}/decision` need a row in `api.alertas` to
-act on, since nothing creates one until `Vigía` exists.
->>>>>>> 237624b (apps/api now owns a Postgres schema, the alert lifecycle and the bitácora, so the six minimal endpoints run for real while Vigía, Analista, Estratega and Ejecutor are still unbuilt.)
-=======
-1. Copy `.env.example` to `.env` and fill in:
-   - `DSN_ADMIN=postgresql://centinela:centinela@localhost:5432/centinela` (from `data/docker-compose.yml`)
-   - `AGENT_SECRET_KEY=your-secret-for-agents-prod` (used to authenticate `/interno/*` endpoints)
-
-2. Start database: `docker-compose -f data/docker-compose.yml up -d`
-
-3. Create API schema: `psql "$DSN_ADMIN" -f sql/01_esquema.sql`
-   (Or via Docker if no local `psql`: `cat sql/01_esquema.sql | docker exec -i centinela-db psql -U centinela -d centinela`)
-
-4. Install and run:
-   ```bash
-   pip install -e ".[dev]"
-   uvicorn centinela_api.main:app --reload
-   ```
-
-**Swagger UI**: `http://127.0.0.1:8000/docs` calls every endpoint from the browser. Try:
-- `GET /alertas` (returns empty until Vigía creates one)
-- `POST /interno/alertas` (create test alert; requires `X-Agent: vigia` + `X-Agent-Key`)
-- `GET /bitacora` (see audit log)
-
-## Key files and modules
-
-| File | Purpose |
-|---|---|
-| `src/centinela_api/main.py` | FastAPI app definition and router imports |
-| `src/centinela_api/modelos.py` | Pydantic models: Alert, Decision, AgentAlertInput, etc. (HTTP contract) |
-| `src/centinela_api/ciclo_vida.py` | State machine: transitions from new → analyzing → proposed → approved/rejected → executed |
-| `src/centinela_api/masking.py` | Data anonymization: masks cliente names and IDs before models see them |
-| `src/centinela_api/routers/alertas.py` | Public endpoints: GET /alertas, GET /alertas/{id}, POST /alertas/{id}/decision |
-| `src/centinela_api/routers/interno.py` | Internal endpoints: POST/PUT /interno/alertas/* (agent gates) |
-| `src/centinela_api/routers/simulacion.py` | POST /simulacion/avanzar (move clock, emit events) |
-| `src/centinela_api/routers/chat.py` | POST /chat (currently stub; will call packages/agents) |
-| `src/centinela_api/routers/bitacora.py` | GET /bitacora (audit trail) |
-| `src/centinela_api/db.py` | Connection pooling and dependency injection |
-| `src/centinela_api/config.py` | Environment variables: DSN_ADMIN, AGENT_SECRET_KEY, ROLES_CON_DECISION |
-| `sql/01_esquema.sql` | Tables: api.simulacion, api.alertas, api.bitacora |
-| `tests/test_flujo_agentes.py` | Unit tests for endpoints and masking (uses mocks) |
-
-## What `packages/agents` needs from this API
-
-1. **POST /interno/alertas** endpoint exists, ready to receive `AgentAlertInput` (created by Vigía orchestrator)
-2. **PUT /interno/alertas/{id}/causa**, **propuesta**, **ejecutar** endpoints ready to receive results from each agent
-3. **Masking is built in**: agents receive masked client data; send to LLMs only anonymized data
-4. **State machine enforced**: the API never allows invalid transitions; agents don't need to track state
-5. **Bitácora records everything**: costs, latencies, and decisions are all logged for audit
-6. **X-Agent-Key authentication**: set this in production; unit tests use "insecure-dev-key"
-7. **Swagger/OpenAPI at /docs**: teams can explore the contract live
-
-## What `apps/web` needs from this API
-
-1. **Public endpoints** (`/alertas`, `/alertas/{id}`, `/alertas/{id}/decision`, `/chat`, `/bitacora`) are ready
-2. **All responses are camelCase** (pesosAtRisk, not pesos_at_risk) for direct use in TypeScript
-3. **SSE streaming** for `/simulacion/avanzar` and `/chat` — the web client receives live events
-4. **User roles** (`X-User-Role: gerente|lider_proceso`) control who can approve
-5. **Open Swagger UI at /docs** for live testing
-
-## Decisions deferred to `packages/agents`
-
-- How to structure the orchestrator graph (LangGraph, custom, etc.)
-- Which models for each step (claude-opus for Analista/Estratega, claude-haiku for routing, etc.)
-- How to handle retries and timeouts (circuit breaker logic)
-- How to embed policies in pgvector and retrieve them
-- Whether to call agents in-process or as a microservice
->>>>>>> c2a6159 (feat: JSON Schema Standardization — explicit response models, enum query parameters, query param documentation)
+- **An alert carries its cost**: the API persists the tokens and model calls the orchestrator
+  counts per alert, and per chat answer. `api.alertas.costos` exists and nothing writes it;
+  `_registrar_costo` records a step's cost sent by `X-Cost-Json` as an `evidence` row and swallows
+  any error.
+- **Timeouts and retries are explicit**, as the orchestrator's graph states them, and "not enough
+  evidence" is a valid response, not an error. The code logs a failed detection or resume and
+  skips it.
+- **The project is a uv project**, with its lockfile beside this page, as `packages/agents` and
+  `packages/tools` are. It is a setuptools package installed with pip.

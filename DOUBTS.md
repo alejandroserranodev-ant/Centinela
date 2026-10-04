@@ -19,14 +19,16 @@ the next reader does not propose it again.
 
 ## Where a debt goes, in order of preference
 
-The first five fail when they stop being true; a paragraph does not.
+Paying a debt leaves nothing to record. Each of the next four places fails when its record stops
+being true; a paragraph does not.
 
 1. **Pay it.** A defect that can be fixed is work, not debt.
-2. **A gate with a reason-carrying map**, once gates exist: each entry names a case and says why,
-   as a string value, and a stale entry fails the gate.
+2. **A gate with a reason-carrying map**: each entry names a case and says why, as a string value,
+   and a stale entry fails the gate. The gates and their maps are in
+   [`scripts/check/AGENTS.md`](./scripts/check/AGENTS.md).
 3. **A test assertion.**
 4. **The level's own `AGENTS.md`**, where the rule the limit qualifies is stated. The clock section
-   of [`data/AGENTS.md`](./data/AGENTS.md) is one: views that ignore the simulated day.
+   of [`data/AGENTS.md`](./data/AGENTS.md#the-simulated-clock) is one: views that ignore the simulated day.
 5. **The one header** a script or a test is allowed.
 6. **A paragraph here**, written as what is wrong, what it costs, and the command that re-derives it.
 
@@ -55,3 +57,15 @@ It costs a requirement that nobody can check against its source, and a missing s
 hold the criteria the jury scores. It is paid when the complete deck replaces the PDF and the
 challenge page is re-read against it. Re-derive it with
 `pdftotext -layout docs/challenge/hackathon-brief.pdf - | grep -n "Evaluación\|Criterios\|oculto\|Escenarios"`.
+
+**Some pages sit outside the level that owns what they describe, by decision.** The root
+holds [`CONEXION_WEB_API.md`](./CONEXION_WEB_API.md), [`FLUJO_DATOS.md`](./FLUJO_DATOS.md),
+[`REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](./REPORTE_JSON_SCHEMA_STANDARDIZATION.md),
+[`SETUP_OPENAI.md`](./SETUP_OPENAI.md) and [`TAREAS_PENDIENTES.md`](./TAREAS_PENDIENTES.md), and
+`packages/agents` holds its `PHASE_*_SETUP.md` pages beside its `AGENTS.md`. The team keeps the
+file structure they arrived with, so each was rewritten to own one topic and link the level page
+for every fact it does not own, rather than moved into that page. It costs a reader names that do
+not say what a page holds, and a route the router does not budget for the `PHASE_*` pages. It is
+paid when the team agrees to fold each page into its level or rename it. Re-derive it with
+`ls *.md packages/agents/PHASE_*.md | grep -v 'AGENTS\|README\|CLAUDE\|DOUBTS\|GENERATED\|docs_guide'`.
+

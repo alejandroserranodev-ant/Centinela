@@ -106,7 +106,6 @@ def reachable(nodes: Mapping[str, Node], starts: Iterable[str], without: frozens
     return seen
 
 
-# Agent Output Schemas (Cause, Action, ExecutedAction, Decision)
 
 
 class Figure(BaseModel):
@@ -164,9 +163,10 @@ class CauseIdentified(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["identified"]
-    sentence: str  # Spanish text describing the cause
+    sentence: Sentence | str
     evidence: list[Evidence] = Field(min_length=1)
-    same_cause_as: str | None = None  # alert_id of another alert with same cause
+    confidence: Confidence | None = None
+    same_cause_as: str | None = None
 
 
 class CauseNoEvidence(BaseModel):
@@ -174,11 +174,10 @@ class CauseNoEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["no_evidence"]
-    reason: str  # Spanish text explaining why no cause was found
-    queriesReviewed: list[str] = Field(default_factory=list)  # queryIds examined
+    reason: str
+    queriesReviewed: list[str] = Field(default_factory=list)
 
 
-# Union of both cause types
 Cause = CauseIdentified | CauseNoEvidence
 
 
@@ -192,12 +191,12 @@ class Action(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    id: str  # Unique action ID within this proposal
-    title: str  # Spanish title
-    description: str  # Spanish description, must cite policy section
+    id: str
+    title: str
+    description: str
     type: Literal["email_draft", "task", "purchase_order_draft", "price_change_draft"]
-    parameters: dict[str, str | int | float]  # Action-specific parameters
-    impact: Figure | None = None  # Null if no formula
+    parameters: dict[str, str | int | float]
+    impact: Figure | None = None
     confidence: Confidence
 
 
@@ -217,10 +216,10 @@ class ExecutedAction(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    actionId: str  # Links to the approved Action
+    actionId: str
     type: Literal["email_draft", "task", "purchase_order_draft", "price_change_draft", "nota_manual"]
-    result: str | dict[str, Any]  # Draft text or task details
-    parameters: dict[str, str | int | float]  # Exactly as approved
+    result: str | dict[str, Any]
+    parameters: dict[str, str | int | float]
 
 
 class Decision(BaseModel):
@@ -235,9 +234,9 @@ class Decision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["approve", "edit", "reject", "request_changes"]
-    actionId: str | None = None  # For approve/edit (which action to execute)
-    parameters: dict[str, str | int | float] | None = None  # For edit only (new values)
-    reason: str | None = None  # For reject/request_changes (why)
+    actionId: str | None = None
+    parameters: dict[str, str | int | float] | None = None
+    reason: str | None = None
 
 
 class RejectionClassifierOutput(BaseModel):

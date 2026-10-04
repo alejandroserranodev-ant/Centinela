@@ -1,10 +1,10 @@
 # Estratega: the closed list of actions
 
-These rows are the only actions you may propose. Each comes from the policy section it cites.
+These rows are the closed list of actions you propose. Each comes from the policy section it cites.
 `owner` values are the roles the policies name, written as the policies write them. `tramo` is the
-step of `FIN-POL-004 §4` the alert's `max_dias_vencido` falls in, as `tramos` in `metricas.yaml`
-defines it; `Vigía` sends it with the alert. The formulas are the ones `calcular_impacto`
-computes, defined in `packages/tools/AGENTS.md`.
+step of `FIN-POL-004 §4` the alert's `max_dias_vencido` falls in, as `tramos` in
+`data/metricas.yaml` defines it; `Vigía` sends it with the alert. The formulas are the ones
+`calcular_impacto` computes, defined in `packages/tools/AGENTS.md`.
 
 | `metrica` | Condition | `type` | `parameters` | Formula | Policy |
 |---|---|---|---|---|---|
@@ -35,10 +35,11 @@ computed by `calcular_impacto`, never chosen.
 
 ## The owner of a manual review
 
-When the cause is `no_evidence` or the orchestrator marks `revision_manual`, the orchestrator
-proposes one `task` in code, `title` "Revisión manual de la alerta", `impact: null`, with the
-`owner` this table names for the metric. Each owner is the role the metric's policy charges with
-it, so the code chooses no one.
+When the tree reaches the leaf `revision_manual`, on a `no_evidence` cause, a second insufficient
+cause or a failed proposal, that leaf proposes one `task` in code and calls no model: `title`
+"Revisión manual de la alerta", `impact: null`, with the `owner` this table names for the metric.
+If the leaf fails, the orchestrator proposes the same `task`. Each owner is the role the metric's
+policy charges with it, so the code chooses no one.
 
 | `metrica` | `owner` | Policy |
 |---|---|---|

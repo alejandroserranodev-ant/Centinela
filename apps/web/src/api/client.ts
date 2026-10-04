@@ -1,4 +1,3 @@
-// Re-export HTTP client as the main API client
 export { ApiError } from './http-client';
 export {
   advanceDay,

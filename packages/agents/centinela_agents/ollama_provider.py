@@ -42,68 +42,52 @@ class OllamaProvider(LLMProvider):
         ).rstrip("/")
         self.timeout = config.timeout_seconds
 
-        if not self.health_check():
+        models = self._pulled_models()
+        if models is None:
             raise ValueError(
                 f"Ollama server not reachable at {self.base_url}. "
                 "Ensure Ollama is running: 'ollama serve' (or check OLLAMA_BASE_URL)"
             )
+        if self.config.model not in models:
+            raise ValueError(
+                f"Model '{self.config.model}' not found in Ollama. "
+                f"Available: {models}. "
+                f"Pull it first: 'ollama pull {self.config.model}'"
+            )
+
+    def _pulled_models(self) -> list[str] | None:
+        try:
+            resp = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            if resp.status_code != 200:
+                return None
+            return [m.get("name", "") for m in resp.json().get("models", [])]
+        except Exception:
+            return None
 
     def health_check(self) -> bool:
         """Check that Ollama is running and the model is available."""
-        try:
-            # Check server is alive
-            resp = requests.get(
-                f"{self.base_url}/api/tags",
-                timeout=5,
-            )
-            if resp.status_code != 200:
-                return False
+        models = self._pulled_models()
+        return models is not None and self.config.model in models
 
-            # Check model is in tags
-            data = resp.json()
-            models = [m.get("name", "") for m in data.get("models", [])]
-
-            # Model name from config (e.g., "qwen3:8b")
-            if self.config.model not in models:
-                raise ValueError(
-                    f"Model '{self.config.model}' not found in Ollama. "
-                    f"Available: {models}. "
-                    f"Pull it first: 'ollama pull {self.config.model}'"
-                )
-
-            return True
-        except (requests.ConnectionError, requests.Timeout, ValueError) as e:
-            raise ValueError(str(e)) from e
-
-    def generate_text(self, request: LLMRequest) -> LLMResponse:
-        """
-        Generate free-form text using Ollama.
-
-        Args:
-            request: LLMRequest with prompts
-
-        Returns:
-            LLMResponse with generated text and usage
-        """
-        messages = [
-            {"role": "system", "content": request.system_prompt},
-            {"role": "user", "content": request.user_prompt},
-        ]
-
-        payload = {
+    def _payload(self, request: LLMRequest | LLMStructuredRequest) -> dict[str, Any]:
+        options: dict[str, Any] = {
+            "temperature": self.config.temperature if request.temperature is None else request.temperature,
+            "top_p": self.config.top_p if request.top_p is None else request.top_p,
+        }
+        if request.max_tokens:
+            options["num_predict"] = request.max_tokens
+        return {
             "model": self.config.model,
-            "messages": messages,
+            "messages": [
+                {"role": "system", "content": request.system_prompt},
+                {"role": "user", "content": request.user_prompt},
+            ],
             "stream": False,
-            "temperature": request.temperature or self.config.temperature,
-            "top_p": request.top_p or self.config.top_p,
+            "think": bool(request.thinking),
+            "options": options,
         }
 
-        if request.thinking:
-            payload["thinking"] = True
-
-        if request.max_tokens:
-            payload["num_predict"] = request.max_tokens
-
+    def _chat(self, payload: dict[str, Any]) -> dict[str, Any]:
         try:
             resp = requests.post(
                 f"{self.base_url}/api/chat",
@@ -117,11 +101,22 @@ class OllamaProvider(LLMProvider):
             ) from e
         except requests.RequestException as e:
             raise ConnectionError(f"Ollama connection failed: {e}") from e
+        return resp.json()
 
-        data = resp.json()
+    def generate_text(self, request: LLMRequest) -> LLMResponse:
+        """
+        Generate free-form text using Ollama.
+
+        Args:
+            request: LLMRequest with prompts
+
+        Returns:
+            LLMResponse with generated text and usage
+        """
+        data = self._chat(self._payload(request))
         return LLMResponse(
             text=data["message"]["content"],
-            stop_reason=data.get("stop_reason", "stop"),
+            stop_reason=data.get("done_reason") or "stop",
             usage={
                 "prompt_tokens": data.get("prompt_eval_count", 0),
                 "completion_tokens": data.get("eval_count", 0),
@@ -147,41 +142,9 @@ class OllamaProvider(LLMProvider):
         Raises:
             ValueError: if output does not match schema
         """
-        messages = [
-            {"role": "system", "content": request.system_prompt},
-            {"role": "user", "content": request.user_prompt},
-        ]
-
-        payload = {
-            "model": self.config.model,
-            "messages": messages,
-            "stream": False,
-            "temperature": request.temperature or self.config.temperature,
-            "top_p": request.top_p or self.config.top_p,
-            "format": request.schema,  # JSON schema constraint
-        }
-
-        if request.thinking:
-            payload["thinking"] = True
-
-        if request.max_tokens:
-            payload["num_predict"] = request.max_tokens
-
-        try:
-            resp = requests.post(
-                f"{self.base_url}/api/chat",
-                json=payload,
-                timeout=self.timeout,
-            )
-            resp.raise_for_status()
-        except requests.Timeout as e:
-            raise TimeoutError(
-                f"Ollama request timed out after {self.timeout}s"
-            ) from e
-        except requests.RequestException as e:
-            raise ConnectionError(f"Ollama connection failed: {e}") from e
-
-        data = resp.json()
+        payload = self._payload(request)
+        payload["format"] = request.schema
+        data = self._chat(payload)
         text = data["message"]["content"]
 
         try:
@@ -194,7 +157,7 @@ class OllamaProvider(LLMProvider):
         return LLMStructuredResponse(
             text=text,
             parsed=parsed,
-            stop_reason=data.get("stop_reason", "stop"),
+            stop_reason=data.get("done_reason") or "stop",
             usage={
                 "prompt_tokens": data.get("prompt_eval_count", 0),
                 "completion_tokens": data.get("eval_count", 0),

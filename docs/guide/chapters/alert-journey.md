@@ -4,8 +4,8 @@ This chapter follows one alert through the monorepo, so that each level page aft
 in one picture. It states no rule of its own: each step names the page that owns it, and each
 diagram names the section it draws.
 
-> **Decided, not implemented.** The journey below is what the level pages decide. Which part of
-> it runs as code today is [What exists today](./status.md).
+The journey below is what the level pages decide. Which part of it runs as code is
+[What runs and what is decided](./status.md).
 
 ## The chain
 
@@ -25,6 +25,11 @@ Each arrow is a call, and nothing calls back up the chain. The rule and what hol
 [the project page](../../../AGENTS.md); what each part decides is its own page under *The levels*.
 
 ## One alert, from the clock to the log
+
+> **Decided, not built.** The earlier alerts and rejection reasons handed to each run,
+> `calcular_impacto`, and action tools that keep their drafts. Of this diagram, `apps/api`
+> advances the day, walks `detectar` over the kernel's KPIs, runs the model leaves, which read the
+> kernel, to the pause at `aprobar.decision`, records the decision and resumes.
 
 ```mermaid
 sequenceDiagram
@@ -67,25 +72,29 @@ sequenceDiagram
   Note over A: every step lands in the bitácora
 ```
 
-*Draws: `AGENTS.md` § How the parts connect; `packages/agents/AGENTS.md` § The orchestrator's graph*
+*Draws: `AGENTS.md` § How the parts connect; `packages/agents/AGENTS.md` § The day run; `packages/agents/AGENTS.md` § The alert graph*
 
-The steps, each with the page that owns it:
+Each step, and the section of the page that owns it:
 
-- **The clock.** `apps/api` owns the simulated day, which replaces `fecha_corte()`
-  ([apps/api](../../../apps/api/AGENTS.md)); which views ignore that day is the clock section of
-  [data](../../../data/AGENTS.md).
-- **Detection.** `Vigía` fires on written thresholds only, one alert per metric and entity, and
-  computes pesos at risk in SQL ([packages/agents](../../../packages/agents/AGENTS.md)).
-- **Explanation.** `Analista` proves a cause by entity, time and direction, or answers that the
-  evidence is not enough; when its cause already explains another open alert, the orchestrator
-  merges the two.
-- **Proposal.** `Estratega` picks only actions its skill lists for the metric, and every amount comes
-  from `calcular_impacto` ([packages/tools](../../../packages/tools/AGENTS.md)).
-- **Approval.** The graph pauses before `Ejecutor` and resumes only with a decision `apps/api`
-  recorded; a rejection's reason is kept and routed back to the agent it concerns.
-- **Execution.** The orchestrator calls the action tool in code with the approved parameters
-  unchanged, so a second run has no effect; `Ejecutor`'s model only writes the body of an email.
-- **The log.** Every step lands in the `bitácora`, which `apps/api` owns and nothing updates.
+- **The clock**: [apps/api](../../../apps/api/AGENTS.md), *The clock*; which views ignore the
+  simulated day, [data](../../../data/AGENTS.md), *The simulated clock*.
+- **Detection**: what `Vigía` fires on, how often it raises an alert again and where its pesos at
+  risk come from, [packages/agents](../../../packages/agents/AGENTS.md), *`Vigía` detects*; the
+  nodes it walks, [the tree](../../../packages/agents/arbol/AGENTS.md), *The stages*.
+- **Order and merging**: [packages/agents](../../../packages/agents/AGENTS.md), *The day run*.
+- **Explanation**: [packages/agents](../../../packages/agents/AGENTS.md), *`Analista` explains,
+  and answers the chat*.
+- **Proposal**: [packages/agents](../../../packages/agents/AGENTS.md), *`Estratega` proposes*; the
+  figures, [packages/tools](../../../packages/tools/AGENTS.md), *The impact calculator*.
+- **Approval**: the checks on a decision, [apps/api](../../../apps/api/AGENTS.md), *Decisions and
+  roles*; the pause and the resume, [packages/agents](../../../packages/agents/AGENTS.md), *The
+  alert graph*; the routing of a rejection's reason, the same page, *Routing*.
+- **Execution**: the check that the condition still holds,
+  [the tree](../../../packages/agents/arbol/AGENTS.md), *The node ejecutar.vigente*; what
+  `Ejecutor` may do, [packages/agents](../../../packages/agents/AGENTS.md), *`Ejecutor` acts after
+  a decision*; why a second run has no effect, [packages/tools](../../../packages/tools/AGENTS.md),
+  *Actions and idempotency*.
+- **The log**: [apps/api](../../../apps/api/AGENTS.md), *The `bitácora`*.
 
 ## The lifecycle of an alert
 
@@ -105,9 +114,7 @@ stateDiagram-v2
   ejecutada --> [*]
 ```
 
-*Draws: `apps/api/AGENTS.md` § Decisions*
+*Draws: `apps/api/AGENTS.md` § The alert lifecycle*
 
-The orchestrator proposes each transition an agent causes, and `apps/api` proposes the ones a
-person causes; `apps/api` validates and persists all of them, because it is the only part with
-storage. `unida` is the one state the brief's lifecycle lacks, and
-[apps/api](../../../apps/api/AGENTS.md) says why it exists.
+Who proposes each transition, who records it, and why `unida` exists beside the brief's states is
+[apps/api](../../../apps/api/AGENTS.md), *The alert lifecycle*.

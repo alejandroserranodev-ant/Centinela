@@ -19,9 +19,10 @@ from typing import Any, Mapping, Optional
 logger = logging.getLogger(__name__)
 
 
-# Token costs (USD) - configure per provider
+TOKENS_PER_RATE = 1000
+
 TOKEN_COSTS = {
-    "ollama": {"input": 0.0, "output": 0.0},  # Local, free
+    "ollama": {"input": 0.0, "output": 0.0},
     "openai": {
         "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
         "gpt-4-turbo": {"input": 0.01, "output": 0.03},
@@ -60,7 +61,7 @@ class TokenUsage:
         input_rate = rates.get("input", 0.0)
         output_rate = rates.get("output", 0.0)
 
-        return (self.prompt_tokens * input_rate) + (self.completion_tokens * output_rate)
+        return ((self.prompt_tokens * input_rate) + (self.completion_tokens * output_rate)) / TOKENS_PER_RATE
 
 
 @dataclass
@@ -113,7 +114,7 @@ class AlertMetrics:
     day: str
     start_time: datetime = field(default_factory=datetime.utcnow)
     end_time: Optional[datetime] = None
-    status: str = "processing"  # processing, completed, failed
+    status: str = "processing"
 
     agent_metrics: dict[str, AgentMetrics] = field(default_factory=dict)
 
@@ -248,7 +249,6 @@ class LangfuseTracer:
 
         if self.enabled:
             try:
-                # Would import langfuse here
                 logger.info("Langfuse tracing enabled")
             except ImportError:
                 logger.warning("Langfuse not installed, tracing disabled")
@@ -265,8 +265,6 @@ class LangfuseTracer:
         if not self.enabled:
             return
 
-        # Would send to Langfuse here
-        # For now, just log
         logger.info(
             f"Langfuse trace: {alert_id}",
             extra={
@@ -314,7 +312,6 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     Returns:
         Root logger configured with JSON-structured format
     """
-    # Basic configuration; in production, use Python-json-logger or similar
     handler = logging.StreamHandler()
     formatter = logging.Formatter(
         '{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "extra": "%(extra)s"}',

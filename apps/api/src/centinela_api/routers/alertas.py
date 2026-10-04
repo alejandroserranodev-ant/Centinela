@@ -8,7 +8,7 @@ import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, decisiones, simulacion
+from .. import bitacora, ciclo_vida, decisiones, simulacion
 from ..agentes import get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..config import ROLES_CON_DECISION
@@ -84,9 +84,6 @@ async def decidir(
         for tipo, detalle in eventos:
             bitacora.registrar(conn, nueva.id, tipo, actor, detalle, dia)
 
-    # Resume the orchestrator to run Ejecutor (approve/edit) or close (reject).
-    # If the graph state is missing (e.g. server restarted), log and continue —
-    # the decision is already persisted in the DB.
     if isinstance(decision, (DecisionApprove, DecisionEdit)):
         try:
             orq = get_orchestrator()
@@ -103,6 +100,7 @@ async def decidir(
 
             ea = state.get("executed_action")
             if ea and isinstance(ea, dict):
+                ciclo_vida.transicionar(nueva.status, "executed")
                 nueva = nueva.model_copy(update={
                     "status": "executed",
                     "executed_action": ExecutedAction(
@@ -120,7 +118,14 @@ async def decidir(
                     )
 
         except Exception as e:
-            logger.warning(f"Orchestrator resume skipped for {id}: {e}")
+            logger.error(f"Orchestrator resume failed for {id}: {e}", exc_info=True)
+            with conn.transaction():
+                bitacora.registrar(
+                    conn, nueva.id, "result",
+                    ActorAgent(agent="ejecutor"),
+                    f"La acción aprobada no se ejecutó: {e}",
+                    dia,
+                )
 
     elif isinstance(decision, DecisionReject):
         try:
@@ -132,6 +137,6 @@ async def decidir(
                 "simulated_day": dia.isoformat(),
             })
         except Exception as e:
-            logger.warning(f"Orchestrator reject skipped for {id}: {e}")
+            logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
     return nueva

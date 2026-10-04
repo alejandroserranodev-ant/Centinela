@@ -257,23 +257,18 @@ class CentinelaMultiAgentValidator:
         print("Provider: Claude Sonnet (Anthropic)")
         print("="*70)
 
-        # Fase 1
         report1 = self.fase_1_detectar()
         self.reports.append(report1)
 
-        # Fase 2
         report2 = self.fase_2_explicar(report1.output)
         self.reports.append(report2)
 
-        # Fase 3
         report3 = self.fase_3_proponer(report2.output)
         self.reports.append(report3)
 
-        # Fase 4
         report4 = self.fase_4_ejecutar(report3.output)
         self.reports.append(report4)
 
-        # Reporte final
         self.print_final_report()
 
     def print_final_report(self):

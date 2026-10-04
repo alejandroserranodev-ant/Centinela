@@ -1,8 +1,8 @@
 # Start here
 
-This guide is for a developer who does not know Centinela yet. Read it top to bottom once: it goes
+This guide is for a developer who does not know Centinela. Read it top to bottom once: it goes
 from what the challenge asks, through how the parts connect and what binds every change, to each
-part's decisions, the two designs that bind the agents next, and what runs today.
+part's decisions, the two designs that bind the agents, and what runs.
 
 ## The reading order
 
@@ -14,18 +14,18 @@ part's decisions, the two designs that bind the agents next, and what runs today
 | *The levels* | what each part decides, from the data up to the screen, then the evaluation set |
 | [The decision tree](./decision-tree.md) | how the orchestrator decides who goes next, on which standards, and how the tree grows |
 | [The KPI kernel](./kpi-kernel.md) | where every business measure comes from, and how a new one is born without any agent writing to a database |
-| [What exists today](./status.md) | what is code, what is only decided, and what is roadmap |
+| [What runs and what is decided](./status.md) | what is code, what is only decided, and what is roadmap |
 | *Conventions* | which files a machine writes, where a debt goes, and how a page is written |
 
 The project page is written for whoever changes the repository: its table routes a task to the
 page that owns it. Here it is read once, for its vocabulary, its picture of the chain and its rules.
 
-## The three states of a claim
+## What runs and what is only decided
 
-Each claim is *Implemented*, *Decided, not implemented*, or *Roadmap*. A chapter or section that
-describes a design with no code carries a warning box saying so. [What exists today](./status.md)
-is the one page that sorts the parts into the three states, and it is built from the commit the
-guide was published from.
+A page states a design in the present tense whether or not code runs it, and a section with no
+code behind it opens with a warning box saying so. [What runs and what is decided](./status.md)
+sorts every claim into its state and part by part; the code inventory under it is generated from
+the commit the guide was published from.
 
 ## How this guide is made
 

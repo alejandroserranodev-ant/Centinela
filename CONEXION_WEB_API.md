@@ -1,135 +1,53 @@
-# Conexión web ↔ API
+# Running the web against the API
 
-## Flujo HTTP: apps/web llamando al apps/api
+This page owns one procedure that crosses three levels: starting the database, `apps/api` and
+`apps/web` on one machine so the screens talk to the real API. It sits at the root rather than on
+a level's page, a departure from the rule that a fact lives on the level that owns it, because the
+team keeps the file structure as it is. Every fact it does not own is linked to the page that does.
 
-```
-┌──────────────────┐                    ┌──────────────────┐
-│   apps/web       │                    │    apps/api      │
-│  (React/Vite)    │                    │   (FastAPI)      │
-└──────────────────┘                    └──────────────────┘
-        │                                       │
-        │ GET /simulacion/dia-actual            │
-        ├──────────────────────────────────────→│
-        │                                       │
-        │  {"dia": "2026-01-15"}                │
-        │←──────────────────────────────────────┤
-        │                                       │
-        │ GET /alertas?estado=propuesta         │
-        ├──────────────────────────────────────→│
-        │                                       │
-        │  Alert[]                              │
-        │←──────────────────────────────────────┤
-        │                                       │
-        │ POST /simulacion/avanzar (SSE)        │
-        ├──────────────────────────────────────→│
-        │                                       │
-        │ event: step (Vigía)                   │
-        │ event: alert (nueva)                  │
-        │ event: end (newAlerts: [...])         │
-        │←──────────────────────────────────────┤
-        │ (mientras los agentes trabajan)       │
-        │                                       │
-        │ POST /alertas/{id}/decision           │
-        ├──────────────────────────────────────→│
-        │ Headers: X-User-Name, X-User-Role     │
-        │                                       │
-        │  Alert (status=approved)              │
-        │←──────────────────────────────────────┤
-        │                                       │
-        │ POST /chat (SSE)                      │
-        ├──────────────────────────────────────→│
-        │                                       │
-        │ event: step (Analista)                │
-        │ event: chunk (respuesta...)           │
-        │ event: end (ChatMessage)              │
-        │←──────────────────────────────────────┤
-        │                                       │
-        │ GET /bitacora?alertId=...             │
-        ├──────────────────────────────────────→│
-        │                                       │
-        │  LogEvent[]                           │
-        │←──────────────────────────────────────┤
-```
+## The three processes
 
-## Archivos de configuración
+Each runs in its own terminal, in this order, because the API reads the database on its first
+request and the web reads the API on load.
 
-### apps/web/.env
+**1. The database**, from `data/`. The compose and what it loads on its first start are
+[`data/AGENTS.md`](./data/AGENTS.md#setting-up-the-database). The API's own schema `api` is not
+among them, so it is applied once, from `apps/api/`:
+
 ```bash
-VITE_API_URL=http://localhost:8000
+psql "postgresql://centinela:centinela@localhost:5432/centinela" -f sql/01_esquema.sql
 ```
 
-(Production: `https://api.centinela.example.com`)
+**2. The API**, from `apps/api/`, in a Python 3.12 environment, because `packages/agents` asks for
+it. `apps/api/pyproject.toml` declares `centinela-agents`, which declares `centinela-tools`, and
+pip finds both only at the paths the command names. The agents call OpenAI with the key of
+`.env.local` at the root, as [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) says:
 
-### apps/web/src/api/
-- `config.ts` — URL base, headers, usuario por defecto
-- `http-client.ts` — Implementación fetch real (reemplaza fixtures)
-- `types.ts` — Tipos TypeScript (sincronizados con apps/api/modelos.py)
-- `client.ts` — Reexporta http-client
-
-## Setup: Levantar todo
-
-### 1. Base de datos y API
 ```bash
-# Terminal 1: Base de datos
-cd data
-docker-compose up -d
-
-# Terminal 2: API
-cd apps/api
-pip install -e .
+pip install -e ../../packages/tools -e ../../packages/agents -e ".[dev]"
 uvicorn centinela_api.main:app --reload
-# http://localhost:8000
-# Swagger: http://localhost:8000/docs
 ```
 
-### 2. Web
+It listens on `http://localhost:8000` and serves its OpenAPI at `http://localhost:8000/docs`.
+What it serves and refuses is [`apps/api/AGENTS.md`](./apps/api/AGENTS.md).
+
+**3. The web**, from `apps/web/`:
+
 ```bash
-# Terminal 3: Web
-cd apps/web
 npm install
-VITE_API_URL=http://localhost:8000 npm run dev
-# http://localhost:5173
+npm run dev
 ```
 
-## Flujo del usuario en la web
+Vite serves it on `http://localhost:5173`. What the screens read from the API, and where the
+fetch client and the API disagree, is [`apps/web/AGENTS.md`](./apps/web/AGENTS.md).
 
-1. **Load**: Web hace GET `/simulacion/dia-actual` → obtiene día simulado
-2. **Inbox**: GET `/alertas?estado=propuesta` → lista alertas (vacía hasta que Vigía cree)
-3. **Clock**: Click "Siguiente día" → POST `/simulacion/avanzar` (SSE)
-   - Ve a Vigía revisando indicadores
-   - Ver alertas nuevas llegar (cuando Vigía esté implementado)
-4. **Alert detail**: GET `/alertas/{id}` → muestra causa, evidencia, acciones
-5. **Decision**: POST `/alertas/{id}/decision` (gerente/lider_proceso)
-   - Aprobada → se pone en verde
-   - Ejecutada → muestra resultado (cuando Ejecutor esté implementado)
-6. **Chat**: POST `/chat` (SSE) → responde "sin evidencia suficiente" por ahora
-7. **Audit**: GET `/bitacora?alertId=...` → historial completo
+## Which `.env` each process reads
 
-## Estado actual (sin agentes)
+| Process | Reads | What it needs there |
+|---|---|---|
+| the web | `apps/web/.env`, through Vite | `VITE_API_URL`; without it the client calls `http://localhost:8000` |
+| the API | the versioned `.env` at the root, then `.env.local` over it, as [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#commands) says | `DSN_ADMIN`, `AGENT_SECRET_KEY`, the kernel's DSNs and the model provider's variables of [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) |
 
-✅ La web conecta al API
-✅ GET endpoints funcionan (lista alertas, obtiene detalle, bitácora)
-✅ POST /alertas/{id}/decision funciona (cambios de estado)
-❌ POST /simulacion/avanzar devuelve `newAlerts: []` (Vigía no existe)
-❌ POST /chat devuelve "sin evidencia suficiente" (Analista no existe)
-❌ POST /alertas/{id}/decision nunca llama a Ejecutor (no existe)
-
-## Próximos pasos
-
-Cuando packages/agents esté lista:
-1. POST /simulacion/avanzar llamará a Vigía → creará alertas
-2. POST /chat llamará a Analista → responderá preguntas
-3. POST /alertas/{id}/decision llamará a Ejecutor → ejecutará acciones
-
-La web no cambia; el API la conecta con los agentes.
-
-## Testing con Swagger UI
-
-Abre http://localhost:8000/docs y prueba:
-
-1. `GET /simulacion/dia-actual` → `{"dia": "2026-01-15"}`
-2. `GET /alertas` → `[]` (vacío, sin alertas creadas aún)
-3. `POST /simulacion/avanzar?dias=1` → mira la respuesta SSE (sin alertas por ahora)
-4. Copia una alerta desde fixtures y `POST /interno/alertas` (si la necess) para probar decisiones
-
-Una vez Vigía esté implementada, `/simulacion/avanzar` creará alertas automáticamente.
+Both files are versioned with local values and no secret, so a clone runs with no copying. Without
+`LLM_MODEL`, a day run logs the provider's error and ends with no new alerts, which looks like a
+quiet day.

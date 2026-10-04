@@ -12,7 +12,7 @@ exceeds `plazo_dias`.
 1. Report H1 as the main cause if it holds. Report H2 as contributing if it holds.
 2. Report H3 as main only if H1 is refuted. If H1 and H3 are refuted and H2 holds, report H2 as main.
 3. If H1 holds and the input lists an open `dias_pago_prom` or `concentracion_vencida_pct` alert
-   whose `entidad` is the entity, set `same_cause_as` to its `id`; if both are listed, choose the
+   whose `entity` is the entity, set `same_cause_as` to its `id`; if both are listed, choose the
    `dias_pago_prom` one. Otherwise, set none.
 4. Add to `assumptions` the limits of `v_dias_pago_mensual` and `v_cartera_cliente` the clock section
    of `data/AGENTS.md` names, and that months whose invoices are still unpaid have no row.

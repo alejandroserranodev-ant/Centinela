@@ -16,23 +16,21 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-# Sensitive patterns to mask before LLM
 SENSITIVE_PATTERNS = {
     "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-    "phone": r"\b(?:\+\d{1,3}[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})\b",
-    "name": r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b",  # Capitalized names
-    "id_passport": r"\b\d{8,10}[A-Z]?\b",  # Spanish DNI/NIE
+    "phone": r"\+\d{1,3}(?:[-.\s]?\d{2,4}){2,4}\b|\b\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
+    "name": r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b",
+    "id_passport": r"\b\d{8,10}[A-Z]?\b",
     "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
-    "api_key": r"sk-[a-zA-Z0-9]{20,}",
-    "token": r"ghp_[a-zA-Z0-9]{36,}",
+    "api_key": r"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}",
+    "token": r"ghp_[A-Za-z0-9]{30,}",
     "password": r"password['\"]?\s*[:=]\s*['\"]?[^\s'\"]+",
 }
 
-# Secret patterns NEVER allowed in logs/prompts
 SECRET_PATTERNS = {
-    "openai_key": r"sk-[a-zA-Z0-9]{20,}",
-    "anthropic_key": r"sk-ant-[a-zA-Z0-9]{20,}",
-    "github_token": r"ghp_[a-zA-Z0-9]{36,}",
+    "openai_key": r"sk-(?!ant-)(?:proj-)?[A-Za-z0-9_-]{20,}",
+    "anthropic_key": r"sk-ant-[A-Za-z0-9_-]{20,}",
+    "github_token": r"ghp_[A-Za-z0-9]{30,}",
     "aws_access": r"AKIA[0-9A-Z]{16}",
 }
 
@@ -80,7 +78,7 @@ def detect_secrets(text: str) -> list[dict[str, Any]]:
         for match in re.finditer(pattern, text):
             secrets.append({
                 "type": secret_type,
-                "value": match.group(0)[:10] + "***",  # Partial exposure
+                "value": match.group(0)[:10] + "***",
                 "start": match.start(),
                 "end": match.end(),
             })
@@ -154,7 +152,6 @@ def restore_data(masked_text: str, replacements: dict[str, str]) -> str:
         if placeholder in restored:
             restored = restored.replace(placeholder, original)
 
-    # Check for orphaned placeholders (LLM invented placeholders)
     orphaned = re.findall(r"{{MASKED_[A-Z_]+_\d+}}", restored)
     if orphaned:
         logger.warning(
@@ -181,8 +178,8 @@ class DataMasker:
             action_id: Action ID (for consistent masking across retries)
         """
         self.action_id = action_id
-        self.mapping: dict[str, str] = {}  # original_value → placeholder
-        self.reverse_mapping: dict[str, str] = {}  # placeholder → original_value
+        self.mapping: dict[str, str] = {}
+        self.reverse_mapping: dict[str, str] = {}
         self.counter = 0
 
     def mask(self, text: str, data_type: str = "generic") -> str:
@@ -196,11 +193,9 @@ class DataMasker:
         Returns:
             Masked text (same masking as previous calls for same text)
         """
-        # If already masked, return cached mapping
         if text in self.mapping:
             return self.mapping[text]
 
-        # New value: create placeholder
         self.counter += 1
         placeholder = f"{{{{MASKED_{data_type.upper()}_{self.counter}}}}}"
 
@@ -228,7 +223,6 @@ class DataMasker:
         for placeholder, original in self.reverse_mapping.items():
             restored = restored.replace(placeholder, original)
 
-        # Check for orphaned placeholders
         orphaned = re.findall(r"{{MASKED_[A-Z_]+_\d+}}", restored)
         if orphaned:
             logger.error(

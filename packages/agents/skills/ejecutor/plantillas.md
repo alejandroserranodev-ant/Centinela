@@ -1,7 +1,8 @@
 # Ejecutor: the body of an email draft
 
-An email draft is the only text you write. `FIN-POL-004 §6` sets its tone for every collection
-message, and the same tone applies to every draft: courteous, in writing, copied to the seller.
+At the leaf `ejecutar`, the body of an email draft is the text you write. `FIN-POL-004 §6` sets
+its tone for every collection message, and the same tone applies to every draft: courteous, in
+writing, copied to the seller.
 
 ## Structure
 

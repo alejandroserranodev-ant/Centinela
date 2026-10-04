@@ -38,8 +38,6 @@ class TestDataMasking:
         text = "Dear Juan García"
         masked = mask_data(text)
 
-        # May or may not mask depending on capitalization pattern
-        # García alone might not match without Juan
         assert isinstance(masked, str)
 
     def test_mask_credit_card(self):
@@ -52,8 +50,6 @@ class TestDataMasking:
     def test_mask_api_key(self):
         """Mask API keys (should be caught by secret detector first)."""
         text = "sk-proj-abc123def456ghi789jkl012"
-        # This is a SECRET, not just data
-        # Should be caught by detect_secrets first
         secrets = detect_secrets(text)
         assert len(secrets) > 0
 
@@ -62,7 +58,6 @@ class TestDataMasking:
         text = "Contact Juan García at juan@example.com or +34 912 345 678"
         masked = mask_data(text)
 
-        # Should mask email and phone
         assert "juan@example.com" not in masked or "{{MASKED" in masked
         assert "912 345 678" not in masked or "{{MASKED" in masked
 
@@ -72,7 +67,7 @@ class TestSecretDetection:
 
     def test_detect_openai_key(self):
         """Detect OpenAI API key."""
-        text = "key: sk-proj-dABcSRLVnt9kUU46bbBz8iyzu"
+        text = "key: sk-proj-EXAMPLEnotARealKey0000000"
         secrets = detect_secrets(text)
 
         assert len(secrets) > 0
@@ -181,7 +176,6 @@ class TestDataMaskerIdempotency:
         """Unmask raises error if LLM introduced new placeholders."""
         masker = DataMasker("action_001")
 
-        # Simulating LLM output with unknown placeholder
         text_with_orphan = "Contact {{MASKED_EMAIL_999}} for details"
 
         with pytest.raises(ValueError, match="Unknown placeholders"):
@@ -230,7 +224,6 @@ class TestSecurePrompt:
         assert "INSTRUCTION" in user
         assert "POLICY" in user
         assert "DATA" in user
-        # Ensure order
         assert user.index("INSTRUCTION") < user.index("POLICY")
         assert user.index("POLICY") < user.index("DATA")
 
@@ -309,8 +302,6 @@ class TestIdempotency:
 
     def test_action_key_components(self):
         """Idempotency key uses alert_id + action_id + decision_id."""
-        # Expected key: hash(alert_id + action_id + decision_id)
-        # Same inputs → same key → same output
 
         alert_id = "alert_001"
         action_id = "action_001"

@@ -48,6 +48,12 @@ class AlertState(TypedDict, total=False):
     events: Annotated[list, operator.add]
 
 
+def subject(state: Mapping[str, Any]) -> tuple[str, str, str]:
+    detection = state.get("detection") or {}
+    entity = ", ".join(str(value) for value in detection.get("entity") or [])
+    return detection.get("metric") or "", entity, state.get("simulated_day") or ""
+
+
 def field_value(state: Mapping[str, Any], path: str) -> Any:
     value: Any = state
     for key in path.split(".")[1:]:

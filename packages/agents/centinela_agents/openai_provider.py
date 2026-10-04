@@ -34,6 +34,16 @@ except ImportError:
     )
 
 
+def usage_of(response: Any) -> dict[str, int]:
+    """Tokens of one call; cached_tokens is the part of the prompt OpenAI served from its prompt cache."""
+    details = getattr(response.usage, "prompt_tokens_details", None)
+    return {
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "cached_tokens": getattr(details, "cached_tokens", 0) or 0,
+    }
+
+
 class OpenAIProvider(LLMProvider):
     """Language model provider using OpenAI API."""
 
@@ -58,11 +68,11 @@ class OpenAIProvider(LLMProvider):
                 "Or create .env file and use: from dotenv import load_dotenv; load_dotenv()"
             )
 
-        # Validate API key format
         if not api_key.startswith("sk-"):
             logger.warning("API key does not start with 'sk-', may be invalid")
 
-        self.client = OpenAI(api_key=api_key)
+        self.timeout = config.timeout_seconds
+        self.client = OpenAI(api_key=api_key, timeout=self.timeout)
         logger.info(f"OpenAI provider initialized with model: {config.model}")
 
         if not skip_health_check and not self._health_check():
@@ -82,20 +92,12 @@ class OpenAIProvider(LLMProvider):
     def _health_check(self) -> bool:
         """Internal health check implementation."""
         try:
-            # List models to verify API access
             self.client.models.list()
             logger.debug("OpenAI API health check passed")
             return True
         except (APIError, APIConnectionError, APITimeoutError) as e:
             logger.error(f"OpenAI API health check failed: {e}")
-            raise ValueError(
-                "OpenAI API health check failed.\n"
-                "Possible causes:\n"
-                "  - Invalid API key\n"
-                "  - API key revoked or expired\n"
-                "  - Network connectivity issue\n"
-                "  - Org/project not configured correctly"
-            ) from e
+            return False
 
     def generate_text(self, request: LLMRequest) -> LLMResponse:
         """
@@ -122,10 +124,6 @@ class OpenAIProvider(LLMProvider):
         if request.max_tokens:
             kwargs["max_tokens"] = request.max_tokens
 
-        # Note: thinking (extended thinking) requires gpt-4o or later, not all models
-        if request.thinking and "4o" in self.config.model.lower():
-            kwargs["thinking"] = {"type": "enabled"}
-
         try:
             response = self.client.chat.completions.create(**kwargs)
         except APITimeoutError as e:
@@ -138,10 +136,7 @@ class OpenAIProvider(LLMProvider):
         return LLMResponse(
             text=response.choices[0].message.content or "",
             stop_reason=response.choices[0].finish_reason or "stop",
-            usage={
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-            },
+            usage=usage_of(response),
             model=self.config.model,
         )
 
@@ -149,10 +144,11 @@ class OpenAIProvider(LLMProvider):
         self, request: LLMStructuredRequest
     ) -> LLMStructuredResponse:
         """
-        Generate structured JSON using OpenAI API with JSON mode.
+        Generate structured JSON using OpenAI's json_schema response format.
 
-        OpenAI enforces JSON schema through response_format constraint
-        and a system instruction. Output is guaranteed valid JSON.
+        The schema goes in response_format, not in the prompt, so the system prompt stays the
+        skill alone and OpenAI's prompt cache keeps its prefix. strict is off, because the
+        leaves' schemas leave fields optional, which strict mode refuses.
 
         Args:
             request: LLMStructuredRequest with JSON schema
@@ -163,14 +159,8 @@ class OpenAIProvider(LLMProvider):
         Raises:
             ValueError: if output does not match schema (manual validation needed)
         """
-        schema_str = json.dumps(request.schema)
-        system_with_schema = (
-            f"{request.system_prompt}\n\n"
-            f"You MUST respond with valid JSON matching this schema:\n{schema_str}"
-        )
-
         messages = [
-            {"role": "system", "content": system_with_schema},
+            {"role": "system", "content": request.system_prompt},
             {"role": "user", "content": request.user_prompt},
         ]
 
@@ -179,15 +169,14 @@ class OpenAIProvider(LLMProvider):
             "messages": messages,
             "temperature": request.temperature or self.config.temperature,
             "top_p": request.top_p or self.config.top_p,
-            "response_format": {"type": "json_object"},  # OpenAI JSON mode
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "salida", "schema": request.schema, "strict": False},
+            },
         }
 
         if request.max_tokens:
             kwargs["max_tokens"] = request.max_tokens
-
-        # Note: thinking requires gpt-4o or later
-        if request.thinking and "4o" in self.config.model.lower():
-            kwargs["thinking"] = {"type": "enabled"}
 
         try:
             response = self.client.chat.completions.create(**kwargs)
@@ -211,9 +200,6 @@ class OpenAIProvider(LLMProvider):
             text=text,
             parsed=parsed,
             stop_reason=response.choices[0].finish_reason or "stop",
-            usage={
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-            },
+            usage=usage_of(response),
             model=self.config.model,
         )

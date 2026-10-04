@@ -6,7 +6,7 @@
 <title>Centinela identity</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="../intro/styles.css">
+<link rel="stylesheet" href="../src/arena.generated.css">
 <style>
   :root.arena-light {
     --color-base-100:#ffffff; --color-base-200:#f3f6f7; --color-base-300:#dfe6e9;
@@ -44,7 +44,7 @@
   h1, h2 { font-family: var(--ff-heading); color: var(--ink-heading);
            letter-spacing: var(--track-heading); }
   h1 { font-size: var(--fs-display); line-height: var(--lh-heading); margin-block: 0 var(--sp-2); }
-  h2 { font-size: var(--fs-xl); margin-block: var(--sp-10) var(--sp-2); }
+  h2 { font-size: var(--fs-h4); margin-block: var(--sp-10) var(--sp-2); }
   p, li { line-height: var(--lh-prose); }
   .note { color: var(--ink-muted); font-size: var(--fs-sm); }
   .row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-block: var(--sp-4); }
@@ -52,7 +52,7 @@
   .chip i { display: block; block-size: calc(var(--sp-1) * 14);
             border: var(--bw-surface) solid var(--edge-surface);
             border-radius: var(--r-surface); }
-  .chip span, .swatch { display: block; font-family: var(--ff-mono); font-size: var(--fs-xs);
+  .chip span, .swatch { display: block; font-family: var(--font-mono); font-size: var(--fs-xs);
                color: var(--ink-muted); margin-block-start: var(--sp-1); }
   .dark .chip span { color: var(--color-neutral-content); }
   .box { inline-size: calc(var(--sp-1) * 26); block-size: calc(var(--sp-1) * 18);
@@ -63,10 +63,10 @@
            border-block-end: var(--bw-separator) solid var(--edge-separator);
            vertical-align: top; font-size: var(--fs-sm); }
   th { color: var(--ink-muted); font-weight: var(--fw-heading); }
-  code { font-family: var(--ff-mono); font-size: var(--fs-xs); color: var(--ink-muted); }
+  code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--ink-muted); }
   .sample { border: var(--bw-surface) solid var(--edge-surface); border-radius: var(--r-sm);
             padding: var(--sp-4); background: var(--color-base-100); }
-  .sample .money { font-family: var(--font-mono); font-size: var(--fs-xl); color: var(--ink-heading); }
+  .sample .money { font-family: var(--font-mono); font-size: var(--fs-h4); color: var(--ink-heading); }
   .sample .label { font-family: var(--font-mono); text-transform: uppercase; font-size: var(--fs-xs);
                    letter-spacing: 0.08em; color: var(--ink-muted); }
   .sample .voice { display: inline-block; margin-block-start: var(--sp-3); padding: var(--sp-2) var(--sp-4);
@@ -79,14 +79,16 @@
 
 <h1>Centinela identity</h1>
 <p>
-  The appearance of Centinela, written down before any screen is built. Each section answers a
-  question Arena's style kernel asks. Once this page is approved, <code>arena.config.json</code>
-  and the style plugin under <code>design/centinela/</code> restate it in the form a build reads.
+  The appearance of Centinela, with the reason for each choice. Each section answers a question
+  Arena's style kernel asks, and <code>arena.config.json</code> and the style plugin under
+  <code>design/centinela/</code> restate it in the form a build reads. A change to either starts
+  here and is approved here.
 </p>
 <p class="note">
-  Until <code>arena-to-prod</code> has run in <code>apps/web</code>, this page reads Arena's
-  reference sheet: the palette and the faces below are Centinela's, while the radius ladder is
-  still drawn from Arena's reference plugin.
+  This page reads the stylesheet <code>arena-to-prod</code> writes from the config and the plugin,
+  so the palette, the faces and the radius ladder below are the ones the screens wear. Open it
+  through <code>npm run dev</code>, at <code>/design/identity.html</code>, because that stylesheet
+  imports Arena's sheets by package name and only Vite resolves them.
 </p>
 
 <h2>The product</h2>
@@ -176,7 +178,7 @@
 </p>
 <div class="sample">
   <div class="label">Margen · línea Hogar · confianza alta</div>
-  <div style="font-family: var(--ff-heading); font-weight: 600; font-size: var(--fs-xl); color: var(--ink-heading); margin-block: var(--sp-2)">El margen de la línea Hogar cayó 6 puntos en 3 semanas</div>
+  <div style="font-family: var(--ff-heading); font-weight: 600; font-size: var(--fs-h4); color: var(--ink-heading); margin-block: var(--sp-2)">El margen de la línea Hogar cayó 6 puntos en 3 semanas</div>
   <div style="font-size: var(--fs-md)">El proveedor X subió el costo de 4 SKU y el precio de venta no se ajustó.</div>
   <div class="money" style="margin-block-start: var(--sp-3)">$ 42.000.000 / mes recuperables</div>
   <span class="voice">Aprobar</span>

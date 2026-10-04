@@ -1,4 +1,5 @@
 import { API_BASE_URL, API_HEADERS, getDecisionHeaders } from './config';
+import { readSse } from './sse';
 import type {
   AdvanceEvent,
   AgentStep,
@@ -41,10 +42,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export async function getSimulationState(): Promise<SimulationState> {
-  // Get current simulated day
   const dia = await fetchJson<{ dia: string }>(`${API_BASE_URL}/simulacion/dia-actual`);
-  // For now, return the simulated day as both simulatedDay and user data
-  // (User is hardcoded in config, real authentication would come later)
   return {
     simulatedDay: dia.dia,
     user: { name: 'Usuario Demo', role: 'gerente' },
@@ -61,54 +59,24 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
     throw new ApiError(response.status, response.statusText);
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) {
+  if (!response.body) {
     throw new Error('No response body');
   }
 
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let currentEvent = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (currentEvent === 'end') {
-              yield {
-                event: 'end',
-                data: { simulatedDay: data.simulatedDay, newAlerts: data.newAlerts },
-              };
-            } else if (currentEvent === 'agent_step') {
-              yield { event: 'step', data: data as AgentStep };
-            }
-          } catch (e) {
-            console.error('Failed to parse SSE event:', line, e);
-          }
-          currentEvent = '';
-        }
-      }
+  for await (const { event, data } of readSse(response.body)) {
+    if (event === 'step') {
+      yield { event: 'step', data: data as AgentStep };
+    } else if (event === 'alert') {
+      yield { event: 'alert', data: data as Alert };
+    } else if (event === 'end') {
+      yield { event: 'end', data: data as { simulatedDay: string; newAlerts: string[] } };
     }
-  } finally {
-    reader.releaseLock();
   }
 }
 
 export async function listAlerts(filter: AlertFilter = {}): Promise<Alert[]> {
   const params = new URLSearchParams();
   if (filter.status) {
-    // Convert status to Spanish for API
     const statusMap: Record<string, string> = {
       new: 'nueva',
       analyzing: 'en_analisis',
@@ -130,7 +98,6 @@ export async function getAlert(id: string): Promise<Alert> {
 }
 
 export async function decide(id: string, decision: Decision): Promise<Alert> {
-  // Convert decision format if needed
   const payload =
     decision.kind === 'edit'
       ? { kind: 'edit', actionId: decision.actionId, parameters: decision.parameters }
@@ -156,46 +123,22 @@ export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator
     throw new ApiError(response.status, response.statusText);
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) {
+  if (!response.body) {
     throw new Error('No response body');
   }
 
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const event = data.event as string;
-            if (event === 'step') {
-              yield { event: 'step', data: data };
-            } else if (event === 'end') {
-              yield { event: 'end', data: data as ChatMessage };
-            }
-          } catch (e) {
-            console.error('Failed to parse SSE event:', line, e);
-          }
-        }
-      }
+  for await (const { event, data } of readSse(response.body)) {
+    if (event === 'step') {
+      yield { event: 'step', data: data as AgentStep };
+    } else if (event === 'chunk') {
+      yield { event: 'chunk', data: data as { text: string } };
+    } else if (event === 'end') {
+      yield { event: 'end', data: data as ChatMessage };
     }
-  } finally {
-    reader.releaseLock();
   }
 }
 
 export async function getInboxSummary(): Promise<InboxSummary> {
-  // Compute summary from alerts in 'proposed' status
   const alerts = await listAlerts({ status: 'proposed' });
   return {
     moneyAtRisk: {
@@ -287,7 +230,6 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function saveSettings(next: Settings): Promise<Settings> {
-  // Settings save not implemented in API yet
   if (Object.values(next.autonomy).some((level) => level === 'execute')) {
     throw new ApiError(422, 'Ninguna acción puede ejecutarse sola durante el piloto: el máximo es Propone');
   }
@@ -305,6 +247,5 @@ export async function listBitacora(filter: LogFilter = {}): Promise<LogEvent[]> 
 }
 
 export async function getQuery(_id: string): Promise<Query> {
-  // Query storage not implemented in API yet
   throw new ApiError(404, 'No existe esa consulta');
 }

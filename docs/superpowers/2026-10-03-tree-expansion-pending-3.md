@@ -6,6 +6,13 @@ the validator; spec 1, `normative-foundations`, for the scope this spec implemen
 expands the tree inside its own stage, resting only on what the tree already holds, with no
 approval before the expansion runs and no agent writing to a database.
 
+**Executed specs.** Specs 1, 2, 4 and 5 are executed and deleted, and a reference below to one of them
+reads as a reference to the page that now states it: spec 1, the foundations and the scope of growth,
+is [`packages/agents/arbol/AGENTS.md`](../../packages/agents/arbol/AGENTS.md); spec 2, the tree, is
+the same page; spec 4, the kernel, is the language in [`data/AGENTS.md`](../../data/AGENTS.md) and the
+tools in [`packages/tools/AGENTS.md`](../../packages/tools/AGENTS.md); spec 5, the base KPIs, is
+[`data/AGENTS.md`](../../data/AGENTS.md).
+
 ## Why
 
 Centinela adapts to a client by changing its tree, and it adapts fastest when the agents that walk
