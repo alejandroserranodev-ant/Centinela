@@ -14,7 +14,7 @@ and what each shows is
 | `src/App.tsx` | the web's routes: `/ingresar` alone, and every other screen inside the shell behind the session |
 | `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`, and `Login` outside the shell), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
 | `src/shell/` | what wraps every route: the bar with the simulated day, the navigation, and the agents' current step |
-| `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog, the series chart |
+| `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog with the first rows the query returned, the series chart |
 | `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
 | `src/state/Session.tsx` | the person and token, `signIn`, `signOut`, and `RequireSession`, the guard of every route but `/ingresar` |
 | `src/api/session.ts` | the token's store and the callback a 401 calls, outside React so the fetch client needs none |

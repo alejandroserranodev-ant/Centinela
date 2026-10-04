@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import alertas as alertas_repo
 from .. import bitacora, ciclo_vida, configuracion, consultas, decisiones, permisos, simulacion
-from ..agentes import converted_actions, get_orchestrator
+from ..agentes import converted_actions, detalle_de_consulta, get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..auth import persona_actual
 from ..db import obtener_conexion
@@ -246,7 +246,7 @@ async def _reproponer(
         for query in nuevas:
             bitacora.registrar(
                 conn, nueva.id, "evidence", ActorAgent(agent="analista"),
-                f"{query['kpi']} el {query['dia']}: {query['consulta']}",
+                detalle_de_consulta(query),
                 dia, query["queryId"],
             )
     return nueva

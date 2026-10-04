@@ -1170,6 +1170,13 @@ export interface components {
              */
             id: string;
             /**
+             * Rows
+             * @description The first rows the kernel call returned, as stored when it ran
+             */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /**
              * Source
              * @description Where the query runs: the KPI kernel of packages/tools, or the stored alerts
              * @default kernel
@@ -1181,6 +1188,13 @@ export interface components {
              * @description The kernel call or the SQL over the stored alerts that returned the figure
              */
             sql: string;
+            /**
+             * Units
+             * @description The unit of each numeric column of rows
+             */
+            units: {
+                [key: string]: "COP" | "points" | "percent" | "days" | "units";
+            };
         };
         /**
          * Sentence

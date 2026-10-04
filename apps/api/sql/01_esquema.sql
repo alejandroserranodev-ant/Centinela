@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS api.consultas (
 );
 
 ALTER TABLE api.consultas ADD COLUMN IF NOT EXISTS fuente text NOT NULL DEFAULT 'kernel';
+ALTER TABLE api.consultas ADD COLUMN IF NOT EXISTS filas jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE api.consultas DROP CONSTRAINT IF EXISTS consultas_fuente_check;
 ALTER TABLE api.consultas ADD CONSTRAINT consultas_fuente_check CHECK (fuente IN ('kernel', 'alertas'));
 

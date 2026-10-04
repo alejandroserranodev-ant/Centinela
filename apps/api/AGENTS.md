@@ -82,7 +82,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`, when its graph no longer waits for a decision, or while another decision resumes it; 422 for a failed check | `decide` |
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
 | GET | `/bandeja/resumen` | the inbox totals, as `InboxSummary` | | `getInboxSummary` |
-| GET | `/consultas/{queryId}` | the call behind a figure, as `Query`, whose `source` is `kernel` or `alertas` | 404 for an unknown query | `getQuery` |
+| GET | `/consultas/{queryId}` | the call behind a figure, as `Query`, `kernel` or `alertas`, with its first rows | 404 for an unknown query | `getQuery` |
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 | GET | `/configuracion` | the `Settings`: watched metrics, their thresholds and owners, autonomy per action type | | `getSettings` |
 | PUT | `/configuracion` | saves the `Settings` whole and returns them as stored | 403 unless analista or gerente; 422 for a failed check | `saveSettings` |

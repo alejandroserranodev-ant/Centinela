@@ -1573,6 +1573,15 @@
             "title": "Id",
             "type": "string"
           },
+          "rows": {
+            "description": "The first rows the kernel call returned, as stored when it ran",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
           "source": {
             "default": "kernel",
             "description": "Where the query runs: the KPI kernel of packages/tools, or the stored alerts",
@@ -1587,13 +1596,30 @@
             "description": "The kernel call or the SQL over the stored alerts that returned the figure",
             "title": "Sql",
             "type": "string"
+          },
+          "units": {
+            "additionalProperties": {
+              "enum": [
+                "COP",
+                "points",
+                "percent",
+                "days",
+                "units"
+              ],
+              "type": "string"
+            },
+            "description": "The unit of each numeric column of rows",
+            "title": "Units",
+            "type": "object"
           }
         },
         "required": [
           "id",
           "source",
           "sql",
-          "description"
+          "description",
+          "rows",
+          "units"
         ],
         "title": "Query",
         "type": "object"

@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 from enum import Enum
 
 from centinela_agents.agents.chat import MAX_QUESTION
@@ -215,6 +215,8 @@ class Query(Esquema):
     source: Literal["kernel", "alertas"] = Field("kernel", description="Where the query runs: the KPI kernel of packages/tools, or the stored alerts")
     sql: str = Field(..., description="The kernel call or the SQL over the stored alerts that returned the figure")
     description: str = Field(..., description="What the query reads and the simulated day it was read on")
+    rows: list[dict[str, Any]] = Field(default_factory=list, description="The first rows the kernel call returned, as stored when it ran")
+    units: dict[str, FigureUnit] = Field(default_factory=dict, description="The unit of each numeric column of rows")
 
 
 class InboxSummary(Esquema):

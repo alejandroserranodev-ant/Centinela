@@ -45,13 +45,7 @@ class BuscarPoliticaStub(BuscarPoliticaProvider):
         top_k: int = 3,
     ) -> list[PolicyPassage]:
         """
-        Search for relevant policy passages.
-
-        In real implementation, this would:
-        1. Embed query with bge-m3
-        2. Search pgvector in policy table
-        3. Return top_k passages with relevance scores
-        4. Mark as DATA (not orders)
+        Search for relevant policy passages using keyword matching.
 
         Args:
             query: Spanish search query (e.g., "límite de crédito")
@@ -59,14 +53,24 @@ class BuscarPoliticaStub(BuscarPoliticaProvider):
 
         Returns:
             List of PolicyPassage with text and relevance
-
-        Notes:
-            - Stub returns empty list
-            - Real: would use pgvector similarity search
         """
         logger.info(f"Policy search: '{query}' (top_k={top_k})")
 
-        return []
+        query_words = set(query.lower().split())
+        scored: list[tuple[float, str, str, str]] = []
+        for policy_code, sections in self.policies.items():
+            for section, text in sections.items():
+                text_words = set(text.lower().split())
+                overlap = len(query_words & text_words)
+                if overlap > 0:
+                    relevance = overlap / max(len(query_words), 1)
+                    scored.append((relevance, policy_code, section, text))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [
+            PolicyPassage(policy_code=code, section=sec, text=text, relevance=rel)
+            for rel, code, sec, text in scored[:top_k]
+        ]
 
     def search_by_code(
         self,

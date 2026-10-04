@@ -69,10 +69,30 @@ def test_la_ruta_exige_sesion_y_responde_la_forma_del_contrato():
 
 def test_la_descripcion_de_alertas_dice_la_suma_y_el_dia():
     conn = MagicMock()
-    conn.execute.return_value.fetchone.return_value = ("q_x", "bandeja_pesos_en_riesgo", DIA, "SELECT 1", "alertas")
+    conn.execute.return_value.fetchone.return_value = ("q_x", "bandeja_pesos_en_riesgo", DIA, "SELECT 1", "alertas", [])
     consulta = consultas.obtener(conn, "q_x")
     assert consulta.source == "alertas"
     assert consulta.description == "Suma de pesos en riesgo de las alertas propuestas, día 2026-10-05"
+
+
+def test_una_consulta_del_kernel_sirve_sus_filas_con_la_unidad_de_cada_columna():
+    conn = MagicMock()
+    filas = [{"cliente_id": "C1", "saldo_vencido": 1500000.0, "max_dias_vencido": 40}]
+    conn.execute.return_value.fetchone.return_value = ("q_k", "saldo_vencido", DIA, "kpi_consultar('saldo_vencido', '2026-10-05')", "kernel", filas)
+    consulta = consultas.obtener(conn, "q_k")
+    assert consulta.rows == filas
+    assert consulta.units == {"max_dias_vencido": "days", "saldo_vencido": "COP"}
+
+
+def test_las_filas_se_guardan_como_json_plano():
+    import datetime
+    import decimal
+    import json
+
+    conn = MagicMock()
+    consultas.registrar(conn, [{"queryId": "q_k", "kpi": "saldo_vencido", "dia": "2026-10-05", "consulta": "c", "filas": [{"saldo": decimal.Decimal("1.5"), "fecha": datetime.date(2026, 10, 5)}]}])
+    jsonb = conn.execute.call_args.args[1][-1]
+    assert json.loads(jsonb.dumps(jsonb.obj)) == [{"saldo": 1.5, "fecha": "2026-10-05"}]
 
 
 @pytest.mark.integracion

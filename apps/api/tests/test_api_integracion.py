@@ -337,7 +337,7 @@ def test_una_pregunta_sin_alerta_queda_en_la_bitacora_y_su_consulta_se_abre(monk
 
         consulta = TestClient(app, headers=CABECERAS_GERENTE).get("/consultas/q_prueba_chat")
         assert consulta.status_code == 200
-        assert consulta.json() == {"id": "q_prueba_chat", "source": "kernel", "sql": CONSULTA_CHAT["consulta"], "description": "Cartera vencida del 2026-03-02"}
+        assert consulta.json() == {"id": "q_prueba_chat", "source": "kernel", "sql": CONSULTA_CHAT["consulta"], "description": "Cartera vencida del 2026-03-02", "rows": [], "units": {}}
         assert TestClient(app, headers=CABECERAS_GERENTE).get("/consultas/q_no_existe").status_code == 404
     finally:
         with conectar() as conn:
