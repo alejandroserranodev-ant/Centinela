@@ -28,15 +28,12 @@ export type ChatMessage = Schemas['ChatMessage'];
 export type ChatOutcome = ChatMessage['outcome'];
 export type ChatQuestion = Schemas['ChatQuestion'];
 export type Query = Schemas['Query'];
+export type Persona = Schemas['Persona'];
+export type Session = Schemas['Sesion'];
 
 export type QuerySource = SemanticView | Query['source'];
 export type AdvanceEnd = Schemas['AdvanceEnd'];
 export type ApiDecision = Schemas['DecisionApprove'] | Schemas['DecisionEdit'] | Schemas['DecisionReject'];
-
-export interface User {
-  name: string;
-  role: string;
-}
 
 export type SemanticView =
   | 'v_ventas'
@@ -70,11 +67,6 @@ export interface AlertFilter {
 export interface LogFilter {
   alertId?: string;
   type?: LogEventType;
-}
-
-export interface SimulationState {
-  simulatedDay: string;
-  user: User;
 }
 
 export interface InboxSummary {

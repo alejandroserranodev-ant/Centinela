@@ -60,6 +60,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sesion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sesion */
+        get: operations["sesion_auth_sesion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bitacora": {
         parameters: {
             query?: never;
@@ -351,7 +385,7 @@ export interface components {
             name: string;
             /**
              * Role
-             * @description Person role (gerente, lider_proceso)
+             * @description Person role (gerente, lider_proceso, analista, auditor)
              */
             role: string;
         };
@@ -513,6 +547,12 @@ export interface components {
              */
             actions: components["schemas"]["Action-Output"][];
             /**
+             * Candecide
+             * @description Whether the person signed in may decide this alert, computed per request and never stored
+             * @default false
+             */
+            canDecide: boolean;
+            /**
              * Cause
              * @description Root cause (identified with evidence or no_evidence)
              */
@@ -525,6 +565,11 @@ export interface components {
             changesRequested: boolean;
             /** @description Confidence in the alert detection */
             confidence: components["schemas"]["Confidence-Output"];
+            /**
+             * Decidedby
+             * @description Who decides this alert: the area that owns its metric, or Gerencia when no area owns it
+             */
+            decidedBy: string | null;
             /** @description Action executed (only when status=executed) */
             executedAction: components["schemas"]["ExecutedAction"] | null;
             /**
@@ -769,6 +814,22 @@ export interface components {
             level: "high" | "medium" | "low";
         };
         /**
+         * Credenciales
+         * @description Email and password a person signs in with.
+         */
+        Credenciales: {
+            /**
+             * Email
+             * @description Sign-in email
+             */
+            email: string;
+            /**
+             * Password
+             * @description Password
+             */
+            password: string;
+        };
+        /**
          * DecisionApprove
          * @description Human decision: approve and execute action.
          */
@@ -996,6 +1057,33 @@ export interface components {
             title: components["schemas"]["Sentence-Output"];
         };
         /**
+         * Persona
+         * @description The person signed in, read from the profiles of the root .env.
+         */
+        Persona: {
+            /**
+             * Area
+             * @description Area a lider_proceso leads, as the owners of a metric name it; null for every other role
+             */
+            area: string | null;
+            /**
+             * Email
+             * @description Sign-in email, lowercase
+             */
+            email: string;
+            /**
+             * Name
+             * @description Name the bitácora records
+             */
+            name: string;
+            /**
+             * Role
+             * @description Role: gerente, lider_proceso, analista or auditor
+             * @enum {string}
+             */
+            role: "gerente" | "lider_proceso" | "analista" | "auditor";
+        };
+        /**
          * Query
          * @description A query of the kernel that produced a figure, recorded when an agent ran it.
          */
@@ -1073,6 +1161,19 @@ export interface components {
             value: number;
         };
         /**
+         * Sesion
+         * @description A signed session token and the person it belongs to.
+         */
+        Sesion: {
+            /** @description The person signed in */
+            persona: components["schemas"]["Persona"];
+            /**
+             * Token
+             * @description Bearer token, valid for eight hours
+             */
+            token: string;
+        };
+        /**
          * SimulatedDay
          * @description Current simulated day in ISO 8601 format.
          */
@@ -1112,7 +1213,9 @@ export interface operations {
                 /** @description Filter by alert estado (Spanish name for status) */
                 estado?: components["schemas"]["AlertEstadoEnum"] | null;
             };
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1141,7 +1244,9 @@ export interface operations {
     obtener_alertas__id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path: {
                 id: string;
             };
@@ -1172,9 +1277,8 @@ export interface operations {
     decidir_alertas__id__decision_post: {
         parameters: {
             query?: never;
-            header: {
-                "x-user-name": string;
-                "x-user-role": string;
+            header?: {
+                authorization?: string | null;
             };
             path: {
                 id: string;
@@ -1207,6 +1311,70 @@ export interface operations {
             };
         };
     };
+    login_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Credenciales"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sesion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sesion_auth_sesion_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Persona"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listar_bitacora_get: {
         parameters: {
             query?: {
@@ -1215,7 +1383,9 @@ export interface operations {
                 /** @description Filter by event type */
                 type?: ("alert" | "evidence" | "proposal" | "decision" | "action" | "result" | "question" | "answer" | "refusal") | null;
             };
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1245,8 +1415,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-user-name"?: string;
-                "x-user-role"?: string;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1280,7 +1449,9 @@ export interface operations {
     obtener_consultas__query_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path: {
                 query_id: string;
             };
@@ -1465,7 +1636,9 @@ export interface operations {
             query?: {
                 dias?: number;
             };
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1494,7 +1667,9 @@ export interface operations {
     dia_actual_simulacion_dia_actual_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1507,6 +1682,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulatedDay"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

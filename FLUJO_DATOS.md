@@ -51,12 +51,14 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
 ## One decision
 
 1. `POST /alertas/{id}/decision` reaches
-   `apps/api/src/centinela_api/routers/alertas.py:decidir(id, decision, x_user_name, x_user_role, conn)`.
-   The role is checked against `ROLES_CON_DECISION`, and
+   `apps/api/src/centinela_api/routers/alertas.py:decidir(id, decision, persona, conn)`, whose
+   person `apps/api/src/centinela_api/auth.py:persona_actual(authorization)` reads from the
+   bearer token. The alert is read, the person is checked by
+   `apps/api/src/centinela_api/permisos.py:puede_decidir(persona, alerta)`, and
    `apps/api/src/centinela_api/decisiones.py:aplicar(alerta, decision)` checks the decision and
    returns the alert as `approved` or `rejected`, together with its log event.
-2. One transaction stores the alert and writes the `decision` row, whose actor is the person named
-   by the headers.
+2. One transaction stores the alert and writes the `decision` row, whose actor is the signed-in
+   person's name and role.
 3. The graph resumes with
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.resume(alert_id, decision)`,
    in a worker thread. On an approval or an edit, a state that carries an `executed_action` turns
@@ -70,10 +72,11 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
 ## One chat question
 
 1. `POST /chat` reaches
-   `apps/api/src/centinela_api/routers/chat.py:chat(pregunta, x_user_name, x_user_role, conn)`.
+   `apps/api/src/centinela_api/routers/chat.py:chat(pregunta, quien, conn)`, whose person
+   `quien` comes from the bearer token.
    The question's length is checked by its Pydantic model, the day is read, and an `alertId`, when sent,
-   must name a stored alert. One transaction writes the `question` row under the person of the
-   headers, with no alert when none was sent.
+   must name a stored alert. One transaction writes the `question` row under the signed-in person,
+   with no alert when none was sent.
 2. `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.ask(question, day, alert)`
    runs in a worker thread. It screens the question in code, then walks the chat graph from
    `conversar.raiz`: a flagged question ends there; otherwise the leaf `clasificar` names an

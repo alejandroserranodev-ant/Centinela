@@ -193,7 +193,7 @@
             "type": "string"
           },
           "role": {
-            "description": "Person role (gerente, lider_proceso)",
+            "description": "Person role (gerente, lider_proceso, analista, auditor)",
             "title": "Role",
             "type": "string"
           }
@@ -504,6 +504,12 @@
             "title": "Actions",
             "type": "array"
           },
+          "canDecide": {
+            "default": false,
+            "description": "Whether the person signed in may decide this alert, computed per request and never stored",
+            "title": "Candecide",
+            "type": "boolean"
+          },
           "cause": {
             "description": "Root cause (identified with evidence or no_evidence)",
             "discriminator": {
@@ -532,6 +538,18 @@
           "confidence": {
             "$ref": "#/components/schemas/Confidence-Output",
             "description": "Confidence in the alert detection"
+          },
+          "decidedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who decides this alert: the area that owns its metric, or Gerencia when no area owns it",
+            "title": "Decidedby"
           },
           "executedAction": {
             "anyOf": [
@@ -657,7 +675,9 @@
           "executedAction",
           "changesRequested",
           "mergedInto",
-          "mergedAlerts"
+          "mergedAlerts",
+          "decidedBy",
+          "canDecide"
         ],
         "title": "Alert",
         "type": "object"
@@ -988,6 +1008,30 @@
           "assumptions"
         ],
         "title": "Confidence",
+        "type": "object"
+      },
+      "Credenciales": {
+        "additionalProperties": false,
+        "description": "Email and password a person signs in with.",
+        "properties": {
+          "email": {
+            "description": "Sign-in email",
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "description": "Password",
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "Credenciales",
         "type": "object"
       },
       "DecisionApprove": {
@@ -1407,6 +1451,53 @@
         "title": "MergedAlert",
         "type": "object"
       },
+      "Persona": {
+        "additionalProperties": false,
+        "description": "The person signed in, read from the profiles of the root .env.",
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Area a lider_proceso leads, as the owners of a metric name it; null for every other role",
+            "title": "Area"
+          },
+          "email": {
+            "description": "Sign-in email, lowercase",
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name the bit\u00e1cora records",
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "description": "Role: gerente, lider_proceso, analista or auditor",
+            "enum": [
+              "gerente",
+              "lider_proceso",
+              "analista",
+              "auditor"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "role",
+          "area"
+        ],
+        "title": "Persona",
+        "type": "object"
+      },
       "Query": {
         "additionalProperties": false,
         "description": "A query of the kernel that produced a figure, recorded when an agent ran it.",
@@ -1518,6 +1609,27 @@
         "title": "SeriesPoint",
         "type": "object"
       },
+      "Sesion": {
+        "additionalProperties": false,
+        "description": "A signed session token and the person it belongs to.",
+        "properties": {
+          "persona": {
+            "$ref": "#/components/schemas/Persona",
+            "description": "The person signed in"
+          },
+          "token": {
+            "description": "Bearer token, valid for eight hours",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "persona"
+        ],
+        "title": "Sesion",
+        "type": "object"
+      },
       "SimulatedDay": {
         "additionalProperties": false,
         "description": "Current simulated day in ISO 8601 format.",
@@ -1605,6 +1717,22 @@
               "description": "Filter by alert estado (Spanish name for status)",
               "title": "Estado"
             }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
           }
         ],
         "responses": {
@@ -1651,6 +1779,22 @@
               "title": "Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
           }
         ],
         "responses": {
@@ -1696,20 +1840,18 @@
           },
           {
             "in": "header",
-            "name": "x-user-name",
-            "required": true,
+            "name": "authorization",
+            "required": false,
             "schema": {
-              "title": "X-User-Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-user-role",
-            "required": true,
-            "schema": {
-              "title": "X-User-Role",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -1770,6 +1912,96 @@
         ]
       }
     },
+    "/auth/login": {
+      "post": {
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credenciales"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sesion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/sesion": {
+      "get": {
+        "operationId": "sesion_auth_sesion_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Persona"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sesion",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/bitacora": {
       "get": {
         "description": "Get audit log (bit\u00e1cora) of alert lifecycle events, optionally filtered by alert and event type.",
@@ -1821,6 +2053,22 @@
               "description": "Filter by event type",
               "title": "Type"
             }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
           }
         ],
         "responses": {
@@ -1858,22 +2106,18 @@
         "parameters": [
           {
             "in": "header",
-            "name": "x-user-name",
+            "name": "authorization",
             "required": false,
             "schema": {
-              "default": "Sin%20nombre",
-              "title": "X-User-Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-user-role",
-            "required": false,
-            "schema": {
-              "default": "lectura",
-              "title": "X-User-Role",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -1922,6 +2166,22 @@
             "schema": {
               "title": "Query Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -2274,6 +2534,22 @@
               "title": "Dias",
               "type": "integer"
             }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
           }
         ],
         "responses": {
@@ -2303,6 +2579,24 @@
       "get": {
         "description": "Get the current simulated day.\nUsed by Vig\u00eda to know what date to filter queries by.",
         "operationId": "dia_actual_simulacion_dia_actual_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2313,6 +2607,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Dia Actual"

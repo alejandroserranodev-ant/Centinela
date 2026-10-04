@@ -6,8 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from centinela_api import db
+from centinela_api.auth import persona_actual
 from centinela_api.main import app
-from centinela_api.modelos import AgentStep
+from centinela_api.modelos import AgentStep, Persona
 from centinela_api.routers import simulacion as simulacion_router
 
 
@@ -49,6 +50,7 @@ def cliente(conn, monkeypatch):
         yield conn
 
     app.dependency_overrides[db.obtener_conexion] = conexion
+    app.dependency_overrides[persona_actual] = lambda: Persona(email="analista@andina.test", name="Camila", role="analista")
     yield TestClient(app)
     app.dependency_overrides.clear()
 

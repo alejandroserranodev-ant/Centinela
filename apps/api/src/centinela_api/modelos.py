@@ -21,6 +21,7 @@ ActionType = Literal["email_draft", "task", "purchase_order_draft", "price_chang
 Agent = Literal["vigia", "analista", "estratega", "ejecutor", "chat"]
 LogEventType = Literal["alert", "evidence", "proposal", "decision", "action", "result", "question", "answer", "refusal"]
 ChatOutcome = Literal["answered", "no_evidence", "out_of_scope", "refused"]
+Role = Literal["gerente", "lider_proceso", "analista", "auditor"]
 
 
 class AlertEstadoEnum(str, Enum):
@@ -137,6 +138,8 @@ class Alert(Esquema):
     changes_requested: bool = Field(False, description="Whether a person asked for changes to the proposal")
     merged_into: str | None = Field(None, description="ID of the alert this one was merged into")
     merged_alerts: list[MergedAlert] = Field(default_factory=list, description="Alerts merged into this one")
+    decided_by: str | None = Field(None, description="Who decides this alert: the area that owns its metric, or Gerencia when no area owns it")
+    can_decide: bool = Field(False, description="Whether the person signed in may decide this alert, computed per request and never stored")
 
 
 class AgentStep(Esquema):
@@ -160,7 +163,7 @@ class ActorPerson(Esquema):
     """Alert decision made by a human."""
     kind: Literal["person"] = Field("person", description="Discriminator: action by person")
     name: str = Field(..., description="Person name (percent-encoded)")
-    role: str = Field(..., description="Person role (gerente, lider_proceso)")
+    role: str = Field(..., description="Person role (gerente, lider_proceso, analista, auditor)")
 
 
 Actor = Annotated[Union[ActorAgent, ActorPerson], Field(discriminator="kind")]
@@ -278,3 +281,23 @@ class CostoAgente(Esquema):
     tokens_entrada: int = Field(..., description="Input tokens consumed")
     tokens_salida: int = Field(..., description="Output tokens generated")
     latencia_ms: int = Field(..., description="Total latency in milliseconds")
+
+
+class Persona(Esquema):
+    """The person signed in, read from the profiles of the root .env."""
+    email: str = Field(..., description="Sign-in email, lowercase")
+    name: str = Field(..., description="Name the bitácora records")
+    role: Role = Field(..., description="Role: gerente, lider_proceso, analista or auditor")
+    area: str | None = Field(None, description="Area a lider_proceso leads, as the owners of a metric name it; null for every other role")
+
+
+class Credenciales(Esquema):
+    """Email and password a person signs in with."""
+    email: str = Field(..., min_length=1, description="Sign-in email")
+    password: str = Field(..., min_length=1, description="Password")
+
+
+class Sesion(Esquema):
+    """A signed session token and the person it belongs to."""
+    token: str = Field(..., description="Bearer token, valid for eight hours")
+    persona: Persona = Field(..., description="The person signed in")

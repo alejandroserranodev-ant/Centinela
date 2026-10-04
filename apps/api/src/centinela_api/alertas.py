@@ -31,7 +31,7 @@ def obtener(conn: psycopg.Connection, id: str) -> Alert | None:
 
 
 def guardar(conn: psycopg.Connection, alerta: Alert) -> None:
-    cuerpo = alerta.model_dump(by_alias=True, exclude={"id", "status"})
+    cuerpo = alerta.model_dump(by_alias=True, exclude={"id", "status", "decided_by", "can_decide"})
     conn.execute(
         "INSERT INTO api.alertas (id, status, cuerpo) VALUES (%s, %s, %s) "
         "ON CONFLICT (id) DO UPDATE SET status = excluded.status, cuerpo = excluded.cuerpo, "

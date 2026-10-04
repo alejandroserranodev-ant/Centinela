@@ -428,3 +428,31 @@ ol {
   font-size: var(--fs-md);
   color: var(--ink-heading);
 }
+
+.person {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--lh-snug);
+  text-align: end;
+}
+
+.person__name {
+  font-size: var(--fs-sm);
+  color: var(--ink-heading);
+  white-space: nowrap;
+}
+
+.login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  box-sizing: border-box;
+}
+
+.session-wait {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}

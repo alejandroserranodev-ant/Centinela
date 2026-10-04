@@ -11,15 +11,18 @@ and what each shows is
 | Path | Why it exists |
 |---|---|
 | `src/main.tsx` | mounts the app with the Spanish locale strings of Arena's components, the theme and the router, and imports the generated stylesheets |
-| `src/App.tsx` | the web's routes, each a screen inside the shell |
-| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
+| `src/App.tsx` | the web's routes: `/ingresar` alone, and every other screen inside the shell behind the session |
+| `src/screens/` | one component per screen (`Inbox`, `Bitacora`, `Settings`, `Chat`, and `Login` outside the shell), and the pieces only one screen renders: the alert's list, detail, proposed actions, "how I got here" and the dialogs that edit, reject or request changes |
 | `src/shell/` | what wraps every route: the bar with the simulated day, the navigation, and the agents' current step |
 | `src/common/` | the pieces several screens or the shell render: severity, status and confidence badges, a sentence whose figures link to their query, the query dialog, the series chart |
 | `src/state/` | `src/state/Simulation.tsx`: the simulated day, the day run in course, the notices, the open query and the open chat, shared by every screen through one provider |
+| `src/state/Session.tsx` | the person and token, `signIn`, `signOut`, and `RequireSession`, the guard of every route but `/ingresar` |
+| `src/api/session.ts` | the token's store and the callback a 401 calls, outside React so the fetch client needs none |
+| `src/roles.ts` | the Spanish label of each role |
 | `src/api/client.ts` | the one module the screens import the API from; it re-exports `src/api/http-client.ts` |
 | `src/api/http-client.ts` | the fetch client, one function per endpoint, with the SSE streams read as async iterators |
 | `src/api/sse.ts` | `readSse(body)`, which reads a server-sent event stream as `event` and parsed `data` pairs, the name from each event's `event:` line; `src/api/sse.test.ts` tests it with Node's test runner |
-| `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and the person every decision is sent as |
+| `src/api/config.ts` | the API's base URL, read from `VITE_API_URL`, and `authHeaders()` with the bearer token |
 | `src/api/types.ts` | the contract the client and the screens share: aliases over `src/api/schema.generated.ts`, plus the types the API has no model for |
 | `src/api/openapi.json` | the API's OpenAPI document, written by `python -m centinela_api.contrato` |
 | `src/api/schema.generated.ts` | the TypeScript types of that document, written by `npm run contract`; never edited |
@@ -61,21 +64,19 @@ and what each shows is
   there. It reads the stylesheet `arena-to-prod` writes, which imports Arena's sheets by package
   name, so it is opened through `npm run dev` at `/design/identity.html`, never from `file://`.
 - **The screens import the API from `src/api/client.ts` alone**, which re-exports the fetch
-  client, so the client behind it changes without touching a screen. It exports `advanceDay`,
-  `listAlerts`, `getAlert`, `decide`, `chat` and `listBitacora` for the brief's minimal API, and
-  `getSimulationState`, `getInboxSummary`, `getSettings`, `saveSettings` and `getQuery` for what
-  the screens need beyond it. Each endpoint, its route and what it refuses are
-  [`../api/AGENTS.md`](../api/AGENTS.md), its endpoint table. A refusal reaches a screen as
-  `src/api/http-client.ts:ApiError(status, message)` with the API's status.
+  client, so the client behind it changes without touching a screen. Which function serves which
+  endpoint, and what each refuses, is the endpoint table of [`../api/AGENTS.md`](../api/AGENTS.md).
+  A refusal reaches a screen as `src/api/http-client.ts:ApiError(status, message)`, with the API's
+  status and `detail`.
 - **Some functions answer inside the client**, because the API serves no endpoint for them:
-  `getSimulationState` reads the day from `GET /simulacion/dia-actual` and takes the person from
-  the client; `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
-  `saveSettings` refuses `execute` with 422 and stores nothing. `getQuery` reads
-  `GET /consultas/{queryId}`, which answers a query an agent ran and refuses the totals' ids with
-  404, so the query dialog of a total shows its error state.
-- **There is no login.** `src/api/config.ts:getDecisionHeaders()` sends every decision and every
-  chat question as `DEFAULT_USER`, a `gerente`, its name percent-encoded in `X-User-Name` because a header is
-  ASCII-only.
+  `getInboxSummary` sums the alerts in `proposed`; `getSettings` returns a constant;
+  `saveSettings` refuses `execute` with 422 and stores nothing. `getQuery` gets 404 for a total's
+  id, so the query dialog of a total shows its error state.
+- **A person signs in first.** `src/state/Session.tsx:RequireSession()` sends a visitor with no
+  session to `/ingresar` and back after it. The token lives in `sessionStorage`, so it dies with
+  the tab; a 401 clears it and the guard returns to `/ingresar`. The bar shows the person, the role
+  and "Salir". The screen decides no permission: with `canDecide` false an alert shows no decision
+  buttons, only "Decide:" and its `decidedBy`.
 - **`src/api/types.ts` is the contract the screens read**: it aliases the types that
   `src/api/schema.generated.ts` generates from the OpenAPI document of `apps/api`, so the API's
   Pydantic models are the source. After a change to a model, run `python -m centinela_api.contrato`
@@ -107,14 +108,11 @@ and what each shows is
 - **The web's own routes are Spanish** (`/alertas/:id`, `/bitacora`, `/configuracion`), because the
   address bar is on screen during the demo and the paths mirror the API and the brief's screen
   names.
-- **Fixture files and ids are English** (`src/api/fixtures/alerts.json`, `alert-hogar-margin`,
-  `q-hogar-drop`); the line name stays as the data spells it. An id never reaches a manager's
-  screen.
-- **The fixtures in `src/api/fixtures/` are illustrative**, and no module imports them. They are
-  built from the brief's public example (the margin of line `Hogar`, supplier X, $42 M a month) and from entities named as
-  examples, never from the dataset, because figures read from `data/csv/` would name the seeded
-  scenarios (see the scenarios section of [`../../data/AGENTS.md`](../../data/AGENTS.md)). Each
-  figure cites an example query against a real `v_*` view; the queries are not run.
+- **The fixtures in `src/api/fixtures/` are illustrative**, English-named, and imported by no
+  module. They come from the brief's public example (line `Hogar`, supplier X, $42 M a month),
+  never from the dataset, whose figures would name the seeded scenarios
+  ([`../../data/AGENTS.md`](../../data/AGENTS.md)). Each figure cites an unrun query on a real
+  `v_*` view.
 - **The screen computes no figure.** The inbox totals are `Figure`s the API computes
   ([`../api/AGENTS.md`](../api/AGENTS.md#the-inbox-totals)), and their queries read the alerts
   table, which is why `src/api/types.ts:QuerySource` also takes `alertas`; a query of the kernel

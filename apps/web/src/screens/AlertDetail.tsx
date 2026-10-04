@@ -214,7 +214,7 @@ export function AlertDetail({ id }: { id: string }) {
             <ArenaSection
               title="Acciones propuestas"
               headingLevel="h3"
-              description={alert.actions.length > 1 ? 'Elige una, revísala y apruébala, edítala o rechaza la propuesta.' : undefined}
+              description={alert.canDecide && alert.actions.length > 1 ? 'Elige una, revísala y apruébala, edítala o rechaza la propuesta.' : undefined}
             >
               <ProposedActions key={alert.id} alert={alert} />
             </ArenaSection>

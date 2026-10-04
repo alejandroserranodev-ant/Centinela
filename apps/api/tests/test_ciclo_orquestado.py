@@ -5,8 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from centinela_api import ciclo_vida, db
+from centinela_api.auth import persona_actual
 from centinela_api.main import app
-from centinela_api.modelos import Action, Alert, CauseNoEvidence, Confidence, Figure, Sentence
+from centinela_api.modelos import Action, Alert, CauseNoEvidence, Confidence, Figure, Persona, Sentence
 from centinela_api.routers import alertas as alertas_router
 from centinela_api.routers import simulacion as simulacion_router
 
@@ -43,6 +44,7 @@ def guardadas(monkeypatch):
         yield MagicMock()
 
     app.dependency_overrides[db.obtener_conexion] = conexion
+    app.dependency_overrides[persona_actual] = lambda: Persona(email="gerente@andina.test", name="Ana", role="gerente")
     yield guardadas
     app.dependency_overrides.clear()
 
@@ -78,7 +80,6 @@ def test_el_resume_no_escribe_ejecutada_si_el_ciclo_la_rechaza(monkeypatch, guar
     respuesta = TestClient(app).post(
         "/alertas/alerta_1/decision",
         json={"kind": "approve", "actionId": "accion_1"},
-        headers={"X-User-Name": "Ana", "X-User-Role": "gerente"},
     )
     assert respuesta.status_code == 200
     assert [a.status for a in guardadas] == ["approved"]

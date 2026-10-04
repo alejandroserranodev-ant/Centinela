@@ -15,7 +15,9 @@ implement.
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
 | `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin and mounts the routers |
-| `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY` and `ROLES_CON_DECISION` |
+| `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
+| `src/centinela_api/auth.py` | the profiles, the password check, the token and `persona_actual(authorization)`, the dependency that names the person |
+| `src/centinela_api/permisos.py` | who owns a metric, who may decide an alert, who may configure |
 | `src/centinela_api/db.py` | `obtener_conexion()`, one connection per request as a FastAPI dependency, with no pool |
 | `src/centinela_api/modelos.py` | the Pydantic models, the HTTP contract's source; their conventions are [`../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md`](../../REPORTE_JSON_SCHEMA_STANDARDIZATION.md) |
 | `src/centinela_api/contrato.py` | `esquema()`, the OpenAPI document plus the payloads of the event streams, and `exportar(destino)`, which `python -m centinela_api.contrato` runs to write `../web/src/api/openapi.json` |
@@ -28,8 +30,8 @@ implement.
 | `src/centinela_api/sse.py` | `flujo(eventos)`, which turns `(event, model)` pairs into a server-sent event stream |
 | `src/centinela_api/agentes.py` | the bridge to `packages/agents`: the orchestrator, the walk's context and the state-to-`Alert` conversion |
 | `src/centinela_api/masking.py` | deterministic masks for client, vendor and product names and ids |
-| `src/centinela_api/routers/` | one router per resource: `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `interno` |
-| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py` and `tests/test_contrato.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py` and `tests/test_chat.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
+| `src/centinela_api/routers/` | one router per resource: `auth`, `simulacion`, `alertas`, `chat`, `bitacora`, `consultas`, `interno` |
+| `tests/` | `tests/test_ciclo_vida.py`, `tests/test_decisiones.py` and `tests/test_manifest.py`, `tests/test_contrato.py` and `tests/test_auth.py` are pure; `tests/test_flujo_agentes.py`, `tests/test_avanzar.py`, `tests/test_ciclo_orquestado.py`, `tests/test_chat.py` and `tests/test_permisos.py` mock the database; `tests/test_api_integracion.py` needs Postgres |
 
 ## Commands
 
@@ -63,28 +65,30 @@ pytest -m integracion
 
 The brief's minimal API is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md), its
 minimal API section; its paths stay as the brief writes them. The web consumes them through
-`apps/web/src/api/http-client.ts`.
+`apps/web/src/api/http-client.ts`. Every route but `/auth/login`, the docs and `/interno/*` needs
+a bearer token, and answers 401 without a valid one.
 
 | Method | Path | Serves | Refuses | Web function |
 |---|---|---|---|---|
-| GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulationState` |
+| POST | `/auth/login` | a `Sesion`, token and `Persona`, for `Credenciales` | 401, one message for any failure | `login` |
+| GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
+| GET | `/simulacion/dia-actual` | the simulated day, as `SimulatedDay` | | `getSimulatedDay` |
 | POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
-| POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject`, with headers `X-User-Name` and `X-User-Role` | 403 for a role that may not decide; 404; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
+| POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
 | GET | `/consultas/{queryId}` | the kernel call behind a figure, as `Query` | 404 for an unknown query | `getQuery` |
 | GET | `/bitacora?alertId=&type=` | the log, newest first, filtered by alert and event type | | `listBitacora` |
 
-**`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, x_user_name, x_user_role, conn)`
-reads the simulated day and the anchored alert, logs the question under the person of
-`X-User-Name` and `X-User-Role`, and calls
+**`/chat` runs the agent `Chat`.** `src/centinela_api/routers/chat.py:chat(pregunta, quien, conn)`
+reads the simulated day and the anchored alert, logs the question under the person signed in, and
+calls
 `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.ask(question, day, alert)`
 through `asyncio.to_thread`. It streams one `step` per node with a Spanish description, then the
 `end`, whose figures pass through `src/centinela_api/agentes.py:_convert_figures(raw)` and whose
 `outcome` names the end the walk reached. A failed model call answers `no_evidence`, never an
-error, and its step and kind join the `answer` row, so the log never reads an outage as a refusal. The
-headers default to `Sin nombre` and `lectura`, because reading needs no role.
+error, and its step and kind join the `answer` row, so the log never reads an outage as a refusal.
 
 **`/consultas/{queryId}` serves the call, never runs it**: `api.consultas` holds each
 `kpi_consultar` a leaf ran, with its KPI and day, written by the day run and by the chat, so a figure
@@ -102,7 +106,6 @@ consistent with the first, paid when they are wired or removed.
 
 | Method | Path | Serves | Refuses | Web function |
 |---|---|---|---|---|
-| GET | undecided | the person signed in, with a role | | `getSimulationState` |
 | GET | undecided | the inbox totals | | `getInboxSummary` |
 | GET | undecided | the watched KPIs, thresholds, owners and autonomy per action type | | `getSettings` |
 | undecided | undecided | saves the settings whole | 422 when any action type's autonomy is `execute` | `saveSettings` |
@@ -221,24 +224,25 @@ door. How the orchestrator reaches each proposal is
 
 ## Decisions and roles
 
-**The API checks a decision before it resumes an alert.**
-`src/centinela_api/decisiones.py:aplicar(alerta, decision)` requires the alert in `proposed`
-(409), a rejection to carry a reason (422), and an approval or an edit to name one of the alert's
-actions (422). The router first checks `X-User-Role` against `ROLES_CON_DECISION`, `gerente` and
-`lider_proceso`, and answers 403. `X-User-Name` arrives percent-encoded, because a header is ASCII
-and Colombian names are not. The decision and its `bitácora` row commit in one transaction before
-the orchestrator resumes, so no action runs without a recorded decision; an approval or an edit
-then resumes into `Ejecutor`, and a rejection resumes to close the graph.
+**A person signs in; every route reads the person from the token.** The profiles are
+`CENTINELA_USUARIOS` in the root `.env`, each `clave` a PBKDF2 hash from
+`python -m centinela_api.auth hash`, because that file is public; a malformed list stops the API.
+`src/centinela_api/auth.py:verificar(correo, clave)` hashes even for an unknown email, so nothing
+tells which half failed. The token signs the email and an eight-hour expiry with
+`AUTH_SECRET_KEY`, and the person is re-read from the profiles. Full enterprise authentication
+stays out of scope.
 
-**Full enterprise authentication is out of scope; roles are not.** There is no login: the role is
-whatever the header says.
+**Who decides is checked first.** `src/centinela_api/permisos.py:puede_decidir(persona, alerta)`
+lets the `gerente` decide any alert and a `lider_proceso` those whose metric its `area` owns in
+`packages/agents/skills/estratega/acciones.md`. Anyone else gets 403, which names the owner: the
+request is valid, the person may not make it. Each alert returned carries `decidedBy` and
+`canDecide`, never stored, so the screen decides no permission. Then
+`src/centinela_api/decisiones.py:aplicar(alerta, decision)` requires `proposed` (409), a
+rejection's reason and one of the alert's actions (422). The decision and its `bitácora` row
+commit before the orchestrator resumes, so no action runs unrecorded.
 
 > **Decided, not built.** The rules below, where the code differs as each one says.
 
-- **The role that decides an alert is the owner of its metric** in the settings, among the roles
-  the policies name, such as `Gerente comercial` or `Jefe de cartera`; the `administrador` role
-  decides the KPI catalogue. The code holds a fixed pair of roles for every alert.
-- **A failed role check answers 422**, like every other check of a decision. The code answers 403.
 - **An edit keeps the keys of the action's `parameters`, adding none and dropping none**, because
   `Ejecutor` passes them unchanged. `aplicar` merges the edit into them, so a new key passes.
 - **A `request_changes` carries a reason, and is capped at one per alert**, because a person who

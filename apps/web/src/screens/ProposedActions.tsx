@@ -70,8 +70,12 @@ export function ProposedActions({ alert }: { alert: Alert }) {
     setApproving(true);
     try {
       await send({ kind: 'approve', actionId: chosen.id });
-    } catch {
-      notify({ tone: 'danger', title: 'No se pudo aprobar', message: 'Inténtalo de nuevo en unos segundos.' });
+    } catch (e) {
+      notify({
+        tone: 'danger',
+        title: 'No se pudo aprobar',
+        message: e instanceof ApiError && e.status === 403 ? e.message : 'Inténtalo de nuevo en unos segundos.',
+      });
     } finally {
       setApproving(false);
     }
@@ -120,28 +124,34 @@ export function ProposedActions({ alert }: { alert: Alert }) {
           />
         </div>
       </ArenaCard>
-      <div className="arena-row arena-row--component decision">
-        <ArenaButton variant="primary" icon="ph-bold ph-check" loading={approving} onClick={approve}>
-          Aprobar
-        </ArenaButton>
-        <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
-          Editar
-        </ArenaButton>
-        {alert.changesRequested ? null : (
-          <ArenaButton variant="secondary" icon="ph-bold ph-arrow-counter-clockwise" onClick={() => setRequesting(true)}>
-            Solicitar cambios
-          </ArenaButton>
-        )}
-        <ArenaButton variant="danger" icon="ph-bold ph-x" onClick={() => setRejecting(true)}>
-          Rechazar
-        </ArenaButton>
-      </div>
-      <p className="text-muted">
-        Aprobar deja un borrador o una tarea: nada se envía ni se publica hasta que una persona lo haga.
-      </p>
-      {alert.changesRequested ? (
-        <p className="text-muted">Ya se pidieron cambios una vez: queda aprobar, editar o rechazar.</p>
-      ) : null}
+      {alert.canDecide ? (
+        <>
+          <div className="arena-row arena-row--component decision">
+            <ArenaButton variant="primary" icon="ph-bold ph-check" loading={approving} onClick={approve}>
+              Aprobar
+            </ArenaButton>
+            <ArenaButton variant="secondary" icon="ph-bold ph-pencil-simple" onClick={() => setEditing(true)}>
+              Editar
+            </ArenaButton>
+            {alert.changesRequested ? null : (
+              <ArenaButton variant="secondary" icon="ph-bold ph-arrow-counter-clockwise" onClick={() => setRequesting(true)}>
+                Solicitar cambios
+              </ArenaButton>
+            )}
+            <ArenaButton variant="danger" icon="ph-bold ph-x" onClick={() => setRejecting(true)}>
+              Rechazar
+            </ArenaButton>
+          </div>
+          <p className="text-muted">
+            Aprobar deja un borrador o una tarea: nada se envía ni se publica hasta que una persona lo haga.
+          </p>
+          {alert.changesRequested ? (
+            <p className="text-muted">Ya se pidieron cambios una vez: queda aprobar, editar o rechazar.</p>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-muted">Decide: {alert.decidedBy ?? 'Gerencia'}</p>
+      )}
       <EditDialog
         action={chosen}
         open={editing}

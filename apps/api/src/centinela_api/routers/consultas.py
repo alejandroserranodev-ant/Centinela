@@ -2,10 +2,11 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException
 
 from .. import consultas as consultas_repo
+from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import Query
 
-router = APIRouter(tags=["queries"])
+router = APIRouter(tags=["queries"], dependencies=[Depends(persona_actual)])
 
 
 @router.get("/consultas/{query_id}", response_model=Query)

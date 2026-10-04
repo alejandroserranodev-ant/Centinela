@@ -9,13 +9,14 @@ from fastapi.responses import StreamingResponse
 from .. import alertas as alertas_repo
 from .. import bitacora, ciclo_vida, consultas, simulacion
 from ..agentes import alert_id_of, get_context, get_orchestrator, prioritized, state_to_alert, status_path
+from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import ActorAgent, AdvanceEnd, AgentStep, SimulatedDay
 from ..sse import flujo
 
 from centinela_agents.walk import detect
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(persona_actual)])
 logger = logging.getLogger(__name__)
 
 

@@ -2,16 +2,15 @@ import asyncio
 import logging
 import uuid
 from typing import Annotated
-from urllib.parse import unquote
 
 import psycopg
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, decisiones, simulacion
+from .. import bitacora, ciclo_vida, decisiones, permisos, simulacion
 from ..agentes import get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
-from ..config import ROLES_CON_DECISION
+from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import (
     ActorAgent,
@@ -19,20 +18,22 @@ from ..modelos import (
     Alert,
     AlertEstadoEnum,
     Decision,
+    Persona,
     DecisionApprove,
     DecisionEdit,
     DecisionReject,
     ExecutedAction,
 )
 
-router = APIRouter(tags=["alerts"])
+router = APIRouter(tags=["alerts"], dependencies=[Depends(persona_actual)])
 logger = logging.getLogger(__name__)
 
 
 @router.get("/alertas", response_model=list[Alert])
 async def listar(
     estado: Annotated[AlertEstadoEnum | None, Query(description="Filter by alert estado (Spanish name for status)")] = None,
-    conn: psycopg.Connection = Depends(obtener_conexion)
+    persona: Persona = Depends(persona_actual),
+    conn: psycopg.Connection = Depends(obtener_conexion),
 ) -> list[Alert]:
     """
     List all alerts, optionally filtered by estado.
@@ -44,30 +45,33 @@ async def listar(
         status = ESTADO_A_STATUS.get(estado)
         if status is None:
             raise HTTPException(422, f"estado desconocido: {estado}")
-    return alertas_repo.listar(conn, status)
+    return [permisos.vista(persona, a) for a in alertas_repo.listar(conn, status)]
 
 
 @router.get("/alertas/{id}", response_model=Alert)
-async def obtener(id: str, conn: psycopg.Connection = Depends(obtener_conexion)) -> Alert:
+async def obtener(
+    id: str,
+    persona: Persona = Depends(persona_actual),
+    conn: psycopg.Connection = Depends(obtener_conexion),
+) -> Alert:
     alerta = alertas_repo.obtener(conn, id)
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
-    return alerta
+    return permisos.vista(persona, alerta)
 
 
 @router.post("/alertas/{id}/decision", response_model=Alert)
 async def decidir(
     id: str,
     decision: Decision,
-    x_user_name: str = Header(...),
-    x_user_role: str = Header(...),
+    persona: Persona = Depends(persona_actual),
     conn: psycopg.Connection = Depends(obtener_conexion),
 ) -> Alert:
-    if x_user_role not in ROLES_CON_DECISION:
-        raise HTTPException(403, "Este rol no puede decidir sobre una alerta")
     alerta = alertas_repo.obtener(conn, id)
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
+    if not permisos.puede_decidir(persona, alerta):
+        raise HTTPException(403, permisos.negada(alerta))
 
     try:
         nueva, eventos = decisiones.aplicar(alerta, decision)
@@ -76,7 +80,7 @@ async def decidir(
     except decisiones.DecisionInvalida as e:
         raise HTTPException(422, str(e)) from e
 
-    actor = ActorPerson(name=unquote(x_user_name), role=x_user_role)
+    actor = ActorPerson(name=persona.name, role=persona.role)
     dia = simulacion.dia_actual(conn)
 
     with conn.transaction():
@@ -139,4 +143,4 @@ async def decidir(
         except Exception as e:
             logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
-    return nueva
+    return permisos.vista(persona, nueva)

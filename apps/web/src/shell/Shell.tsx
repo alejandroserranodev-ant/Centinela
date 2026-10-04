@@ -13,7 +13,9 @@ import {
   useArenaViewportBelow,
 } from '@dravensoft/arena-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useSession } from '../state/Session';
 import { useSimulation } from '../state/Simulation';
+import { roleLabel } from '../roles';
 import { QueryDialog } from '../common/QueryDialog';
 import { Chat } from '../screens/Chat';
 import { Clock } from './Clock';
@@ -41,6 +43,7 @@ export function Shell() {
   const mobile = useArenaViewportBelow('lg');
   const [theme, setTheme] = useArenaTheme();
   const { toasts, toastAction, openChat, chat } = useSimulation();
+  const { persona, signOut } = useSession();
   const active = activeDestination(pathname);
   const go = (id: string) => {
     const destination = DESTINATIONS.find((d) => d.id === id);
@@ -78,6 +81,19 @@ export function Shell() {
               size={mobile ? 'sm' : 'md'}
               pressed={theme === 'dark'}
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            />
+            {persona && !mobile ? (
+              <div className="person">
+                <span className="person__name">{persona.name}</span>
+                <span className="text-muted">{roleLabel(persona)}</span>
+              </div>
+            ) : null}
+            <ArenaIconButton
+              icon="ph-bold ph-sign-out"
+              label="Salir"
+              showLabel={!mobile}
+              size={mobile ? 'sm' : 'md'}
+              onClick={signOut}
             />
           </div>
         }

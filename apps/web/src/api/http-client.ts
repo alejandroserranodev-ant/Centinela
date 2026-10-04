@@ -1,4 +1,5 @@
-import { API_BASE_URL, API_HEADERS, getDecisionHeaders } from './config';
+import { API_BASE_URL, API_HEADERS, authHeaders } from './config';
+import { notifyUnauthorized } from './session';
 import { readSse } from './sse';
 import type {
   AdvanceEvent,
@@ -13,8 +14,9 @@ import type {
   LogEvent,
   LogFilter,
   Query,
+  Persona,
+  Session,
   Settings,
-  SimulationState,
 } from './types';
 
 export class ApiError extends Error {
@@ -27,37 +29,60 @@ export class ApiError extends Error {
   }
 }
 
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+async function errorMessage(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  try {
+    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+  } catch {
+    return text || response.statusText;
+  }
+  return text || response.statusText;
+}
+
+async function request(url: string, options?: RequestInit, anonymous = false): Promise<Response> {
   const response = await fetch(url, {
     ...options,
-    headers: { ...API_HEADERS, ...options?.headers },
+    headers: { ...(anonymous ? API_HEADERS : authHeaders()), ...options?.headers },
   });
 
   if (!response.ok) {
-    const error = await response.text().catch(() => response.statusText);
-    throw new ApiError(response.status, error || response.statusText);
+    const message = await errorMessage(response);
+    if (response.status === 401 && !anonymous) {
+      notifyUnauthorized();
+    }
+    throw new ApiError(response.status, message);
   }
 
+  return response;
+}
+
+async function fetchJson<T>(url: string, options?: RequestInit, anonymous = false): Promise<T> {
+  const response = await request(url, options, anonymous);
   return response.json() as Promise<T>;
 }
 
-export async function getSimulationState(): Promise<SimulationState> {
-  const dia = await fetchJson<{ dia: string }>(`${API_BASE_URL}/simulacion/dia-actual`);
-  return {
-    simulatedDay: dia.dia,
-    user: { name: 'Usuario Demo', role: 'gerente' },
-  };
+export async function login(email: string, password: string): Promise<Session> {
+  return fetchJson<Session>(
+    `${API_BASE_URL}/auth/login`,
+    { method: 'POST', body: JSON.stringify({ email, password }) },
+    true,
+  );
+}
+
+export async function getSession(): Promise<Persona> {
+  return fetchJson<Persona>(`${API_BASE_URL}/auth/sesion`);
+}
+
+export async function getSimulatedDay(): Promise<string> {
+  const day = await fetchJson<{ dia: string }>(`${API_BASE_URL}/simulacion/dia-actual`);
+  return day.dia;
 }
 
 export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
-  const response = await fetch(`${API_BASE_URL}/simulacion/avanzar?dias=${days}`, {
-    method: 'POST',
-    headers: API_HEADERS,
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, response.statusText);
-  }
+  const response = await request(`${API_BASE_URL}/simulacion/avanzar?dias=${days}`, { method: 'POST' });
 
   if (!response.body) {
     throw new Error('No response body');
@@ -107,21 +132,15 @@ export async function decide(id: string, decision: Decision): Promise<Alert> {
 
   return fetchJson<Alert>(`${API_BASE_URL}/alertas/${id}/decision`, {
     method: 'POST',
-    headers: getDecisionHeaders(),
     body: JSON.stringify(payload),
   });
 }
 
 export async function* chat({ question, alertId }: ChatQuestion): AsyncGenerator<ChatEvent> {
-  const response = await fetch(`${API_BASE_URL}/chat`, {
+  const response = await request(`${API_BASE_URL}/chat`, {
     method: 'POST',
-    headers: getDecisionHeaders(),
     body: JSON.stringify({ question, alertId }),
   });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, response.statusText);
-  }
 
   if (!response.body) {
     throw new Error('No response body');

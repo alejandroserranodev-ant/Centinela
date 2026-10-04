@@ -2,21 +2,21 @@ import asyncio
 import datetime
 import logging
 import uuid
-from urllib.parse import unquote
 
 import psycopg
 from centinela_agents.agents.chat import FAILED, masked
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
 from .. import bitacora, consultas, simulacion
 from ..agentes import _convert_figures, get_orchestrator
+from ..auth import persona_actual
 from ..db import obtener_conexion
-from ..modelos import ActorAgent, ActorPerson, AgentStep, ChatMessage, ChatQuestion, CostoAgente
+from ..modelos import ActorAgent, ActorPerson, AgentStep, ChatMessage, ChatQuestion, CostoAgente, Persona
 from ..sse import flujo
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(persona_actual)])
 logger = logging.getLogger(__name__)
 
 DESENLACE = {
@@ -60,8 +60,7 @@ def costo_de(costo: dict) -> str:
 @router.post("/chat")
 async def chat(
     pregunta: ChatQuestion,
-    x_user_name: str = Header("Sin%20nombre"),
-    x_user_role: str = Header("lectura"),
+    quien: Persona = Depends(persona_actual),
     conn: psycopg.Connection = Depends(obtener_conexion),
 ) -> StreamingResponse:
     dia = simulacion.dia_actual(conn)
@@ -70,7 +69,7 @@ async def chat(
         alerta = alertas_repo.obtener(conn, pregunta.alert_id)
         if alerta is None:
             raise HTTPException(404, "No existe esa alerta")
-    persona = ActorPerson(name=unquote(x_user_name), role=x_user_role)
+    persona = ActorPerson(name=quien.name, role=quien.role)
     agente = ActorAgent(agent="chat")
     with conn.transaction():
         bitacora.registrar(conn, pregunta.alert_id, "question", persona, masked(pregunta.question), dia)

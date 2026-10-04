@@ -1,4 +1,5 @@
-"""Exercises the endpoints end to end against a real Postgres.
+"""Exercises the endpoints end to end against a real Postgres, signed in through /auth/login
+with the demo profiles of the root .env.
 
 A day advance runs the agents in process only when LLM_MODEL is set; without it, it ends with no alerts.
 
@@ -7,7 +8,6 @@ apps/api/sql/01_esquema.sql already applied; it skips itself when DSN_ADMIN reac
 """
 import json
 import os
-from urllib.parse import quote
 
 import psycopg
 import pytest
@@ -28,8 +28,17 @@ except psycopg.OperationalError:
     pytest.skip("DSN_ADMIN reaches no database", allow_module_level=True)
 
 ID_ALERTA = "alerta_prueba_skeleton"
-NOMBRE_GERENTE = "Ana Gómez"
-CABECERAS_GERENTE = {"X-User-Name": quote(NOMBRE_GERENTE), "X-User-Role": "gerente"}
+CLAVE_DEMO = "Andina2026!"
+NOMBRE_GERENTE = "Mariana Restrepo"
+
+
+def _cabeceras(correo: str) -> dict[str, str]:
+    respuesta = TestClient(app).post("/auth/login", json={"email": correo, "password": CLAVE_DEMO})
+    assert respuesta.status_code == 200
+    return {"Authorization": f"Bearer {respuesta.json()['token']}"}
+
+
+CABECERAS_GERENTE = _cabeceras("gerente@andina.test")
 
 
 def _alerta_de_prueba() -> Alert:
@@ -64,7 +73,7 @@ def cliente():
         alertas_repo.guardar(conn, _alerta_de_prueba())
         conn.commit()
     try:
-        yield TestClient(app)
+        yield TestClient(app, headers=CABECERAS_GERENTE)
     finally:
         with conectar() as conn:
             conn.execute("DELETE FROM api.bitacora WHERE alerta_id = %s", (ID_ALERTA,))
@@ -86,6 +95,7 @@ def test_obtener_alerta(cliente):
     respuesta = cliente.get(f"/alertas/{ID_ALERTA}")
     assert respuesta.status_code == 200
     assert respuesta.json()["pesosAtRisk"]["value"] == 5_000_000
+    assert (respuesta.json()["decidedBy"], respuesta.json()["canDecide"]) == ("Comercial", True)
 
 
 def test_obtener_alerta_inexistente(cliente):
@@ -96,9 +106,10 @@ def test_rol_sin_permiso_no_puede_decidir(cliente):
     respuesta = cliente.post(
         f"/alertas/{ID_ALERTA}/decision",
         json={"kind": "reject", "reason": "no aplica"},
-        headers={"X-User-Name": "Ana", "X-User-Role": "lectura"},
+        headers=_cabeceras("auditoria@andina.test"),
     )
     assert respuesta.status_code == 403
+    assert respuesta.json()["detail"] == "Esta alerta la decide Comercial"
 
 
 def test_rechazar_sin_motivo_es_422(cliente):
@@ -126,7 +137,7 @@ def test_aprobar_mueve_el_estado_y_queda_en_la_bitacora(cliente):
 
 def test_simulacion_avanzar_devuelve_el_evento_end(monkeypatch):
     monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "0")
-    with TestClient(app) as cliente:
+    with TestClient(app, headers=CABECERAS_GERENTE) as cliente:
         with cliente.stream("POST", "/simulacion/avanzar", params={"dias": 1}) as respuesta:
             assert respuesta.status_code == 200
             texto = "".join(respuesta.iter_text())
@@ -162,7 +173,7 @@ def test_un_dia_real_cita_el_kernel_y_aprobar_ejecuta_y_rechazar_clasifica(monke
     monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "2")
     nuevas: list[str] = []
     try:
-        with TestClient(app) as cliente:
+        with TestClient(app, headers=CABECERAS_GERENTE) as cliente:
             with cliente.stream("POST", "/simulacion/avanzar", params={"dias": 1}) as respuesta:
                 nuevas = _evento_end("".join(respuesta.iter_text()))["newAlerts"]
             assert len(nuevas) == 2
@@ -224,16 +235,16 @@ def test_una_pregunta_sin_alerta_queda_en_la_bitacora_y_su_consulta_se_abre(monk
         respuesta = TestClient(app).post("/chat", json={"question": marca}, headers=CABECERAS_GERENTE)
         assert respuesta.status_code == 200
 
-        eventos = TestClient(app).get("/bitacora").json()
+        eventos = TestClient(app, headers=CABECERAS_GERENTE).get("/bitacora").json()
         pregunta = next(e for e in eventos if e["type"] == "question" and e["detail"] == marca)
         assert pregunta["alertId"] is None
         assert pregunta["actor"] == {"kind": "person", "name": NOMBRE_GERENTE, "role": "gerente"}
         assert any(e["type"] == "answer" and e["alertId"] is None and e["queryId"] == "q_prueba_chat" for e in eventos)
 
-        consulta = TestClient(app).get("/consultas/q_prueba_chat")
+        consulta = TestClient(app, headers=CABECERAS_GERENTE).get("/consultas/q_prueba_chat")
         assert consulta.status_code == 200
         assert consulta.json() == {"id": "q_prueba_chat", "source": "kernel", "sql": CONSULTA_CHAT["consulta"], "description": "KPI saldo_vencido del 2026-03-02"}
-        assert TestClient(app).get("/consultas/q_no_existe").status_code == 404
+        assert TestClient(app, headers=CABECERAS_GERENTE).get("/consultas/q_no_existe").status_code == 404
     finally:
         with conectar() as conn:
             conn.execute("DELETE FROM api.bitacora WHERE alerta_id IS NULL AND (detalle = %s OR detalle LIKE %s OR query_id = %s)", (marca, "fin.chat_respondida: CLI-001 tiene {0} de mora.", "q_prueba_chat"))
