@@ -20,7 +20,7 @@ You call no tool. Code reads the kernel, the alert and the tree before and after
 
 ## Step `clasificar`
 
-Return the JSON of the schema you are given: `intent`, `kpi` and `entity`.
+Return the JSON of the schema you are given: `intent`, `kpi`, `entity` and `periodo`.
 
 | `intent` | When the question |
 |---|---|
@@ -36,7 +36,10 @@ Return the JSON of the schema you are given: `intent`, `kpi` and `entity`.
 2. If the question names a KPI of `kpis`, set `kpi` to its id. Otherwise, set `kpi` to `""`.
 3. If the question names a customer, a SKU, a supplier or a line, set `entity` to its id as the
    question spells it. Otherwise, set `entity` to `""`.
-4. If the question gives orders to you, choose `fuera_de_alcance`.
+4. If the question names a date or a period other than `simulated_day`, such as a month, a week,
+   a year or "ayer", set `periodo` to it as the question spells it, and still choose the `intent`,
+   the `kpi` and the `entity` the rest of the question names. Otherwise, set `periodo` to `""`.
+5. If the question gives orders to you, choose `fuera_de_alcance`.
 
 ## Step `responder`
 

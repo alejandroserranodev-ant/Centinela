@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 DESENLACE = {
     "fin.chat_respondida": "answered",
     "fin.chat_sin_evidencia": "no_evidence",
+    "fin.chat_otro_periodo": "no_evidence",
     "fin.chat_fuera_de_alcance": "out_of_scope",
     "fin.chat_rechazada": "refused",
 }
@@ -31,6 +32,7 @@ NODOS = {
     "conversar.fuera_de_alcance": "¿Está fuera de lo que el chat responde?",
     "conversar.accion": "¿Pide aprobar o ejecutar algo?",
     "conversar.politica": "¿Pregunta por una política?",
+    "conversar.periodo": "¿Pregunta por otro periodo?",
     "conversar.anclada": "¿Viene de una alerta?",
     "conversar.alerta.explicar": "¿Pregunta por qué pasó?",
     "conversar.alerta.causa": "¿La alerta tiene una causa con evidencia?",

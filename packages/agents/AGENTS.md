@@ -240,11 +240,11 @@ and the only context is the alert it is anchored to.
   `centinela_agents/security.py:check_prompt_injection(user_input, instructions)` matches, in
   English or Spanish, and the tree ends a flagged one before any model reads it.
 - **`clasificar`**, `centinela_agents/agents/chat.py:classify(provider, state, sources)`: the model
-  returns an intent of `centinela_agents/agents/chat.py:INTENTS`, a KPI of the catalogue and an
-  entity, at temperature 0, from a prompt
+  returns an intent of `centinela_agents/agents/chat.py:INTENTS`, a KPI of the catalogue, an
+  entity and any period other than the simulated day, at temperature 0, from a prompt
   `centinela_agents/security.py:SecurePrompt` builds with the question as untrusted content. Code
-  drops a KPI outside the catalogue and an entity the question does not spell or that holds no
-  letter, and reads a question with an imperative or an infinitive to act as `accion` whatever the
+  drops a KPI outside the catalogue, an entity or a period the question does not spell, and an
+  entity with no letter, and reads a question with an imperative or an infinitive to act as `accion` whatever the
   model says. A failed call raises; its fallback is `fuera_de_alcance`, the failure lands in
   `failures`, and the person reads that the model failed, never that the data is silent. Anchored to an alert with no KPI named, the KPI and entity are the alert's.
 - **`responder`**, `centinela_agents/agents/chat.py:answer(provider, state, sources)`: code
@@ -443,7 +443,7 @@ checkpointer and no interrupt, because a question never waits for a person.
 `costs`. `ask` takes the anchored alert's cause, actions and entity from the alert's own thread
 when this process holds it, and from what `apps/api` hands otherwise, and returns the end, the
 steps the walk took, the `centinela_agents/schema.py:ChatAnswer`
-`centinela_agents/agents/chat.py:closing(state)` writes for that end, the queries, the screen's
+`centinela_agents/agents/chat.py:closing(state, metrics)` writes for that end, the queries, the screen's
 result, the failures and the costs. A chat run touches no alert's state, proposes no transition and
 does not wait for the day run.
 

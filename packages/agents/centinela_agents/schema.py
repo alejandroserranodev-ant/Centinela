@@ -23,6 +23,7 @@ ENDS = frozenset(
         "fin.fallo_ejecucion",
         "fin.chat_respondida",
         "fin.chat_sin_evidencia",
+        "fin.chat_otro_periodo",
         "fin.chat_fuera_de_alcance",
         "fin.chat_rechazada",
     }

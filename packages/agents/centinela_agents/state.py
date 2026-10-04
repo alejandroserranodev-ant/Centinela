@@ -20,6 +20,7 @@ STATE_FIELDS = DERIVED_FIELDS | frozenset(
         "estado.chat.intent",
         "estado.chat.alert_id",
         "estado.chat.kpi",
+        "estado.chat.periodo",
         "estado.chat.figuras",
     }
 )

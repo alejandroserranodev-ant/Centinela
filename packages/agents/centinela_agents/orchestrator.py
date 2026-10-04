@@ -312,7 +312,7 @@ class CentinelaOrchestrator:
             "alert": anchored,
             "cause": cause,
             "actions": actions,
-            "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "figuras": None},
+            "chat": {"sospechosa": screened["sospechosa"], "alert_id": (anchored or {}).get("id"), "intent": None, "kpi": None, "entity": None, "periodo": None, "figuras": None},
             "queries": [],
         }
         state = self._chat_graph.invoke(initial, dict(self.tracer.config(f"chat_{uuid.uuid4().hex[:12]}")) if self.tracer else None)
@@ -325,7 +325,7 @@ class CentinelaOrchestrator:
         return {
             "fin": state.get("fin"),
             "steps": steps,
-            "answer": closing(state),
+            "answer": closing(state, self.metrics),
             "chat": state.get("chat"),
             "queries": state.get("queries") or [],
             "screen": screened,

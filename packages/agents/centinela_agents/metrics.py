@@ -15,6 +15,7 @@ class Metrics:
     threshold_sources: Mapping[str, str] = field(default_factory=dict)
     severities: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     tranches: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    periods: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -33,6 +34,7 @@ def load_metrics(path: Path) -> Metrics:
         threshold_sources={name: entry.get("fuente_umbral", "") for name, entry in entries.items()},
         severities={name: entry["severidad"] for name, entry in entries.items() if "severidad" in entry},
         tranches={name: entry["tramos"] for name, entry in entries.items() if "tramos" in entry},
+        periods={name: entry["kernel"]["linea_base"]["periodo"] for name, entry in entries.items() if "linea_base" in entry.get("kernel", {})},
     )
 
 
