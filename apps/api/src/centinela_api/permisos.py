@@ -37,7 +37,12 @@ def puede_configurar(persona: Persona) -> bool:
     return persona.role in ("analista", "gerente")
 
 
-def negada(conn: psycopg.Connection, alerta: Alert) -> str:
+AUDITORIA = "Auditoría consulta las alertas; no las decide"
+
+
+def negada(conn: psycopg.Connection, persona: Persona, alerta: Alert) -> str:
+    if persona.role == "auditor":
+        return AUDITORIA
     area = area_que_decide(conn, alerta.metric)
     return f"Esta alerta la decide {area}" if area else "Esta alerta la decide la gerencia"
 

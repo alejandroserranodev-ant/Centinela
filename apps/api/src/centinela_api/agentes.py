@@ -7,6 +7,7 @@ root .env, using LangGraph with InMemorySaver (state is per-process).
 """
 
 import hashlib
+from functools import cache
 import logging
 import os
 import re
@@ -112,6 +113,19 @@ def _build_orchestrator() -> CentinelaOrchestrator:
     )
 
 
+@cache
+def _etiquetas() -> Mapping[str, str]:
+    return load_metrics(METRICAS).labels
+
+
+def etiqueta(kpi: str) -> str:
+    return _etiquetas().get(kpi, kpi)
+
+
+def detalle_de_consulta(query: Mapping[str, Any]) -> str:
+    return f"Consulta de {etiqueta(query['kpi'])} del {query['dia']}"
+
+
 def alert_id_of(detection: Detection) -> str:
     """One alert per metric and entity: the id is derived from both."""
     key = "|".join([detection.metric, *map(str, detection.entity)])
@@ -124,9 +138,16 @@ def pesos_of(detection: Detection) -> float:
 
 
 def prioritized(detections: list[Detection], known: set[str], watched: Collection[str]) -> list[Detection]:
-    """The day's new detections of the API's watched metrics, the most pesos at risk first, at most CENTINELA_ALERTAS_POR_DIA."""
-    fresh = [d for d in detections if d.metric in API_METRICS and d.metric in watched and alert_id_of(d) not in known]
-    return sorted(fresh, key=pesos_of, reverse=True)[: int(os.environ.get(ALERTS_PER_DAY, "3"))]
+    """The day's new detections of the API's watched metrics, at most CENTINELA_ALERTAS_POR_DIA: the largest of each metric first, then the rest, each by pesos at risk."""
+    fresh = sorted(
+        (d for d in detections if d.metric in API_METRICS and d.metric in watched and alert_id_of(d) not in known),
+        key=pesos_of,
+        reverse=True,
+    )
+    largest = list({d.metric: d for d in reversed(fresh)}.values())
+    first = sorted(largest, key=pesos_of, reverse=True)
+    rest = [d for d in fresh if all(d is not f for f in first)]
+    return [*first, *rest][: int(os.environ.get(ALERTS_PER_DAY, "3"))]
 
 
 _STATUS_MAP: dict[str, str] = {

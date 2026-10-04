@@ -229,6 +229,6 @@ def _registrar_costo(
         )
         dia = simulacion.dia_actual(conn)
         actor = ActorAgent(agent=costo.agent)
-        bitacora.registrar(conn, alert_id, "evidence", actor, detalle, dia)
+        bitacora.registrar_costo(conn, alert_id, actor, detalle, dia)
     except Exception as e:
         pass

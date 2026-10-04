@@ -42,6 +42,7 @@ def guardadas(monkeypatch):
         monkeypatch.setattr(modulo.bitacora, "registrar", MagicMock())
         monkeypatch.setattr(modulo.simulacion, "dia_actual", lambda conn: DIA)
     monkeypatch.setattr(simulacion_router.simulacion, "avanzar", lambda conn, dias: DIA)
+    monkeypatch.setattr(simulacion_router.simulacion, "sin_datos", lambda conn, dias: None)
     monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id, bloquear=False: guardadas[-1] if guardadas else _alerta())
 
     def conexion():
@@ -87,6 +88,24 @@ def test_el_resume_no_escribe_ejecutada_si_el_ciclo_la_rechaza(monkeypatch, guar
     )
     assert respuesta.status_code == 200
     assert [a.status for a in guardadas] == ["approved"]
+
+
+@pytest.mark.parametrize(
+    "estado, detalle",
+    [
+        ({"fin": "fin.ya_no_aplica"}, "La acción aprobada no se ejecutó: el indicador ya no está fuera de su umbral el 2026-01-15."),
+        ({"fin": "fin.fallo_ejecucion", "failures": [{"step": "hoja.ejecutor.ejecutar", "kind": "error"}]}, "La acción aprobada no se ejecutó: falló su preparación, así que queda para hacerla a mano."),
+    ],
+)
+def test_una_aprobacion_sin_accion_ejecutada_lo_registra(monkeypatch, guardadas, estado, detalle):
+    orquestador = MagicMock()
+    orquestador.resume.return_value = estado
+    monkeypatch.setattr(alertas_router, "get_orchestrator", lambda: orquestador)
+    respuesta = TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "approve", "actionId": "accion_1"})
+    assert respuesta.status_code == 200
+    assert [a.status for a in guardadas] == ["approved"]
+    resultado = [c.args for c in alertas_router.bitacora.registrar.call_args_list if c.args[2] == "result"]
+    assert [args[4] for args in resultado] == [detalle]
 
 
 def _accion_nueva() -> dict:
@@ -290,7 +309,7 @@ def test_una_union_rechazada_corre_la_alerta_otra_vez_sin_ese_destino(monkeypatc
     (propia,) = guardadas
     assert propia.status == "proposed" and propia.merged_into is None and propia.actions
     assert f'"newAlerts": ["{propia.id}"]' in _fin(respuesta)
-    assert "No se unió a la alerta alerta_1, que está rejected." in simulacion_router.bitacora.registrar.call_args_list[0].args[4]
+    assert "No se unió a la alerta alerta_1, que está rechazada." in simulacion_router.bitacora.registrar.call_args_list[0].args[4]
 
 
 def test_una_alerta_sin_grafo_en_pausa_no_es_candidata(monkeypatch, guardadas):

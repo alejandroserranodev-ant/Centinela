@@ -22,7 +22,8 @@ steps.
 ## One simulated day
 
 1. `POST /simulacion/avanzar` reaches
-   `apps/api/src/centinela_api/routers/simulacion.py:avanzar(dias, persona, conn)`. The day moves in its own
+   `apps/api/src/centinela_api/routers/simulacion.py:avanzar(dias, persona, conn)`, which answers 409
+   when the day would pass the last day with data. The day moves in its own
    transaction, through `apps/api/src/centinela_api/simulacion.py:avanzar(conn, dias)`, before
    anything detects.
 2. Detection runs in the API's process.
@@ -43,10 +44,10 @@ steps.
    `apps/api/src/centinela_api/agentes.py:prioritized(detections, known, vigiladas)` keeps the
    detections whose metric is in `API_METRICS`, because the API's `Alert` model accepts no other, and
    in `apps/api/src/centinela_api/configuracion.py:vigiladas(ajustes)`, the metrics the settings
-   leave watched, drops those whose alert already exists, and keeps the `CENTINELA_ALERTAS_POR_DIA` with the most `pesos_en_riesgo`.
+   leave watched, drops those whose alert already exists, and keeps `CENTINELA_ALERTAS_POR_DIA`: the largest `pesos_en_riesgo` of each metric first, then the rest by pesos.
 3. For each detection the stream sends a `step` event, an `AgentStep` of `vigia`. Then
-   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)`
-   runs the graph in a worker thread, through `asyncio.to_thread`, so the event loop keeps
+   `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, on_step)`
+   runs the graph in a worker thread, and each agent whose leaf starts reaches the stream as one more `step`, through `asyncio.to_thread`, so the event loop keeps
    serving the stream. It runs until the approval interrupt or an end. The orchestrator comes from
    `apps/api/src/centinela_api/agentes.py:get_orchestrator()`, which builds it once per process
    with the model provider, the kernel's call, the four action stubs and an in-memory checkpointer.
@@ -60,8 +61,8 @@ steps.
    from its `transitions`: a path that does not start at `new` or skips a transition is refused,
    and the alert is logged and skipped. One transaction then stores it with
    `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)` and writes one `alert` row, actor `vigia`, with
-   `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id)`,
-   under the KPI's `queryId`, then one `evidence` row per query in `queries`, its SQL as the detail.
+   `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id, figures)`,
+   under the KPI's `queryId` and with the title's figures, then one `evidence` row per query in `queries`.
    An alert the graph ends `unida` is stored `merged` into the alert that remains, and a detection
    it absorbed is stored `merged` without running, as the lifecycle in
    [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle) states.
@@ -95,7 +96,8 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.resume(alert_id, decision)`,
    in a worker thread. On an approval or an edit, a state that carries an `executed_action` turns
    the alert `executed` through
-   `apps/api/src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)`, and a `result` row with actor `ejecutor` is written. A rejection resumes
+   `apps/api/src/centinela_api/ciclo_vida.py:transicionar(actual, siguiente)`, and a `result` row with actor `ejecutor` is written; a state without one
+   writes a `result` row saying why the action did not run, and the alert stays `approved`. A rejection resumes
    the graph and writes nothing more. A request for changes resumes it through
    `apps/api/src/centinela_api/routers/alertas.py:_reproponer(conn, alerta, motivo, ajustes, dia)`:
    the orchestrator receives the reason as `request_changes`, `Estratega` proposes again, and the
@@ -121,7 +123,8 @@ provider with no `LLM_MODEL`, is logged too, and the stream still ends with no n
    model writes.
 3. The stream sends one `step` per node the walk took, then one `end` with the `ChatMessage`.
    One transaction records each query in `api.consultas` and as an `evidence` row, then the
-   `answer` or `refusal` row, then one `evidence` row per model step's cost. No alert changes.
+   `answer` or `refusal` row with its figures, then one `costo` row per model step, which the log
+   never serves. No alert changes.
 4. A figure of the answer opens its source through `GET /consultas/{queryId}`,
    `apps/api/src/centinela_api/routers/consultas.py:obtener(query_id, conn)`.
 

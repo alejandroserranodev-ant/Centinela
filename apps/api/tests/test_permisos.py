@@ -126,6 +126,10 @@ def test_analista_y_auditor_reciben_403(decidir, persona):
     assert decidir(persona, "saldo_vencido").status_code == 403
 
 
+def test_el_403_del_auditor_dice_que_auditoria_solo_consulta(decidir):
+    assert decidir(AUDITOR, "saldo_vencido").json() == {"detail": "Auditoría consulta las alertas; no las decide"}
+
+
 def test_la_gerente_decide_y_la_respuesta_lo_dice(decidir):
     respuesta = decidir(GERENTE, "margen_pct")
     assert respuesta.status_code == 200
@@ -137,12 +141,12 @@ def test_un_dueno_que_ningun_lider_tiene_lo_decide_la_gerencia(metric):
     assert permisos.responsable(SEMILLA, metric) is None
     vista = permisos.vista(SEMILLA, COMERCIAL, alerta(metric))
     assert (vista.decided_by, vista.can_decide) == ("Gerencia", False)
-    assert permisos.negada(SEMILLA, alerta(metric)) == "Esta alerta la decide la gerencia"
+    assert permisos.negada(SEMILLA, COMERCIAL, alerta(metric)) == "Esta alerta la decide la gerencia"
     assert permisos.vista(SEMILLA, GERENTE, alerta(metric)).can_decide
 
 
 def test_una_metrica_sin_area_la_decide_la_gerencia():
     conn = guardada(margen_pct=None)
-    assert permisos.negada(conn, alerta("margen_pct")) == "Esta alerta la decide la gerencia"
+    assert permisos.negada(conn, COMERCIAL, alerta("margen_pct")) == "Esta alerta la decide la gerencia"
     assert permisos.vista(conn, COMERCIAL, alerta("margen_pct")).decided_by == "Gerencia"
     assert not permisos.puede_decidir(conn, COMERCIAL, alerta("margen_pct"))

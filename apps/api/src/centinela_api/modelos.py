@@ -179,8 +179,9 @@ class LogEvent(Esquema):
     alert_id: str | None = Field(None, description="Alert ID, null for a chat question asked from no alert")
     type: LogEventType = Field(..., description="Event type: alert, evidence, proposal, decision, action, result, question, answer, refusal, configuracion")
     actor: Actor = Field(..., description="Who/what performed the action (agent or person)")
-    detail: str = Field(..., description="Human-readable description or JSON cost data")
+    detail: str = Field(..., description="Spanish sentence of the event, with a {0} placeholder per figure")
     query_id: str | None = Field(None, description="SQL query ID if relevant to this event")
+    figures: list[Figure] = Field(default_factory=list, description="The figures the detail's placeholders point to")
 
 
 class ChatMessage(Esquema):
@@ -226,6 +227,7 @@ class InboxSummary(Esquema):
 class SimulatedDay(Esquema):
     """Current simulated day in ISO 8601 format."""
     dia: str = Field(..., description="Current simulated day (YYYY-MM-DD)", example="2026-10-03")
+    ultimo_dia: str = Field(..., description="Last day the dataset holds, past which the clock does not advance (YYYY-MM-DD)")
 
 
 class DecisionApprove(Esquema):

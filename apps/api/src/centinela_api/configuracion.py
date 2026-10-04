@@ -1,4 +1,5 @@
 import math
+import re
 from functools import cache
 from typing import Any, get_args
 
@@ -34,6 +35,21 @@ ETIQUETAS = {
     "veces_intervalo_habitual": "Veces el intervalo habitual",
 }
 
+LEGIBLE = {
+    "ref_margen_minimo_linea": "el margen mínimo de su línea",
+    "margen_minimo_pct": "el margen mínimo de su línea",
+    "max_dias_vencido": "los días vencidos",
+    "saldo_abierto": "el saldo abierto",
+    "cupo_credito": "el cupo de crédito",
+    "clase_abc": "clase ABC",
+}
+
+
+def legible(texto: str) -> str:
+    texto = re.sub(r"\s*\(vista [^)]*\)", "", texto)
+    texto = re.sub(r"^kit\b", "Kit del reto", texto)
+    return re.sub(r"\b[a-z]+(?:_[a-z]+)+\b", lambda m: LEGIBLE.get(m.group(0), m.group(0).replace("_", " ")), texto)
+
 
 class ConfiguracionInvalida(Exception):
     pass
@@ -55,9 +71,9 @@ def _umbral(clave: str, spec: Any) -> Threshold:
     if isinstance(spec, bool):
         regla = "sí" if spec else "no"
     elif isinstance(spec, dict) and "columna" in spec:
-        regla = f"según la columna {spec['columna']}"
+        regla = f"según {legible(spec['columna'])}"
     elif isinstance(spec, dict) and "por" in spec:
-        regla = f"por {spec['por']}: " + ", ".join(f"{clase} {_numero(valor)}" for clase, valor in spec["valores"].items())
+        regla = f"por {legible(spec['por'])}: " + ", ".join(f"{clase} {_numero(valor)}" for clase, valor in spec["valores"].items())
     else:
         regla = str(spec)
     return Threshold(key=clave, value=None, label=etiqueta, editable=False, rule=regla)
@@ -77,8 +93,8 @@ def semilla() -> Settings:
                 name=entrada["etiqueta"],
                 description=entrada["descripcion"],
                 view=entrada["vista"],
-                rule=entrada["umbral_alerta"],
-                source=entrada["fuente_umbral"],
+                rule=legible(entrada["umbral_alerta"]),
+                source=legible(entrada["fuente_umbral"]),
                 thresholds=[_umbral(clave, spec) for clave, spec in (entrada.get("umbrales") or {}).items()],
                 watched=True,
                 owner=duenos.get(nombre) if duenos.get(nombre) in posibles else None,
@@ -136,14 +152,14 @@ def _validar(actual: Settings, nuevo: Settings) -> None:
         previa = previas[metrica.metric]
         umbrales = {u.key: u for u in previa.thresholds}
         if sorted(u.key for u in metrica.thresholds) != sorted(umbrales):
-            raise ConfiguracionInvalida(f"Los umbrales de {previa.name} no coinciden con los de data/metricas.yaml")
+            raise ConfiguracionInvalida(f"Los umbrales de {previa.name} no coinciden con los que vigila Centinela")
         for umbral in metrica.thresholds:
             antes = umbrales[umbral.key]
             if not antes.editable:
                 if umbral.value != antes.value or umbral.editable:
-                    raise ConfiguracionInvalida(f"El umbral {umbral.key} de {previa.name} no se cambia desde Centinela: {antes.rule}")
+                    raise ConfiguracionInvalida(f"El umbral «{antes.label}» de {previa.name} no se cambia desde Centinela: {antes.rule}")
             elif umbral.value is None or not math.isfinite(umbral.value) or umbral.value < 0:
-                raise ConfiguracionInvalida(f"El umbral {umbral.key} de {previa.name} debe ser un número mayor o igual a cero")
+                raise ConfiguracionInvalida(f"El umbral «{antes.label}» de {previa.name} debe ser un número mayor o igual a cero")
         if metrica.owner is not None and metrica.owner not in actual.owners:
             raise ConfiguracionInvalida(f"{metrica.owner} no es un área que lidere un proceso: elige una de la lista o Gerencia")
 

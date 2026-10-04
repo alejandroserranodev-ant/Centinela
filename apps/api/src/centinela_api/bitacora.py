@@ -3,7 +3,9 @@ import datetime
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .modelos import Actor, LogEvent, LogEventType
+from collections.abc import Sequence
+
+from .modelos import Actor, Figure, LogEvent, LogEventType
 
 
 def registrar(
@@ -14,11 +16,13 @@ def registrar(
     detalle: str,
     dia_simulado: datetime.date,
     query_id: str | None = None,
+    figures: Sequence[Figure] = (),
 ) -> LogEvent:
+    figuras = [figura.model_dump(by_alias=True) for figura in figures]
     fila = conn.execute(
-        "INSERT INTO api.bitacora (alerta_id, tipo, actor, detalle, query_id, dia_simulado) "
-        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, creado_en",
-        (alerta_id, tipo, Jsonb(actor.model_dump(by_alias=True)), detalle, query_id, dia_simulado),
+        "INSERT INTO api.bitacora (alerta_id, tipo, actor, detalle, query_id, dia_simulado, figuras) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, creado_en",
+        (alerta_id, tipo, Jsonb(actor.model_dump(by_alias=True)), detalle, query_id, dia_simulado, Jsonb(figuras)),
     ).fetchone()
     id, creado_en = fila
     return LogEvent(
@@ -30,13 +34,21 @@ def registrar(
         actor=actor,
         detail=detalle,
         query_id=query_id,
+        figures=list(figures),
+    )
+
+
+def registrar_costo(conn: psycopg.Connection, alerta_id: str | None, actor: Actor, detalle: str, dia_simulado: datetime.date) -> None:
+    conn.execute(
+        "INSERT INTO api.bitacora (alerta_id, tipo, actor, detalle, dia_simulado) VALUES (%s, 'costo', %s, %s, %s)",
+        (alerta_id, Jsonb(actor.model_dump(by_alias=True)), detalle, dia_simulado),
     )
 
 
 def listar(
     conn: psycopg.Connection, alerta_id: str | None, tipo: LogEventType | None
 ) -> list[LogEvent]:
-    condiciones = []
+    condiciones = ["tipo <> 'costo'"]
     parametros: list[str] = []
     if alerta_id is not None:
         condiciones.append("alerta_id = %s")
@@ -44,9 +56,9 @@ def listar(
     if tipo is not None:
         condiciones.append("tipo = %s")
         parametros.append(tipo)
-    donde = f"WHERE {' AND '.join(condiciones)}" if condiciones else ""
+    donde = f"WHERE {' AND '.join(condiciones)}"
     filas = conn.execute(
-        f"SELECT id, alerta_id, tipo, actor, detalle, query_id, dia_simulado, creado_en "
+        f"SELECT id, alerta_id, tipo, actor, detalle, query_id, dia_simulado, creado_en, figuras "
         f"FROM api.bitacora {donde} ORDER BY creado_en DESC",
         parametros,
     ).fetchall()
@@ -54,7 +66,7 @@ def listar(
 
 
 def _a_evento(fila: tuple) -> LogEvent:
-    id, alerta_id, tipo, actor, detalle, query_id, dia_simulado, creado_en = fila
+    id, alerta_id, tipo, actor, detalle, query_id, dia_simulado, creado_en, figuras = fila
     return LogEvent(
         id=str(id),
         date=creado_en.isoformat(),
@@ -64,4 +76,5 @@ def _a_evento(fila: tuple) -> LogEvent:
         actor=actor,
         detail=detalle,
         query_id=query_id,
+        figures=figuras,
     )

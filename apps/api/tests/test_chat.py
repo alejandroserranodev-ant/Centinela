@@ -74,7 +74,8 @@ def mundo(monkeypatch):
     escritos = {"bitacora": [], "consultas": []}
     monkeypatch.setattr(chat_router.simulacion, "dia_actual", lambda conn: DIA)
     monkeypatch.setattr(chat_router.alertas_repo, "obtener", lambda conn, id: alerta() if id == "alerta_1" else None)
-    monkeypatch.setattr(chat_router.bitacora, "registrar", lambda conn, alerta_id, tipo, actor, detalle, dia, query_id=None: escritos["bitacora"].append((alerta_id, tipo, actor.model_dump(by_alias=True), detalle, query_id)))
+    monkeypatch.setattr(chat_router.bitacora, "registrar", lambda conn, alerta_id, tipo, actor, detalle, dia, query_id=None, figures=(): escritos["bitacora"].append((alerta_id, tipo, actor.model_dump(by_alias=True), detalle, query_id, [f.model_dump(by_alias=True) for f in figures])))
+    monkeypatch.setattr(chat_router.bitacora, "registrar_costo", lambda conn, alerta_id, actor, detalle, dia: escritos["bitacora"].append((alerta_id, "costo", actor.model_dump(by_alias=True), detalle, None, [])))
     monkeypatch.setattr(chat_router.consultas, "registrar", lambda conn, consultas: escritos["consultas"].extend(consultas))
     app.dependency_overrides[obtener_conexion] = lambda: Conexion()
     app.dependency_overrides[persona_actual] = lambda: Persona(email="gerente@andina.test", name="Ana Gómez", role="gerente")
@@ -117,9 +118,12 @@ def test_la_bitacora_registra_pregunta_consulta_respuesta_y_costo_sin_alerta(mon
     TestClient(app).post("/chat", json={"question": "¿Cuánta mora tiene CLI-001?"})
 
     tipos = [(alerta_id, tipo) for alerta_id, tipo, *_ in mundo["bitacora"]]
-    assert tipos == [(None, "question"), (None, "evidence"), (None, "answer"), (None, "evidence")]
+    assert tipos == [(None, "question"), (None, "evidence"), (None, "answer"), (None, "costo")]
     pregunta = mundo["bitacora"][0]
     assert pregunta[2] == {"kind": "person", "name": "Ana Gómez", "role": "gerente"}
+    assert mundo["bitacora"][1][3] == "Consulta de Cartera vencida del 2026-03-02"
+    assert mundo["bitacora"][2][3] == "CLI-001 tiene {0} de mora."
+    assert mundo["bitacora"][2][5] == [{"value": 45.0, "unit": "days", "queryId": "q_saldo"}]
     assert mundo["bitacora"][2][4] == "q_saldo"
     assert mundo["bitacora"][2][2] == {"kind": "agent", "agent": "chat"}
     assert mundo["consultas"] == [CONSULTA]
@@ -174,4 +178,4 @@ def test_un_fallo_del_modelo_no_se_registra_como_rechazo(monkeypatch, mundo):
     mensaje = eventos(TestClient(app).post("/chat", json={"question": "¿Cuánto?"}).text)[-1][1]
     assert mensaje["outcome"] == "no_evidence"
     tipo, detalle = mundo["bitacora"][-1][1], mundo["bitacora"][-1][3]
-    assert tipo == "answer" and "hoja.chat.clasificar: timeout" in detalle
+    assert tipo == "answer" and detalle.endswith("El asistente no pudo terminar su respuesta.")

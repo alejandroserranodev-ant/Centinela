@@ -136,7 +136,7 @@ def test_rol_sin_permiso_no_puede_decidir(cliente):
         headers=_cabeceras("auditoria@andina.test"),
     )
     assert respuesta.status_code == 403
-    assert respuesta.json()["detail"] == "Esta alerta la decide Comercial"
+    assert respuesta.json()["detail"] == "Auditoría consulta las alertas; no las decide"
 
 
 def test_rechazar_sin_motivo_es_422(cliente):
@@ -211,7 +211,20 @@ def test_rechazar_un_analisis_que_no_espera_queda_registrado(cliente, monkeypatc
     assert [e["detail"] for e in _decisiones(cliente)] == ["Rechazada. Motivo: Ya no aplica"]
 
 
-def test_simulacion_avanzar_devuelve_el_evento_end(monkeypatch):
+@pytest.fixture
+def reloj():
+    with conectar() as conn:
+        antes = conn.execute("SELECT dia_actual FROM api.simulacion").fetchone()
+        conn.execute("UPDATE api.simulacion SET dia_actual = centinela.fecha_corte() - 10")
+    try:
+        yield
+    finally:
+        with conectar() as conn:
+            if antes is not None:
+                conn.execute("UPDATE api.simulacion SET dia_actual = %s", antes)
+
+
+def test_simulacion_avanzar_devuelve_el_evento_end(monkeypatch, reloj):
     monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "0")
     with TestClient(app, headers=CABECERAS_GERENTE) as cliente:
         with cliente.stream("POST", "/simulacion/avanzar", params={"dias": 1}) as respuesta:
@@ -245,14 +258,14 @@ def _query_ids(alerta: dict) -> set[str]:
 
 
 @pytest.mark.skipif(not _modelo_responde(), reason="the model provider of the root .env is unusable")
-def test_un_dia_real_cita_el_kernel_y_aprobar_ejecuta_y_rechazar_clasifica(monkeypatch):
-    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "2")
+def test_un_dia_real_cita_el_kernel_y_aprobar_ejecuta_y_rechazar_clasifica(monkeypatch, reloj):
+    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "4")
     nuevas: list[str] = []
     try:
         with TestClient(app, headers=CABECERAS_GERENTE) as cliente:
             with cliente.stream("POST", "/simulacion/avanzar", params={"dias": 1}) as respuesta:
                 nuevas = _evento_end("".join(respuesta.iter_text()))["newAlerts"]
-            assert len(nuevas) == 2
+            assert len(nuevas) >= 2
 
             for id_alerta in nuevas:
                 alerta = cliente.get(f"/alertas/{id_alerta}").json()
@@ -317,7 +330,9 @@ def test_una_pregunta_sin_alerta_queda_en_la_bitacora_y_su_consulta_se_abre(monk
         pregunta = next(e for e in eventos if e["type"] == "question" and e["detail"] == marca)
         assert pregunta["alertId"] is None
         assert pregunta["actor"] == {"kind": "person", "name": NOMBRE_GERENTE, "role": "gerente"}
-        assert any(e["type"] == "answer" and e["alertId"] is None and e["queryId"] == "q_prueba_chat" for e in eventos)
+        respondida = next(e for e in eventos if e["type"] == "answer" and e["alertId"] is None and e["queryId"] == "q_prueba_chat")
+        assert respondida["detail"] == "CLI-001 tiene {0} de mora."
+        assert respondida["figures"] == [{"value": 45.0, "unit": "days", "queryId": "q_prueba_chat"}]
 
         consulta = TestClient(app, headers=CABECERAS_GERENTE).get("/consultas/q_prueba_chat")
         assert consulta.status_code == 200
@@ -325,7 +340,7 @@ def test_una_pregunta_sin_alerta_queda_en_la_bitacora_y_su_consulta_se_abre(monk
         assert TestClient(app, headers=CABECERAS_GERENTE).get("/consultas/q_no_existe").status_code == 404
     finally:
         with conectar() as conn:
-            conn.execute("DELETE FROM api.bitacora WHERE alerta_id IS NULL AND (detalle = %s OR detalle LIKE %s OR query_id = %s)", (marca, "fin.chat_respondida: CLI-001 tiene {0} de mora.", "q_prueba_chat"))
+            conn.execute("DELETE FROM api.bitacora WHERE alerta_id IS NULL AND (detalle = %s OR detalle LIKE %s OR query_id = %s)", (marca, "CLI-001 tiene {0} de mora.", "q_prueba_chat"))
             conn.execute("DELETE FROM api.consultas WHERE query_id = %s", ("q_prueba_chat",))
             conn.commit()
 

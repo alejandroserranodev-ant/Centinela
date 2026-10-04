@@ -1380,9 +1380,17 @@
             "type": "string"
           },
           "detail": {
-            "description": "Human-readable description or JSON cost data",
+            "description": "Spanish sentence of the event, with a {0} placeholder per figure",
             "title": "Detail",
             "type": "string"
+          },
+          "figures": {
+            "description": "The figures the detail's placeholders point to",
+            "items": {
+              "$ref": "#/components/schemas/Figure"
+            },
+            "title": "Figures",
+            "type": "array"
           },
           "id": {
             "description": "Log entry ID",
@@ -1432,7 +1440,8 @@
           "type",
           "actor",
           "detail",
-          "queryId"
+          "queryId",
+          "figures"
         ],
         "title": "LogEvent",
         "type": "object"
@@ -1741,10 +1750,16 @@
             "example": "2026-10-03",
             "title": "Dia",
             "type": "string"
+          },
+          "ultimoDia": {
+            "description": "Last day the dataset holds, past which the clock does not advance (YYYY-MM-DD)",
+            "title": "Ultimodia",
+            "type": "string"
           }
         },
         "required": [
-          "dia"
+          "dia",
+          "ultimoDia"
         ],
         "title": "SimulatedDay",
         "type": "object"

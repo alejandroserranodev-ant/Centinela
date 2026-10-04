@@ -437,10 +437,11 @@ detection whose alert exists, orders the rest, and runs the alert graph of each 
 names an alert by metric and entity, so a detection an earlier alert covers proposes the same id
 and is dropped.
 
-**The order is by `pesos_en_riesgo` from the largest, and a day raises at most
+**The order is the largest `pesos_en_riesgo` of each metric, then the rest by pesos, and a day raises at most
 `CENTINELA_ALERTAS_POR_DIA` alerts**, three by default. In series, because a local model is loaded once and
 parallel requests share its memory and compute, and in the cloud the order of the inbox is the
-order of the run. By pesos, because the largest exposure reaches the
+order of the run. A metric first, because a metric with hundreds of rows would otherwise fill every
+day. By pesos, because the largest exposure reaches the
 inbox first, and because a merge keeps the alert analysed first, which is the larger:
 `explicar.destino_analizado` joins this alert to one analysed before it, and
 `explicar.destino_nuevo` joins to this alert one the day run has not reached. Capped, because the

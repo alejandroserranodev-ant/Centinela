@@ -1,7 +1,13 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import alertas, auth, bandeja, bitacora, chat, configuracion, consultas, interno, simulacion
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+for ruidoso in ("httpx", "httpx2", "httpcore", "openai"):
+    logging.getLogger(ruidoso).setLevel(logging.WARNING)
 
 app = FastAPI(title="Centinela API")
 

@@ -122,9 +122,8 @@ The views are listed by `grep -o 'VIEW v_[a-z_]*' sql/0[34]_*.sql`.
 `inventario_diario.fecha`). For the demo, Centinela must live any day: the clock advances one day
 at a time, the simulated day replaces `fecha_corte()`, and every query filters
 `fecha <= <simulated day>`. [`../apps/api/AGENTS.md`](../apps/api/AGENTS.md) owns the clock: it
-keeps the day in its table `api.simulacion` and seeds it, on the first read, from `fecha_corte()`
-(`apps/api/src/centinela_api/simulacion.py:dia_actual(conn)`), so the first advance already passes
-the dataset's last day. The day it advances reaches every KPI as the `dia` of the kernel's
+keeps the day in its table `api.simulacion`, seeds it before `fecha_corte()` and stops it there
+(`apps/api/src/centinela_api/simulacion.py:dia_actual(conn)`). The day it advances reaches every KPI as the `dia` of the kernel's
 `kpi_consultar`, the reader the API hands detection and the agents.
 
 **The three paragraphs below describe the views**, and bind every reader of one: an agent through

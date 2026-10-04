@@ -63,8 +63,8 @@ def test_la_semilla_sale_de_metricas_yaml():
     assert margen.rule.startswith("caída > 3 puntos")
     assert (umbral(semilla, "margen_pct", "caida_pts").value, umbral(semilla, "margen_pct", "caida_pts").editable) == (3, True)
     minimo = umbral(semilla, "margen_pct", "margen_pct")
-    assert (minimo.value, minimo.editable, minimo.rule) == (None, False, "según la columna margen_minimo_pct")
-    assert umbral(semilla, "cobertura_dias", "cobertura_dias").rule == "por clase_abc: A 10, B 7"
+    assert (minimo.value, minimo.editable, minimo.rule) == (None, False, "según el margen mínimo de su línea")
+    assert umbral(semilla, "cobertura_dias", "cobertura_dias").rule == "por clase ABC: A 10, B 7"
     assert set(semilla.autonomy.values()) == {"propose"} and len(semilla.autonomy) == 4
 
 
@@ -168,6 +168,21 @@ def test_cualquiera_lee_la_configuracion_pero_auditoria_no_la_cambia(cliente):
     assert cliente(ANALISTA).put("/configuracion", json=leida.json()).status_code == 200
 
 
+def test_las_reglas_y_fuentes_no_muestran_columnas_ni_vistas():
+    for m in configuracion.semilla().metrics:
+        textos = [m.rule, m.source, *(u.rule for u in m.thresholds)]
+        assert not any("_" in texto or "vista" in texto for texto in textos), textos
+    assert metrica(configuracion.semilla(), "margen_pct").source == "Kit del reto; margen mínimo en OPE-POL-007 §4"
+
+
+def test_un_umbral_negativo_se_rechaza_con_su_etiqueta(cliente):
+    cuerpo = configuracion.semilla().model_dump(mode="json", by_alias=True)
+    margen = next(m for m in cuerpo["metrics"] if m["metric"] == "margen_pct")
+    next(u for u in margen["thresholds"] if u["key"] == "caida_pts")["value"] = -1
+    respuesta = cliente(ANALISTA).put("/configuracion", json=cuerpo)
+    assert (respuesta.status_code, respuesta.json()["detail"]) == (422, "El umbral «Caída frente al promedio de 8 semanas, en puntos» de Margen debe ser un número mayor o igual a cero")
+
+
 def test_el_422_trae_el_mensaje_en_espanol(cliente):
     cuerpo = configuracion.semilla().model_dump(mode="json", by_alias=True)
     cuerpo["autonomy"]["email_draft"] = "execute"
@@ -184,6 +199,30 @@ def test_el_dia_descarta_las_metricas_que_no_se_vigilan():
     ajustes = con(configuracion.semilla(), "margen_pct", watched=False)
     elegidas = agentes.prioritized(detecciones, set(), configuracion.vigiladas(ajustes))
     assert [d.metric for d in elegidas] == ["saldo_vencido"]
+
+
+def de(metric: str, entidad: str, pesos: float) -> Detection:
+    return Detection(metric, (entidad,), "e", (), {"pesos_en_riesgo": pesos})
+
+
+def test_cada_metrica_tiene_su_alerta_antes_que_los_pesos(monkeypatch):
+    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "3")
+    detecciones = [de("saldo_vencido", "C1", 900), de("saldo_vencido", "C2", 800), de("veces_intervalo_habitual", "C3", 700), de("margen_pct", "Hogar", 5)]
+    elegidas = agentes.prioritized(detecciones, set(), agentes.API_METRICS)
+    assert [(d.metric, d.entity) for d in elegidas] == [("saldo_vencido", ("C1",)), ("veces_intervalo_habitual", ("C3",)), ("margen_pct", ("Hogar",))]
+
+
+def test_el_cupo_sobrante_va_por_pesos(monkeypatch):
+    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "4")
+    detecciones = [de("margen_pct", "Hogar", 5), de("saldo_vencido", "C1", 900), de("saldo_vencido", "C2", 800), de("saldo_vencido", "C3", 100), de("margen_pct", "Aseo", 300)]
+    elegidas = agentes.prioritized(detecciones, set(), agentes.API_METRICS)
+    assert [d.entity for d in elegidas] == [("C1",), ("Aseo",), ("C2",), ("C3",)]
+
+
+def test_si_hay_mas_metricas_que_cupo_ganan_las_de_mas_pesos(monkeypatch):
+    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "1")
+    detecciones = [de("margen_pct", "Hogar", 5), de("saldo_vencido", "C1", 900)]
+    assert [d.metric for d in agentes.prioritized(detecciones, set(), agentes.API_METRICS)] == ["saldo_vencido"]
 
 
 def test_los_umbrales_editados_reemplazan_a_los_del_yaml_y_el_resto_queda():

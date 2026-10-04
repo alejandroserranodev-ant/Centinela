@@ -11,6 +11,8 @@ from .. import bitacora, ciclo_vida, configuracion, consultas, permisos, simulac
 from ..agentes import (
     STATUS_A_ESTADO,
     absorbed_alert,
+    detalle_de_consulta,
+    etiqueta,
     alert_id_of,
     brief_of_alert,
     brief_of_detection,
@@ -47,7 +49,7 @@ def _unir(conn: psycopg.Connection, alerta: Alert, dia: datetime.date, nota: str
     bitacora.registrar(
         conn, alerta.id, "alert", ANALISTA,
         f"Unida a la alerta {destino.id}: la misma causa. {alerta.title.text}{nota}",
-        dia, alerta.pesos_at_risk.query_id,
+        dia, alerta.pesos_at_risk.query_id, alerta.title.figures,
     )
     return destino
 
@@ -63,12 +65,40 @@ def _absorber(conn, alerta: Alert, nombradas: list[str], pendientes: dict, day_s
         bitacora.registrar(
             conn, unida.id, "alert", ANALISTA,
             f"Unida a la alerta {alerta.id}: la misma causa. {unida.title.text}",
-            dia, unida.pesos_at_risk.query_id,
+            dia, unida.pesos_at_risk.query_id, unida.title.figures,
         )
         unidas.append(unida)
     if unidas:
         alerta = alertas_repo.guardar(conn, alerta.model_copy(update={"merged_alerts": [*alerta.merged_alerts, *map(merged_summary, unidas)]}))
     return alerta, unidas
+
+
+PASOS = {
+    "vigia": "Detectada anomalía en {sujeto}",
+    "analista": "Buscando la causa de {sujeto}",
+    "estratega": "Proponiendo acciones para {sujeto}",
+}
+
+
+def _sujeto(detection) -> str:
+    return " · ".join([etiqueta(detection.metric), *map(str, detection.entity)])
+
+
+async def _con_pasos(llamada):
+    cola: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    tarea = asyncio.ensure_future(asyncio.to_thread(llamada, lambda agente, nodo: loop.call_soon_threadsafe(cola.put_nowait, agente)))
+    while True:
+        espera = asyncio.ensure_future(cola.get())
+        hechas, _ = await asyncio.wait({espera, tarea}, return_when=asyncio.FIRST_COMPLETED)
+        if espera in hechas:
+            yield "paso", espera.result()
+            continue
+        espera.cancel()
+        while not cola.empty():
+            yield "paso", cola.get_nowait()
+        yield "estado", tarea.result()
+        return
 
 
 def _paso_final(alerta: Alert) -> str:
@@ -86,7 +116,7 @@ async def dia_actual(conn: psycopg.Connection = Depends(obtener_conexion)) -> Si
     Used by Vigía to know what date to filter queries by.
     """
     dia = simulacion.dia_actual(conn)
-    return SimulatedDay(dia=dia.isoformat())
+    return SimulatedDay(dia=dia.isoformat(), ultimo_dia=simulacion.ultimo_dia(conn).isoformat())
 
 
 @router.post("/simulacion/avanzar")
@@ -97,6 +127,9 @@ async def avanzar(
 ) -> StreamingResponse:
     if day_run.locked():
         raise HTTPException(status_code=409, detail="Ya hay un día en curso")
+    motivo = simulacion.sin_datos(conn, dias)
+    if motivo is not None:
+        raise HTTPException(status_code=409, detail=motivo)
     await day_run.acquire()
     held = True
 
@@ -140,25 +173,25 @@ async def avanzar(
                     continue
 
                 inicio = datetime.datetime.now(datetime.UTC).isoformat()
-                yield "step", AgentStep(
-                    alert_id=alert_id,
-                    agent="vigia",
-                    status="running",
-                    description=f"Detectada anomalía en {detection.metric}",
-                    start=inicio,
-                )
+                sujeto = _sujeto(detection)
+                agente = "vigia"
+                yield "step", AgentStep(alert_id=alert_id, agent=agente, status="running", description=PASOS[agente].format(sujeto=sujeto), start=inicio)
 
                 try:
                     excluidas: dict[str, str] = {}
                     while True:
-                        state = await asyncio.to_thread(
-                            orq.start,
-                            detection,
-                            alert_id=alert_id,
-                            day=day_str,
-                            earlier_alerts={**earlier, **{otra: "nueva" for otra in pendientes}},
-                            alert_briefs={**briefs, **{otra: brief_of_detection(d) for otra, d in pendientes.items()}},
-                        )
+                        opciones = {
+                            "alert_id": alert_id,
+                            "day": day_str,
+                            "earlier_alerts": {**earlier, **{otra: "nueva" for otra in pendientes}},
+                            "alert_briefs": {**briefs, **{otra: brief_of_detection(d) for otra, d in pendientes.items()}},
+                        }
+                        async for tipo, valor in _con_pasos(lambda on_step: orq.start(detection, on_step=on_step, **opciones)):
+                            if tipo == "estado":
+                                state = valor
+                            elif valor in PASOS and valor != agente:
+                                agente = valor
+                                yield "step", AgentStep(alert_id=alert_id, agent=agente, status="running", description=PASOS[agente].format(sujeto=sujeto), start=inicio)
                         alerta = state_to_alert(alert_id, state, detection, day_str)
                         ciclo_vida.recorrer(status_path(alert_id, state))
                         nota = "".join(f" No se unió a la alerta {otra}, que está {estado}." for otra, estado in excluidas.items())
@@ -169,7 +202,7 @@ async def avanzar(
                                 destino = _unir(conn, alerta, nuevo_dia, nota)
                                 if destino is None:
                                     actual = alertas_repo.obtener(conn, alerta.merged_into)
-                                    excluidas[alerta.merged_into] = actual.status if actual else "inexistente"
+                                    excluidas[alerta.merged_into] = STATUS_A_ESTADO.get(actual.status, actual.status) if actual else "inexistente"
                                     logger.warning("Merge of %s into %s refused: the target is %s; the alert runs again without it", alert_id, alerta.merged_into, excluidas[alerta.merged_into])
                                     earlier.pop(alerta.merged_into, None)
                                     briefs.pop(alerta.merged_into, None)
@@ -182,6 +215,7 @@ async def avanzar(
                                     f"Alerta detectada: {alerta.title.text}{nota}",
                                     nuevo_dia,
                                     alerta.pesos_at_risk.query_id,
+                                    alerta.title.figures,
                                 )
                                 alerta, unidas = _absorber(conn, alerta, list(state.get("merged_alerts") or []), pendientes, day_str, nuevo_dia)
                             consultas.registrar(conn, state.get("queries") or [])
@@ -189,7 +223,7 @@ async def avanzar(
                                 bitacora.registrar(
                                     conn, alert_id, "evidence",
                                     ActorAgent(agent="analista"),
-                                    f"{query['kpi']} el {query['dia']}: {query['consulta']}",
+                                    detalle_de_consulta(query),
                                     nuevo_dia,
                                     query["queryId"],
                                 )
@@ -218,6 +252,14 @@ async def avanzar(
 
                 except Exception as e:
                     logger.error(f"Error processing detection {alert_id}: {e}", exc_info=True)
+                    yield "step", AgentStep(
+                        alert_id=alert_id,
+                        agent=agente,
+                        status="done",
+                        description=f"El análisis de {sujeto} no terminó.",
+                        start=inicio,
+                        end=datetime.datetime.now(datetime.UTC).isoformat(),
+                    )
 
         except Exception as e:
             logger.error(f"Detection phase failed: {e}", exc_info=True)

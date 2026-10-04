@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from .. import alertas as alertas_repo
 from .. import bitacora, consultas, simulacion
-from ..agentes import _convert_figures, get_orchestrator
+from ..agentes import _convert_figures, detalle_de_consulta, get_orchestrator
 from ..auth import persona_actual
 from ..db import obtener_conexion
 from ..modelos import ActorAgent, ActorPerson, AgentStep, ChatMessage, ChatQuestion, CostoAgente, Persona
@@ -40,6 +40,7 @@ NODOS = {
     "hoja.chat.responder": "Redactar la respuesta con las cifras del kernel",
     "conversar.con_evidencia": "¿Cada frase cita una consulta?",
 }
+INCOMPLETA = "El asistente no pudo terminar su respuesta."
 RAMAS = {"si": "sí", "no": "no", "hoja": "hecho"}
 
 
@@ -103,12 +104,15 @@ async def chat(
         with conn.transaction():
             consultas.registrar(conn, respuesta["queries"])
             for consulta in respuesta["queries"]:
-                bitacora.registrar(conn, pregunta.alert_id, "evidence", agente, f"{consulta['kpi']} el {consulta['dia']}: {consulta['consulta']}", dia, consulta["queryId"])
+                bitacora.registrar(conn, pregunta.alert_id, "evidence", agente, detalle_de_consulta(consulta), dia, consulta["queryId"])
             tipo = "refusal" if desenlace in ("refused", "out_of_scope") else "answer"
-            fallidos = "".join(f" [falló {fallo['step']}: {fallo['kind']}]" for fallo in fallos)
-            bitacora.registrar(conn, pregunta.alert_id, tipo, agente, f"{respuesta['fin']}: {final['text']}{fallidos}", dia, figuras[0].query_id if figuras else None)
+            detalle = final["text"]
+            if fallos:
+                logger.warning("Chat answered with failures: %s", fallos)
+                detalle = f"{detalle} {INCOMPLETA}"
+            bitacora.registrar(conn, pregunta.alert_id, tipo, agente, detalle, dia, figuras[0].query_id if figuras else None, figuras)
             for costo in respuesta.get("costs") or []:
-                bitacora.registrar(conn, pregunta.alert_id, "evidence", agente, costo_de(costo), dia)
+                bitacora.registrar_costo(conn, pregunta.alert_id, agente, costo_de(costo), dia)
 
         yield "end", ChatMessage(
             id=f"msg_{uuid.uuid4().hex[:8]}",

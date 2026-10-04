@@ -1066,9 +1066,14 @@ export interface components {
             date: string;
             /**
              * Detail
-             * @description Human-readable description or JSON cost data
+             * @description Spanish sentence of the event, with a {0} placeholder per figure
              */
             detail: string;
+            /**
+             * Figures
+             * @description The figures the detail's placeholders point to
+             */
+            figures: components["schemas"]["Figure"][];
             /**
              * Id
              * @description Log entry ID
@@ -1273,6 +1278,11 @@ export interface components {
              * @example 2026-10-03
              */
             dia: string;
+            /**
+             * Ultimodia
+             * @description Last day the dataset holds, past which the clock does not advance (YYYY-MM-DD)
+             */
+            ultimoDia: string;
         };
         /**
          * Threshold

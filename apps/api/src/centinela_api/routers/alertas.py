@@ -65,6 +65,8 @@ async def obtener(
 
 EN_PAUSA = "El análisis de esta alerta ya no está en pausa: no puede reanudarse"
 EN_CURSO = "Esta alerta está procesando otra decisión: espera a que termine"
+NO_EJECUTADA = "La acción aprobada no se ejecutó"
+EJECUTOR = ActorAgent(agent="ejecutor")
 reanudando: set[str] = set()
 
 
@@ -87,7 +89,7 @@ async def decidir(
     if alerta is None:
         raise HTTPException(404, "No existe esa alerta")
     if not permisos.puede_decidir(conn, persona, alerta):
-        raise HTTPException(403, permisos.negada(conn, alerta))
+        raise HTTPException(403, permisos.negada(conn, persona, alerta))
     if id in reanudando:
         raise HTTPException(409, EN_CURSO)
     reanudando.add(id)
@@ -104,6 +106,12 @@ def _aplicar(alerta: Alert, decision: Decision, ajustes: Settings) -> tuple[Aler
         raise HTTPException(409, str(e)) from e
     except decisiones.DecisionInvalida as e:
         raise HTTPException(422, str(e)) from e
+
+
+def no_ejecutada(fin: str | None, dia: datetime.date) -> str:
+    if fin == "fin.ya_no_aplica":
+        return f"{NO_EJECUTADA}: el indicador ya no está fuera de su umbral el {dia.isoformat()}."
+    return f"{NO_EJECUTADA}: falló su preparación, así que queda para hacerla a mano."
 
 
 async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: psycopg.Connection) -> Alert:
@@ -149,22 +157,16 @@ async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: ps
                 })
                 with conn.transaction():
                     nueva = alertas_repo.guardar(conn, nueva)
-                    bitacora.registrar(
-                        conn, nueva.id, "result",
-                        ActorAgent(agent="ejecutor"),
-                        f"Acción ejecutada: {nueva.executed_action.result}",
-                        dia,
-                    )
+                    bitacora.registrar(conn, nueva.id, "result", EJECUTOR, f"Acción ejecutada: {nueva.executed_action.result}", dia)
+            else:
+                logger.warning("Approved action of %s was not executed: %s %s", id, state.get("fin"), state.get("failures"))
+                with conn.transaction():
+                    bitacora.registrar(conn, nueva.id, "result", EJECUTOR, no_ejecutada(state.get("fin"), dia), dia)
 
         except Exception as e:
             logger.error(f"Orchestrator resume failed for {id}: {e}", exc_info=True)
             with conn.transaction():
-                bitacora.registrar(
-                    conn, nueva.id, "result",
-                    ActorAgent(agent="ejecutor"),
-                    f"La acción aprobada no se ejecutó: {e}",
-                    dia,
-                )
+                bitacora.registrar(conn, nueva.id, "result", EJECUTOR, no_ejecutada(None, dia), dia)
 
     elif isinstance(decision, DecisionReject):
         if en_pausa:
