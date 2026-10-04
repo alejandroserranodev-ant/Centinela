@@ -141,7 +141,8 @@ async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: ps
                 "simulated_day": dia.isoformat(),
             }
             if isinstance(decision, DecisionEdit):
-                orch_decision["parameters"] = decision.parameters
+                aprobada = next(a for a in nueva.actions if a.id == decision.action_id)
+                orch_decision["parameters"] = dict(aprobada.parameters)
 
             state = await asyncio.to_thread(orq.resume, id, orch_decision)
 

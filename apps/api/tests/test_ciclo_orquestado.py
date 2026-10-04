@@ -114,6 +114,17 @@ def test_una_aprobacion_sin_accion_ejecutada_lo_registra(monkeypatch, guardadas,
     assert [args[4] for args in resultado] == [detalle]
 
 
+def test_una_edicion_parcial_llega_al_ejecutor_con_los_demas_parametros(monkeypatch, guardadas):
+    accion = Action(id="accion_1", title="Tarea", description=Sentence(text="Hace algo", figures=[]), type="task", impact=None, confidence=Confidence(level="medium"), parameters={"owner": "Compras", "cliente_id": "C1"})
+    monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id, bloquear=False: _alerta().model_copy(update={"actions": [accion]}))
+    orquestador = MagicMock()
+    orquestador.resume.return_value = {"executed_action": {"actionId": "accion_1", "result": "Tarea creada"}}
+    monkeypatch.setattr(alertas_router, "get_orchestrator", lambda: orquestador)
+    respuesta = TestClient(app).post("/alertas/alerta_1/decision", json={"kind": "edit", "actionId": "accion_1", "parameters": {"owner": "Ventas"}})
+    assert respuesta.status_code == 200
+    assert orquestador.resume.call_args.args[1]["parameters"] == {"owner": "Ventas", "cliente_id": "C1"}
+
+
 def _accion_nueva() -> dict:
     return {"id": "accion_2", "title": "Llamar al cliente", "description": "Llama", "type": "task", "parameters": {}}
 

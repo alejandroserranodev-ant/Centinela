@@ -306,7 +306,7 @@ is out of scope ([`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.
 alert, and a `lider_proceso` the alerts whose metric its `area` owns, as
 `src/centinela_api/permisos.py:area_que_decide(conn, metric)` reads the owner from the settings. A
 metric with no owner, or one no `lider_proceso` profile holds, leaves the alert to the `gerente`,
-because no one else could act on it. An `auditor` gets 403 "Auditoría consulta las alertas; no las decide", anyone else "Esta alerta la decide" and the area, or "la gerencia": the request is
+because no one else could act on it. An `auditor` gets a 403 saying auditing reads, anyone else "Esta alerta la decide" and the area, or "la gerencia": the request is
 valid, the person may not make it. `src/centinela_api/permisos.py:vista(conn, persona, alerta)` adds
 `decidedBy`, the area or `Gerencia`, and the person's `canDecide` to every alert returned, so the
 screen decides no permission; `src/centinela_api/alertas.py:guardar(conn, alerta)` strips both,
@@ -328,7 +328,7 @@ would carry out. A rejection is still recorded there, without a resume, because 
 otherwise the alert would wait forever. The decision transaction re-reads the alert with a row lock
 and runs `aplicar` on it, so two concurrent decisions cannot both pass, and commits the alert and
 its `bitácora` row, whose actor is the person's name and role, before the orchestrator resumes, so
-no action runs without a recorded decision; an approval or an edit then resumes into `Ejecutor`,
+no action runs without a recorded decision; an approval or an edit, with every stored parameter, resumes into `Ejecutor`,
 and a rejection resumes to close the graph.
 
 **A `request_changes` carries a reason, and is capped at one per alert**, because a person who
