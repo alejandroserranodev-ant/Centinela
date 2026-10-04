@@ -111,8 +111,10 @@ def _execute_email_draft(
 ) -> dict[str, Any]:
     recipient = parameters.get("recipient")
     listed = "\n".join(f"- {name}: {value}" for name, value in parameters.items())
+    desc = action.get("description")
+    desc_text = desc.get("text", "") if isinstance(desc, dict) else str(desc or "")
     prompt = mask_data(f"""action.title: {action.get("title")}
-action.description: {action.get("description")}
+action.description: {desc_text}
 action.parameters:
 {listed}
 
