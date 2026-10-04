@@ -24,17 +24,18 @@ catch every exception themselves ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)).
 
 - **`centinela_agents/ollama_provider.py:OllamaProvider(config)`** posts to `/api/chat` with
   `requests`, at `OLLAMA_API_URL`, else `OLLAMA_BASE_URL`, else `http://localhost:11434`. Its
-  constructor calls `health_check()`, which lists `/api/tags` and raises `ValueError` when the
-  server is down or the model is not pulled, so constructing one fails without a running Ollama.
-  A structured request sends the schema as Ollama's `format`. It reads token counts from
-  `prompt_eval_count` and `eval_count`. It sends `temperature`, `top_p` and `thinking` as
-  top-level fields rather than under `options` and as `think`, and reads `stop_reason` rather than
-  Ollama's `done_reason`, so Ollama ignores the sampling settings and the thinking flag.
+  constructor lists `/api/tags` and raises `ValueError` when the server is down or the model is
+  not pulled, so constructing one fails without a running Ollama; `health_check()` asks the same
+  and answers `False` instead. A request sends `temperature`, `top_p` and the token cap
+  `num_predict` under `options`, and the thinking flag as `think`, always, because a `qwen3` model
+  thinks when `think` is absent. A structured request sends the schema as Ollama's `format`. It
+  reads the stop reason from `done_reason` and token counts from `prompt_eval_count` and
+  `eval_count`.
 - **`centinela_agents/openai_provider.py:OpenAIProvider(config, skip_health_check)`** uses the
   `openai` client with `OPENAI_API_KEY` and calls `models.list()` on construction unless told to
   skip it. A structured request asks for `response_format` `json_object` with the schema in the
-  prompt, not a strict JSON schema. Its timeout messages name `self.timeout`, which the class
-  never sets. This provider sends the prompt off the machine,
+  prompt, not a strict JSON schema. Its client waits `timeout_seconds` of the config, and a call
+  past it raises `TimeoutError`. This provider sends the prompt off the machine,
   against the level's rule that models run locally ([`AGENTS.md`](./AGENTS.md)).
 
 ## The factory

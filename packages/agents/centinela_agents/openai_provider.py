@@ -61,7 +61,8 @@ class OpenAIProvider(LLMProvider):
         if not api_key.startswith("sk-"):
             logger.warning("API key does not start with 'sk-', may be invalid")
 
-        self.client = OpenAI(api_key=api_key)
+        self.timeout = config.timeout_seconds
+        self.client = OpenAI(api_key=api_key, timeout=self.timeout)
         logger.info(f"OpenAI provider initialized with model: {config.model}")
 
         if not skip_health_check and not self._health_check():
