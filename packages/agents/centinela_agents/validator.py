@@ -10,7 +10,8 @@ from .metrics import Metrics, load_metrics, threshold_shape_problem
 from .predicate import KPI_PATH, STATE_PATH
 from .graph import BOUND_NODES
 from .severity import severity_problems
-from .schema import AGENT_DECISIONS, CHAT_ROOT, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, reachable, stage_of
+from .schema import AGENT_DECISIONS, AGENT_STAGE, CHAT_ROOT, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, live, reachable, resolve, stage_of
+from .skills import action_rows
 from .state import STATE_FIELDS
 from .yaml_loader import load_yaml
 
@@ -55,6 +56,7 @@ def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
         *atomicity_problems(tree),
         *fundamento_problems(tree, grounds.registry),
         *reference_problems(tree, nodes),
+        *split_problems(nodes),
         *approval_problems(nodes),
         *cycle_problems(nodes),
         *end_problems(nodes),
@@ -64,6 +66,7 @@ def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
         *candidate_problems(nodes, grounds.catalog),
         *threshold_problems(tree, grounds),
         *leaf_problems(tree, grounds.skills),
+        *exclusion_problems(tree, grounds),
         *coverage_problems(tree, grounds),
         *severity_problems(grounds.metrics, grounds.catalog),
         *base_problems(tree, grounds.base),
@@ -174,6 +177,27 @@ def reference_problems(tree: Tree, nodes: Mapping[str, Node]) -> list[str]:
         for name, target in branches(node)
         if target not in nodes and target not in ENDS
     ]
+
+
+def split_problems(nodes: Mapping[str, Node]) -> list[str]:
+    found: list[str] = []
+    for node_id, node in sorted(nodes.items()):
+        if node.divide is None:
+            continue
+        leaf = nodes.get(node.divide)
+        if leaf is None or leaf.hoja is None:
+            found.append(f"{node_id} divides {node.divide}, which is no leaf")
+            continue
+        stage = AGENT_STAGE.get(leaf.hoja.agente)
+        if node.hoja is not None or level(node_id) == 1 or node_id.split(".")[0] != stage:
+            found.append(f"{node_id} divides a leaf of {leaf.hoja.agente}, and only an L2 or L3 node of {stage} does")
+        if node.no is None or resolve(node.no, nodes) != node.divide:
+            found.append(f"{node_id} does not lead back to {node.divide} on no")
+        taken = nodes.get(resolve(node.si, nodes)) if node.si is not None else None
+        kind = (leaf.hoja.agente, leaf.hoja.decision)
+        if taken is None or taken.hoja is None or taken.id == node.divide or (taken.hoja.agente, taken.hoja.decision) != kind:
+            found.append(f"{node_id} takes no new leaf of {leaf.hoja.agente}/{leaf.hoja.decision} on si")
+    return found
 
 
 def approval_problems(nodes: Mapping[str, Node]) -> list[str]:
@@ -355,7 +379,21 @@ def leaf_problems(tree: Tree, skills: Path) -> list[str]:
     return found
 
 
+def exclusion_problems(tree: Tree, grounds: Grounds) -> list[str]:
+    known = {f"act-{metric}-{row.ref}" for metric in grounds.metrics.names for row in action_rows(metric)}
+    found: list[str] = []
+    for node in tree.nodos:
+        leaf = node.hoja
+        if leaf is None or not leaf.excluye:
+            continue
+        if (leaf.agente, leaf.decision) != ("estratega", "proponer"):
+            found.append(f"{node.id} excludes rows, and only a proponer leaf of estratega does")
+        found += [f"{node.id} excludes {action}, which no row of acciones.md names" for action in leaf.excluye if action not in known]
+    return found
+
+
 def coverage_problems(tree: Tree, grounds: Grounds) -> list[str]:
+    alive = live(index(tree), [ROOT])
     read = {
         KPI_PATH.match(node.predicado.lee).group(1)
         for node in tree.nodos
@@ -363,6 +401,8 @@ def coverage_problems(tree: Tree, grounds: Grounds) -> list[str]:
         and KPI_PATH.match(node.predicado.lee)
         and node.id.split(".")[0] == "detectar"
         and level(node.id) == 3
+        and node.id in alive
+        and node.retirado is None
     }
     listed = (grounds.skills / "estratega" / "acciones.md").read_text(encoding="utf-8").split("\n## ")[0]
     found: list[str] = []
@@ -376,13 +416,18 @@ def coverage_problems(tree: Tree, grounds: Grounds) -> list[str]:
     return found
 
 
+def resolved(node: Node, nodes: Mapping[str, Node]) -> Node:
+    return node.model_copy(update={key: resolve(getattr(node, key), nodes) for key in ("si", "no", "sigue") if getattr(node, key) is not None})
+
+
 def base_problems(tree: Tree, base: Tree) -> list[str]:
+    nodes = index(tree)
     found = [] if tree.leyes == base.leyes else ["L0 differs from the base"]
-    mine = {node.id: node for node in tree.nodos if node.hoja is None and level(node.id) == 1}
+    mine = {node.id: resolved(node, nodes) for node in tree.nodos if node.hoja is None and level(node.id) == 1}
     theirs = {node.id: node for node in base.nodos if node.hoja is None and level(node.id) == 1}
     found += [f"L1 node {node_id} differs from the base" for node_id in sorted(theirs) if mine.get(node_id) != theirs[node_id]]
     found += [f"L1 node {node_id} is absent from the base" for node_id in sorted(set(mine) - set(theirs))]
-    leaves = {node.id: leaf_route(node) for node in tree.nodos if node.hoja is not None}
+    leaves = {node.id: leaf_route(resolved(node, nodes)) for node in tree.nodos if node.hoja is not None}
     found += [
         f"leaf {node.id} differs from the base"
         for node in sorted(base.nodos, key=lambda node: node.id)
@@ -391,5 +436,5 @@ def base_problems(tree: Tree, base: Tree) -> list[str]:
     return found
 
 
-def leaf_route(node: Node) -> tuple[str, str, str | None]:
-    return node.hoja.agente, node.hoja.decision, node.sigue
+def leaf_route(node: Node) -> tuple[str, str, tuple[str, ...], str | None]:
+    return node.hoja.agente, node.hoja.decision, node.hoja.excluye, node.sigue

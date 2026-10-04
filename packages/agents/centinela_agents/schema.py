@@ -5,10 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field
 STAGES = ("detectar", "explicar", "proponer", "aprobar", "ejecutar", "cerrar", "medir", "conversar")
 FAMILIES = ("cartera", "margen", "inventario", "comercial", "abastecimiento", "clientes")
 AGENT_DECISIONS = {
-    "vigia": ("detectar", "titular", "proponer_kpi", "expandir"),
-    "analista": ("explicar", "expandir"),
-    "estratega": ("proponer", "revision_manual", "expandir"),
-    "ejecutor": ("ejecutar", "nota_manual", "expandir"),
+    "vigia": ("detectar", "titular", "proponer_kpi"),
+    "analista": ("explicar",),
+    "estratega": ("proponer", "revision_manual"),
+    "ejecutor": ("ejecutar", "nota_manual"),
     "chat": ("clasificar", "responder"),
 }
 AGENT_STAGE = {"vigia": "detectar", "analista": "explicar", "estratega": "proponer", "ejecutor": "ejecutar", "chat": "conversar"}
@@ -50,6 +50,7 @@ class Leaf(Strict):
     agente: str
     decision: str
     skill: str
+    excluye: tuple[str, ...] = ()
 
 
 class Node(Strict):
@@ -60,6 +61,8 @@ class Node(Strict):
     no: str | None = None
     hoja: Leaf | None = None
     sigue: str | None = None
+    divide: str | None = None
+    retirado: str | None = None
 
 
 class Law(Strict):
@@ -113,6 +116,32 @@ def reachable(nodes: Mapping[str, Node], starts: Iterable[str], without: frozens
     return seen
 
 
+def resolve(target: str, nodes: Mapping[str, Node]) -> str:
+    seen: set[str] = set()
+    while target in nodes and nodes[target].divide is not None and target not in seen:
+        seen.add(target)
+        target = nodes[target].divide
+    return target
+
+
+def live_branches(node: Node) -> list[tuple[str, str]]:
+    if node.retirado is not None:
+        return [("no", node.no)] if node.no else []
+    return branches(node)
+
+
+def live(nodes: Mapping[str, Node], starts: Iterable[str]) -> set[str]:
+    seen: set[str] = set()
+    stack = list(starts)
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        node = nodes.get(current)
+        if node is not None:
+            stack.extend(target for _, target in live_branches(node))
+    return seen
 
 
 class Figure(BaseModel):

@@ -8,6 +8,7 @@ STATE_FIELDS = DERIVED_FIELDS | frozenset(
     {
         "estado.candidato.metrica",
         "estado.candidato.descriptivo",
+        "estado.detection.metric",
         "estado.cause.kind",
         "estado.same_cause_as",
         "estado.insufficient_cause",

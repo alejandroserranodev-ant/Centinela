@@ -8,7 +8,7 @@ import pytest
 from centinela_agents.metrics import load_metrics
 from centinela_agents.schema import GATE
 from centinela_agents.validator import InvalidTree, checked_base, load_base, load_registry, problems
-from support import ARBOL, METRICAS, SKILLS, KERNEL_CATALOG, base_data, grounds, node_of
+from support import ARBOL, METRICAS, SKILLS, KERNEL_CATALOG, base_data, grounds, node_of, split_data
 
 
 def set_key(node_id, key, value):
@@ -32,6 +32,14 @@ def set_predicate(node_id, **changes):
 def set_leaf(node_id, **changes):
     def plant(data):
         node_of(data, node_id)["hoja"].update(changes)
+    return plant
+
+
+def split_with(node=None, leaf=None):
+    def plant(data):
+        split_data(data)
+        node_of(data, "proponer.cartera.saldo_vencido.division_1").update(node or {})
+        node_of(data, "hoja.estratega.proponer.saldo_vencido.1")["hoja"].update(leaf or {})
     return plant
 
 
@@ -142,11 +150,36 @@ PLANTED = [
     ("chat root screens nothing", set_predicate("conversar.raiz", lee="estado.chat.intent"), "conversar.raiz reads estado.chat.intent; the chat's first node reads estado.chat.sospechosa"),
     ("chat without its root", drop_node("conversar.raiz"), "the tree lacks its root conversar.raiz"),
     ("kpi read on another metric's row", set_key("detectar.cartera.concentracion_vencida_pct.participacion", "no", "detectar.cartera.saldo_vencido.cupo"), "reads saldo_vencido where the candidate may be concentracion_vencida_pct"),
+    ("split that does not lead back to its leaf", split_with(node={"no": "hoja.estratega.revision_manual"}), "proponer.cartera.saldo_vencido.division_1 does not lead back to hoja.estratega.proponer on no"),
+    ("split of no leaf", split_with(node={"divide": "proponer.con_acciones"}), "divides proponer.con_acciones, which is no leaf"),
+    ("split into another decision", split_with(leaf={"decision": "revision_manual", "skill": "estratega/acciones.md"}), "takes no new leaf of estratega/proponer on si"),
+    ("exclusion on another decision", set_leaf("hoja.estratega.revision_manual", excluye=["act-saldo_vencido-r1"]), "hoja.estratega.revision_manual excludes rows, and only a proponer leaf of estratega does"),
+    ("exclusion of an unknown row", split_with(leaf={"excluye": ["act-saldo_vencido-r99"]}), "excludes act-saldo_vencido-r99, which no row of acciones.md names"),
+    ("base leaf with an exclusion", set_leaf("hoja.estratega.proponer", excluye=["act-saldo_vencido-r1"]), "leaf hoja.estratega.proponer differs from the base"),
+    ("retired last branch of a metric", set_key("detectar.inventario.cobertura_dias.minima", "retirado", "No aplica"), "metric cobertura_dias has no L3 branch in detectar"),
+    ("retired family", set_key("detectar.inventario", "retirado", "No aplica"), "metric cobertura_dias has no L3 branch in detectar"),
+    ("retired L1 node", set_key("explicar.con_evidencia", "retirado", "No aplica"), "L1 node explicar.con_evidencia differs from the base"),
 ]
 
 
 def test_the_base_passes():
     assert problems(base_data(), grounds()) == []
+
+
+def test_a_split_of_a_base_leaf_passes():
+    assert problems(split_data(base_data()), grounds()) == []
+
+
+def test_a_split_nested_on_the_leaf_a_split_added_passes():
+    data = split_data(base_data())
+    split_data(data, excluye=("act-saldo_vencido-r1", "act-saldo_vencido-r2"), number=2, leaf="hoja.estratega.proponer.saldo_vencido.1")
+    assert problems(data, grounds()) == []
+
+
+def test_a_retired_branch_of_a_metric_with_another_live_branch_passes():
+    data = base_data()
+    node_of(data, "detectar.cartera.saldo_vencido.dias")["retirado"] = "No aplica"
+    assert problems(data, grounds()) == []
 
 
 @pytest.mark.parametrize("name, plant, expected", PLANTED, ids=[name for name, _, _ in PLANTED])
