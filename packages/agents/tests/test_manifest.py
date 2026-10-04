@@ -15,7 +15,7 @@ def normalized(name: str) -> str:
 def imported_modules() -> set[str]:
     modules = set()
     for source in (PACKAGE / "centinela_agents").rglob("*.py"):
-        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(source.read_text())):
             if isinstance(node, ast.Import):
                 modules.update(alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -24,7 +24,7 @@ def imported_modules() -> set[str]:
 
 
 def test_every_third_party_import_of_the_package_is_a_declared_dependency():
-    manifest = tomllib.loads((PACKAGE / "pyproject.toml").read_text(encoding="utf-8"))
+    manifest = tomllib.loads((PACKAGE / "pyproject.toml").read_text())
     declared = {normalized(re.split(r"[<>=!~\[ ;]", spec, maxsplit=1)[0]) for spec in manifest["project"]["dependencies"]}
     distributions = packages_distributions()
     undeclared = {

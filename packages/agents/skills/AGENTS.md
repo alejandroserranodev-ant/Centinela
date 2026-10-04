@@ -13,13 +13,6 @@ holds a manual note's, which no running leaf asks a model for. The leaf's user p
 the facts its code read; a leaf of `Chat` adds the person's question, marked as untrusted data, and
 both of its steps load `chat/contrato.md`.
 
-The step `responder` also loads `chat/rol_<role>.md` for the signed-in role (`gerente`, `lider_proceso`,
-`analista` or `auditor`), which changes only the voice and focus of the answer, never its facts or its
-citations. A missing or unknown role loads no role file. The API passes the role from the session.
-Code also shapes the answer by role: `gerente` and `lider_proceso` receive the figures and the verdict but
-not the steps of the tree, `gerente` is held to two sentences, and an `auditor` who asks to act is told
-Auditoría only consults.
-
 ## Decisions
 
 - **A leaf's `skill` names the file its step starts from**: the contract of its agent, or, for

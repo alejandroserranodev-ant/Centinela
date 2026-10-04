@@ -80,7 +80,7 @@ async def chat(
         yield "step", AgentStep(alert_id=pregunta.alert_id, agent="chat", status="running", description="Leyendo la pregunta", start=inicio)
         try:
             respuesta = await asyncio.to_thread(
-                get_orchestrator().ask, pregunta.question, dia.isoformat(), anclada(alerta) if alerta is not None else None, quien.role
+                get_orchestrator().ask, pregunta.question, dia.isoformat(), anclada(alerta) if alerta is not None else None
             )
         except Exception as error:
             logger.error(f"Chat failed: {error}", exc_info=True)

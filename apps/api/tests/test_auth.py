@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from centinela_api import auth
 from centinela_api.main import app
 
-CLAVE = "HackathonByPass"
+CLAVE = "Andina2026!"
 
 
 @pytest.fixture

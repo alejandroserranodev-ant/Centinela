@@ -61,7 +61,6 @@ class ChatState(TypedDict, total=False):
     cause: dict[str, Any] | None
     actions: list[dict[str, Any]] | None
     chat: dict[str, Any]
-    role: str | None
     answer: dict[str, Any] | None
     queries: list[Any]
     next_node: str
