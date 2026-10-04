@@ -15,6 +15,7 @@ reads them when `apps/api` first builds the orchestrator, in
 |---|---|---|
 | `LLM_PROVIDER` | `get_provider` | `ollama`, the default, or `openai`; `anthropic` raises `NotImplementedError` |
 | `LLM_MODEL` | `get_provider` | the model's name, `qwen3:4b-instruct` in the versioned `.env`, or one such as `gpt-4o-mini`; it has no default, and `get_provider` raises `ValueError` without it. Which model a machine runs is [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#models) |
+| `CENTINELA_CACHE_RESPUESTAS` | `packages/agents/centinela_agents/provider_factory.py:cached(provider)` | how many model answers the process keeps, 256 by default; `0` turns the cache off |
 | `LLM_MODEL_RAZONA` | `packages/agents/centinela_agents/provider_factory.py:get_reasoning_provider()` | a second model for `Analista` and `Estratega`; empty, they use `LLM_MODEL` |
 | `OPENAI_API_KEY` | `packages/agents/centinela_agents/openai_provider.py:OpenAIProvider` | required with `openai`; a key that does not start with `sk-` is logged as a warning, and the provider lists the account's models at construction, so a key OpenAI refuses fails there |
 | `OLLAMA_API_URL`, then `OLLAMA_BASE_URL` | `packages/agents/centinela_agents/ollama_provider.py:OllamaProvider` | Ollama's address, `http://localhost:11434` when neither is set |

@@ -34,6 +34,16 @@ except ImportError:
     )
 
 
+def usage_of(response: Any) -> dict[str, int]:
+    """Tokens of one call; cached_tokens is the part of the prompt OpenAI served from its prompt cache."""
+    details = getattr(response.usage, "prompt_tokens_details", None)
+    return {
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "cached_tokens": getattr(details, "cached_tokens", 0) or 0,
+    }
+
+
 class OpenAIProvider(LLMProvider):
     """Language model provider using OpenAI API."""
 
@@ -126,10 +136,7 @@ class OpenAIProvider(LLMProvider):
         return LLMResponse(
             text=response.choices[0].message.content or "",
             stop_reason=response.choices[0].finish_reason or "stop",
-            usage={
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-            },
+            usage=usage_of(response),
             model=self.config.model,
         )
 
@@ -193,9 +200,6 @@ class OpenAIProvider(LLMProvider):
             text=text,
             parsed=parsed,
             stop_reason=response.choices[0].finish_reason or "stop",
-            usage={
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-            },
+            usage=usage_of(response),
             model=self.config.model,
         )

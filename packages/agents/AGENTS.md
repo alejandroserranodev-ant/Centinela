@@ -27,6 +27,7 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/metrics.py` | the descriptions and `umbrales` of `data/metricas.yaml`, and a threshold's shapes |
 | `centinela_agents/catalog.py` | the catalogue of KPI columns, the reader of a KPI on a day, and the connection to the kernel that builds both |
 | `centinela_agents/evidence.py` | what a leaf reads of the kernel: each query under its `queryId`, each figure as a numbered fact, and the refusal of a figure no query returned |
+| `centinela_agents/cache.py` | the in-process cache of model answers every provider of the factory sits behind |
 | `centinela_agents/skills.py` | the loading of a skill as a model's instructions, and the rows of `skills/estratega/acciones.md` |
 | `centinela_agents/predicate.py` | one comparison, and a threshold's value on a row |
 | `centinela_agents/validator.py` | every refusal of a tree, and the loading of the base |
@@ -112,6 +113,14 @@ product's path.
   query returned, and `centinela_agents/evidence.py:stray_digits(text, allowed)` a figure written
   outside a placeholder, because a model copies a number wrong more often than it chooses a fact
   wrong, and one call per leaf is faster and cheaper than a loop of tool calls.
+- **A repeated request pays once.** `centinela_agents/provider_factory.py:cached(provider)` puts
+  every provider behind `centinela_agents/cache.py:CachingProvider(inner, size)`, an LRU of
+  `CENTINELA_CACHE_RESPUESTAS` answers keyed by the model and everything the request sends, at
+  temperature 0 only. A hit returns the stored answer with zero tokens and `cached` in its usage, so
+  a day run again, a repeated eval or a reopened alert costs nothing, and a cost count never charges
+  a hit. It lives in the process, because no agent writes anywhere. `OpenAIProvider` reports
+  `cached_tokens` besides, the part of a prompt OpenAI served from its own prompt cache, which
+  starts at 1,024 tokens of identical prefix: each prompt opens with its skill for that reason.
 - **Every output is short and capped**: a title, one sentence of cause with at most two pieces of
   evidence, and one to three actions with an eight-word title, each call with its `max_tokens`,
   because each token is paid and waited for.
