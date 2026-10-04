@@ -7,6 +7,8 @@ from urllib.parse import unquote
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
+from centinela_agents import query_registry
+
 from .. import alertas as alertas_repo
 from .. import bitacora, ciclo_vida, decisiones, simulacion
 from ..agentes import get_orchestrator
@@ -140,3 +142,62 @@ async def decidir(
             logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
     return nueva
+
+
+@router.get("/queries/{id}")
+async def obtener_query(id: str, conn: psycopg.Connection = Depends(obtener_conexion)):
+    """
+    Return query metadata + data rows for figure traceability ("Ver de dónde sale").
+    """
+    # Summary IDs are computed dynamically from the current alerts
+    if id in ("q-summary-risk", "q-summary-pending", "q-summary-recoverable"):
+        alerts = alertas_repo.listar(conn, "proposed")
+        if id == "q-summary-risk":
+            rows = [
+                {"id": a.id, "metric": a.metric, "title": a.title.text,
+                 "pesos_at_risk": a.pesos_at_risk.value}
+                for a in alerts
+            ]
+            desc = (
+                f"Suma de pesos en riesgo de {len(alerts)} alerta{'s' if len(alerts) != 1 else ''} "
+                "pendientes de decisión."
+            )
+            sql = "SELECT id, cuerpo->>'metric' AS metric, cuerpo->'title'->>'text' AS title, (cuerpo->'pesosAtRisk'->>'value')::numeric AS pesos_at_risk FROM api.alertas WHERE status = 'proposed'"
+        elif id == "q-summary-pending":
+            rows = [
+                {"id": a.id, "metric": a.metric, "status": a.status,
+                 "title": a.title.text}
+                for a in alerts
+            ]
+            desc = (
+                f"{len(alerts)} alerta{'s' if len(alerts) != 1 else ''} "
+                "esperan tu aprobación o rechazo."
+            )
+            sql = "SELECT id, cuerpo->>'metric' AS metric, status, cuerpo->'title'->>'text' AS title FROM api.alertas WHERE status = 'proposed'"
+        else:  # q-summary-recoverable
+            rows = [
+                {"id": a.id, "metric": a.metric, "title": a.title.text,
+                 "recoverable_per_month": a.recoverable_per_month.value}
+                for a in alerts
+                if a.recoverable_per_month
+            ]
+            desc = (
+                "Suma del potencial de recuperación mensual de las alertas pendientes, "
+                "si se aprueban todas las acciones propuestas."
+            )
+            sql = "SELECT id, cuerpo->>'metric' AS metric, cuerpo->'title'->>'text' AS title, (cuerpo->'recoverablePerMonth'->>'value')::numeric AS recoverable_per_month FROM api.alertas WHERE status = 'proposed' AND cuerpo->'recoverablePerMonth' IS NOT NULL"
+        return {"id": id, "source": "alertas", "sql": sql, "description": desc, "rows": rows}
+
+    record = query_registry.get(id)
+    if record is None:
+        raise HTTPException(
+            404,
+            f"Consulta '{id}' no encontrada. Es posible que el servidor haya reiniciado.",
+        )
+    return {
+        "id": record.id,
+        "source": record.source,
+        "sql": record.sql,
+        "description": record.description,
+        "rows": record.rows,
+    }

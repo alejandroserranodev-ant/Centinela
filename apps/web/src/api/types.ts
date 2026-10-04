@@ -28,6 +28,7 @@ export interface Query {
   source: QuerySource;
   sql: string;
   description: string;
+  rows?: Record<string, unknown>[];
 }
 
 export type FigureUnit = 'COP' | 'points' | 'percent' | 'days' | 'units';
