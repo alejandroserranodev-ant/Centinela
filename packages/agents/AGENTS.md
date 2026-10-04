@@ -295,8 +295,8 @@ and the only context is the alert it is anchored to.
 - **Leaves:** `ejecutar`, for an action whose type has a tool in `packages/tools`, and
   `nota_manual`, for one that has none. Either receives the alert id, the approved action with an
   edit's `parameters`, and the recorded decision, and nothing else of the state,
-  `centinela_agents/graph.py:leaf_node(node, function, ctx, token_cap)`; the alert id because an
-  action is keyed by alert and action, so a second run has no effect.
+  `centinela_agents/graph.py:leaf_node(node, function, ctx, token_cap)`; the alert id travels for
+  the idempotency [`packages/tools`](../tools/AGENTS.md#actions-and-idempotency) decides.
 - **Tools:** none for its model. The leaf calls the action tool in code, a draft or a sandbox
   effect; the model writes the body of an approved `email_draft` and the text of a manual note.
 - **Ceiling: no discretion.** It passes the approved `parameters` unchanged. The stubs of

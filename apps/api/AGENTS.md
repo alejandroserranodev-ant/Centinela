@@ -13,7 +13,7 @@ implement.
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion`; `api.alertas` holds `entidad`, the values of the KPI's entity, which coverage compares, and `costos`, the alert's `cost`, an object by agent over a default of `'[]'` |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion`; `api.alertas` holds `entidad`, the values of the KPI's entity, which coverage compares, and `costos`, the alert's `cost` by agent ([`../../DOUBTS.md`](../../DOUBTS.md#filed-debts) files its default) |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin, mounts the routers and logs every package at INFO |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
 | `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
@@ -404,8 +404,8 @@ no row of its own.
   no migration tool. *No gate holds this.*
 
 - **An alert carries its cost**: the day run stores the `cost` the orchestrator counts per alert
-  in `api.alertas.costos`. The decision route writes no cost yet, so a resume's model calls are
-  not added. *No gate holds this.*
+  in `api.alertas.costos`. The decision route writes no cost, so a resume's model calls are not
+  added. *No gate holds this.*
 - **Timeouts and retries are explicit**, as
   [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#how-a-step-runs) states them,
   and "not enough evidence" is a valid response, not an error. A failed alert of a day is logged

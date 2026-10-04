@@ -7,7 +7,7 @@ interrupts, failures, routing) and links here.
 
 ## What it does
 
-`centinela_agents/orchestrator.py:CentinelaOrchestrator(provider, tools, tree, metrics, catalog, reader, checkpointer, owners, kernel, reasoning_provider)`
+`centinela_agents/orchestrator.py:CentinelaOrchestrator(provider, tools, tree, metrics, catalog, reader, checkpointer, owners, kernel, reasoning_provider, token_cap, tracer)`
 maps each leaf of the tree to a function of [`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md), keyed by
 agent and decision: `vigia`/`titular`, `analista`/`explicar`, `estratega`/`proponer` and
 `revision_manual`, `ejecutor`/`ejecutar` and `nota_manual`. The leaves of `Vigía`, `Analista` and
@@ -18,9 +18,12 @@ that map, the metrics, the KPI catalogue, the reader, a rejection classifier and
 `centinela_agents/graph.py:Compiler`, and compiles the tree once.
 
 - `start(detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)` runs
-  `centinela_agents/graph.py:start_alert(graph, detection)` until the graph pauses at the approval gate or ends.
+  `centinela_agents/graph.py:start_alert(graph, detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, tracer)`
+  until the graph pauses at the approval gate or ends.
+- `run_day(ctx, day, earlier, watched, limit, cause_rejections, proposal_rejections)` returns the
+  generator of `centinela_agents/day.py:run_day(graph, ctx, day, earlier, watched, limit, cause_rejections, proposal_rejections, tracer)`.
 - `is_awaiting_decision(alert_id)` says whether it paused.
-- `resume(alert_id, decision)` runs `centinela_agents/graph.py:resume(graph, alert_id, decision)` with the person's decision.
+- `resume(alert_id, decision)` runs `centinela_agents/graph.py:resume(graph, alert_id, decision, tracer)` with the person's decision.
 - `get_state(alert_id)` returns the alert's state from the checkpointer.
 
 It adds logging and nothing else; the walk, the gate and the ends are `centinela_agents/graph.py`'s.

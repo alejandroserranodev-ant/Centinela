@@ -22,7 +22,7 @@ code read, with the data last.
 
 - **A leaf raises, and the graph takes its fallback.** A model error, a timeout, or an output the
   leaf refuses, `centinela_agents/failures.py:SchemaRefused`, reaches
-  `centinela_agents/graph.py:leaf_node(node, function, ctx)`, which writes the fallback and records
+  `centinela_agents/graph.py:leaf_node(node, function, ctx, token_cap)`, which writes the fallback and records
   the failure. The classifier alone catches its own exceptions and returns `ninguno`.
 - **The code reads the figures; the model cites them.** `Vigía` hands the compared columns and
   `pesos_en_riesgo` as `{0}`, `{1}`; `Analista` hands numbered facts `f1`, `f2` and receives refs,
