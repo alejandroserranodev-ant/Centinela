@@ -36,6 +36,7 @@ ACTION_WORDS = re.compile(
     r"\b(?:aprueb[ae]s?|apruébal[ao]s?|aprobar(?:l[ao]s?)?|rechaz[ae]|rechaces|rechazar(?:l[ao]s?)?|ejecut[ae]s?|ejecutar(?:l[ao]s?)?|env[ií][ae]s?|enviar(?:l[ao]s?)?|mand[ae]|mandar|borr[ae]|borrar|elimin[ae]|eliminar|modific[ae]|modifique|modificar|edit[ae]|editar|cerrar(?:l[ao]s?)?|cambiar(?:l[ao]s?)?|cambies|approve|reject|execute|send|delete)\b",
     re.IGNORECASE,
 )
+DO_WORDS = re.compile(r"\b(?:hacer|haga|hago|acci[oó]n(?:es)?|propon\w*|recomiend\w*|soluci[oó]n|resolver|corregir)\b", re.IGNORECASE)
 ENTITY = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9_-]{1,40}$")
 TYPED = re.compile(r"[A-Za-z0-9_-]*\d[A-Za-z0-9_-]*")
 MASKED = ("email", "api_key", "token", "password", "credit_card")
@@ -146,6 +147,9 @@ def classify(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) 
     intent = parsed.get("intent") if parsed.get("intent") in INTENTS else "fuera_de_alcance"
     if ACTION_WORDS.search(question):
         intent = "accion"
+    elif metric and intent == "fuera_de_alcance":
+        # inside an alert, a question the model cannot place is still about that alert
+        intent = "que_hacer" if DO_WORDS.search(question) and state.get("actions") else "dato"
     kpi = parsed.get("kpi") if parsed.get("kpi") in sources.catalog.kpis else None
     named = str(parsed.get("entity") or "")
     chosen = named if ENTITY.match(named) and named.lower() in question.lower() else None
@@ -268,8 +272,7 @@ def answer(provider: LLMProvider, state: Mapping[str, Any], sources: Sources) ->
     ledger = sources.ledger()
     facts = Facts()
     alert_facts(facts, state)
-    anchored_reading = chat["intent"] in ("explicar", "que_hacer") and state.get("alert")
-    if chat.get("kpi") and not anchored_reading:
+    if chat.get("kpi"):
         kpi_facts(facts, ledger, state, sources)
     queries = merged_queries(state, ledger)
     if not facts.figures:

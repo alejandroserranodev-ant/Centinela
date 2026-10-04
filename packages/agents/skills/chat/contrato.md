@@ -50,6 +50,10 @@ Return the JSON of the schema you are given: `sentences`, each a `text` and its 
 2. Cite a figure only by its ref: list the refs a sentence uses in its `figures`, in order, and
    write each in the text as `{0}`, `{1}`.
 3. Cite only refs `evidencia` lists. If `evidencia` cannot answer the question, return no sentence.
+   When `alerta` is not `ninguna`, the question is about that alert: answer it with the alert's
+   facts even when it is loosely worded. Its risks are its `pesos_en_riesgo` and the figures that
+   put it in alert; what to do is its actions, or, when `evidencia` lists none, the figures a person
+   reviews in the inbox before deciding.
 4. Write no number outside a placeholder. The only digits allowed are in identifiers and dates
    copied from the input.
 5. Cite each ref once, and write no unit beside a placeholder: the screen writes the figure with
