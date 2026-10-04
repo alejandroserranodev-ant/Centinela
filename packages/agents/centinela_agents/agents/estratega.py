@@ -18,6 +18,7 @@ from centinela_agents.llm_provider import (
     LLMStructuredRequest,
 )
 from centinela_agents.schema import Action, Confidence
+from centinela_agents.state import subject
 from centinela_agents.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class EstrategaError(Exception):
 
 def propose_actions(
     provider: LLMProvider,
-    alert: dict[str, Any],
+    state: dict[str, Any],
     cause: dict[str, Any],
     tools: ToolRegistry,
 ) -> dict[str, Any]:
@@ -39,12 +40,7 @@ def propose_actions(
 
     Args:
         provider: LLM provider (thinking ON)
-        alert: {
-            metric: str,
-            entity: str,
-            day: str,
-            severity: str,
-        }
+        state: the alert state; its `detection` holds the metric and the entity
         cause: Cause schema (identified or no_evidence)
         tools: ToolRegistry with sql_vistas, buscar_politica, calcular_impacto
 
@@ -52,7 +48,6 @@ def propose_actions(
         {
             actions: list[Action] | None,
             insufficient_cause: bool,
-            error: str | None,
         }
 
     Rules:
@@ -65,9 +60,7 @@ def propose_actions(
         7. Cite policy section in description
         8. If no row passes or insufficient_cause again, fallback to manual review
     """
-    metric = alert.get("metric")
-    entity = alert.get("entity")
-    day = alert.get("day")
+    metric, entity, day = subject(state)
     cause_kind = cause.get("kind")
 
     logger.info(
@@ -80,7 +73,6 @@ def propose_actions(
         return {
             "actions": None,
             "insufficient_cause": True,
-            "error": None,
         }
 
     sql_tool = tools.sql_vistas if hasattr(tools, 'sql_vistas') else None
@@ -183,13 +175,11 @@ Devuelve JSON puro. Nada de markdown ni explicación."""
             return {
                 "actions": None,
                 "insufficient_cause": True,
-                "error": None,
             }
 
         result = {
             "actions": actions,
             "insufficient_cause": False,
-            "error": None,
         }
 
         logger.info(f"Estratega: proposed {len(actions)} actions")
@@ -200,5 +190,4 @@ Devuelve JSON puro. Nada de markdown ni explicación."""
         return {
             "actions": None,
             "insufficient_cause": True,
-            "error": str(e),
         }

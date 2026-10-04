@@ -11,17 +11,18 @@ the alert's state. Its prompt is written inline in the module: no leaf loads a s
 
 | Leaf | Function | Model call | Thinking |
 |---|---|---|---|
-| `Vigía` writes the title | `centinela_agents/agents/vigia.py:redact_title(provider, detection)` | text, temperature 0 | off |
-| `Analista` explains the cause | `centinela_agents/agents/analista.py:explain_cause(provider, alert, tools)` | structured `Cause`, temperature 0.3 | on |
-| `Estratega` proposes actions | `centinela_agents/agents/estratega.py:propose_actions(provider, alert, cause, tools)` | structured actions, temperature 0.3 | on |
+| `Vigía` writes the title | `centinela_agents/agents/vigia.py:redact_title(provider, state)` | text, temperature 0 | off |
+| `Analista` explains the cause | `centinela_agents/agents/analista.py:explain_cause(provider, state, tools)` | structured `Cause`, temperature 0.3 | on |
+| `Estratega` proposes actions | `centinela_agents/agents/estratega.py:propose_actions(provider, state, cause, tools)` | structured actions, temperature 0.3 | on |
 | `Ejecutor` turns an approved action into a draft | `centinela_agents/agents/ejecutor.py:execute_action(provider, action, decision, tools)` | text for an email body only | off |
 | The orchestrator classifies a rejection reason | `centinela_agents/agents/orquestador.py:classify_rejection(provider, reason, cause, actions)` | structured `destino`, temperature 0 | off |
 
 ## How the leaves behave
 
-- **Every leaf catches its own exceptions** and returns a fallback with an `error` key: a title
-  built from the metric and entity, a `no_evidence` cause, `insufficient_cause`, or `ninguno`. The
-  graph's own failure handling ([`AGENTS.md`](./AGENTS.md)) therefore does not see a model
+- **Every leaf catches its own exceptions**, logs them and returns a fallback holding only keys
+  the state declares: a title built from the metric and entity, a `no_evidence` cause,
+  `insufficient_cause`, or no executed action. The classifier's mapping alone also carries the
+  exception, as `error`, because the graph reads only its `destino`. The graph's own failure handling ([`AGENTS.md`](./AGENTS.md)) therefore does not see a model
   failure.
 - **The model writes the figures.** `Analista`'s evidence and `Estratega`'s impact come back from
   the model with their values and query ids; no leaf calls a tool, because `explain_cause` and
@@ -29,11 +30,14 @@ the alert's state. Its prompt is written inline in the module: no leaf loads a s
   and never call them. This breaks the rule that every figure comes from a tool call.
 - **Rejection reasons do not reach the prompts.** The leaves document `cause_rejections` but do
   not read them.
-- **The leaves read the detection at the state's top level** (`metric`, `entity`, `cifra`), while
-  the graph keeps them under `detection`, so a leaf run inside the graph sees them empty.
+- **The leaves read the alert from the state the graph keeps.** `centinela_agents/state.py:subject(state)`
+  returns the metric and the entity of `detection` and the `simulated_day`. The detection holds
+  no figure, so the title the model writes carries none.
 - **`Ejecutor` builds a task's title and description in code** (`Revisar cliente …`), and writes
   an email body with the model; it calls the action tool when the registry holds one.
 
 ## Tests
 
-`uv run pytest tests/test_agents.py` runs each leaf with a mocked provider.
+`uv run pytest tests/test_agents.py` runs each leaf with a mocked provider;
+`tests/test_leaves_in_the_graph.py` starts an alert through the orchestrator and checks what each
+prompt names and that each leaf returns only declared keys.

@@ -250,12 +250,8 @@ orchestrator's own write, and the gate `aprobar.decision` is where the graph pau
 ### The state of an alert
 
 `centinela_agents/state.py:AlertState` declares it. Every leaf but `Ejecutor`'s receives the whole
-state; *Read by* is what each is meant to use of it.
-
-> **Limit.** `centinela_agents/agents/vigia.py:redact_title(provider, detection)` and
-> `centinela_agents/agents/analista.py:explain_cause(provider, alert, tools)` read `metric`, `entity` and `cifra` at the top of the state, where it
-> holds them under `detection`, so each prompts its model with no metric and no entity. Every
-> leaf also returns an `error` key the state does not declare.
+state; *Read by* is what each is meant to use of it. A key a leaf returns that the state does not
+declare is dropped without a trace, so the leaves return none.
 
 | Field | Written by | Read by |
 |---|---|---|

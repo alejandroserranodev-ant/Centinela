@@ -58,7 +58,6 @@ def execute_action(
     Returns:
         {
             executed_action: ExecutedAction,
-            error: str | None,
         }
 
     Rules:
@@ -104,7 +103,6 @@ def execute_action(
         logger.error(f"Ejecutor: execution failed: {e}")
         return {
             "executed_action": None,
-            "error": str(e),
         }
 
 
@@ -167,7 +165,6 @@ Redacta SOLO el cuerpo del email. Sin subject, sin saludos formales iniciales.""
         logger.info(f"Ejecutor: email draft created for {recipient}")
         return {
             "executed_action": executed.model_dump(),
-            "error": None,
         }
 
     except Exception as e:
@@ -208,7 +205,6 @@ def _execute_task(
 
     return {
         "executed_action": executed.model_dump(),
-        "error": None,
     }
 
 
@@ -250,7 +246,6 @@ def _execute_po_draft(
 
     return {
         "executed_action": executed.model_dump(),
-        "error": None,
     }
 
 
@@ -288,5 +283,4 @@ def _execute_price_draft(
 
     return {
         "executed_action": executed.model_dump(),
-        "error": None,
     }

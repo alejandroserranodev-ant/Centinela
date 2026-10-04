@@ -19,6 +19,7 @@ from centinela_agents.llm_provider import (
     LLMStructuredRequest,
 )
 from centinela_agents.schema import Cause, CauseIdentified, CauseNoEvidence
+from centinela_agents.state import subject
 from centinela_agents.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class AnalistaError(Exception):
 
 def explain_cause(
     provider: LLMProvider,
-    alert: dict[str, Any],
+    state: dict[str, Any],
     tools: ToolRegistry,
 ) -> dict[str, Any]:
     """
@@ -39,20 +40,12 @@ def explain_cause(
 
     Args:
         provider: LLM provider (thinking ON)
-        alert: {
-            metric: str,
-            entity: str,
-            day: str,
-            cifra: Figure,
-            severity: str,
-            cause_rejections: list[{reason, target}],
-        }
+        state: the alert state; its `detection` holds the metric and the entity
         tools: ToolRegistry with sql_vistas, buscar_politica
 
     Returns:
         {
             cause: CauseIdentified | CauseNoEvidence,
-            error: str | None,
         }
 
     Rules:
@@ -63,9 +56,7 @@ def explain_cause(
         5. If no hypothesis passes, answer no_evidence
         6. Check rejection reasons; if reason refutes, test next hypothesis
     """
-    metric = alert.get("metric")
-    entity = alert.get("entity")
-    day = alert.get("day")
+    metric, entity, day = subject(state)
 
     logger.info(
         f"Analista: explain {metric}:{entity} on {day}",
@@ -171,7 +162,6 @@ Devuelve JSON puro. Nada de markdown, backticks ni explicación."""
 
         result = {
             "cause": cause.model_dump(),
-            "error": None,
         }
 
         logger.info(f"Analista: cause found: {cause.kind}")
@@ -185,5 +175,4 @@ Devuelve JSON puro. Nada de markdown, backticks ni explicación."""
                 reason=f"El análisis no terminó: falló una herramienta o la conexión.",
                 queriesReviewed=[]
             ).model_dump(),
-            "error": str(e),
         }

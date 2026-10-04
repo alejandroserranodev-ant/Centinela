@@ -14,7 +14,6 @@ from centinela_agents.agents.estratega import propose_actions
 from centinela_agents.agents.orquestador import classify_rejection
 from centinela_agents.agents.vigia import redact_title
 from centinela_agents.llm_provider import LLMResponse, LLMStructuredResponse, ModelConfig
-from centinela_agents.schema import Figure
 from centinela_agents.tools import ToolRegistry
 
 
@@ -31,35 +30,23 @@ class TestVigia:
             model="qwen3:8b"
         )
 
-        detection = {
-            "metric": "saldo_vencido",
-            "entity_type": "cliente_id",
-            "entity": "cliente_123",
-            "cifra": Figure(value=45, unit="days", queryId="q_dias_001"),
-            "severity": "high",
-        }
+        state = {"detection": {"metric": "saldo_vencido", "entity": ["cliente_123"]}, "simulated_day": "2026-10-03"}
 
-        result = redact_title(provider, detection)
+        result = redact_title(provider, state)
 
-        assert result["error"] is None
         assert "cliente_123" in result["title"]["text"]
-        assert len(result["title"]["figures"]) > 0
+        prompt = provider.generate_text.call_args.args[0].user_prompt
+        assert "saldo_vencido" in prompt and "cliente_123" in prompt
 
     def test_redact_title_fallback(self):
         """Vigía falls back on LLM failure."""
         provider = MagicMock()
         provider.generate_text.side_effect = Exception("LLM error")
 
-        detection = {
-            "metric": "margen_pct",
-            "entity_type": "linea",
-            "entity": "linea_456",
-            "cifra": Figure(value=3.5, unit="pts", queryId="q_margen"),
-        }
+        state = {"detection": {"metric": "margen_pct", "entity": ["2026-W09", "linea_456"]}, "simulated_day": "2026-10-03"}
 
-        result = redact_title(provider, detection)
+        result = redact_title(provider, state)
 
-        assert result["error"] is not None
         assert "margen_pct" in result["title"]["text"]
 
 
@@ -81,18 +68,12 @@ class TestAnalista:
             model="qwen3:8b"
         )
 
-        alert = {
-            "metric": "saldo_vencido",
-            "entity": "cliente_123",
-            "day": "2026-10-03",
-            "severity": "high",
-        }
+        alert = {"detection": {"metric": "saldo_vencido", "entity": ["cliente_123"]}, "simulated_day": "2026-10-03"}
 
         tools = ToolRegistry()
 
         result = explain_cause(provider, alert, tools)
 
-        assert result["error"] is None
         assert result["cause"]["kind"] == "identified"
 
     def test_explain_cause_no_evidence(self):
@@ -110,17 +91,12 @@ class TestAnalista:
             model="qwen3:8b"
         )
 
-        alert = {
-            "metric": "dias_pago_prom",
-            "entity": "cliente_456",
-            "day": "2026-10-03",
-        }
+        alert = {"detection": {"metric": "dias_pago_prom", "entity": ["cliente_456", "2026-09"]}, "simulated_day": "2026-10-03"}
 
         tools = ToolRegistry()
 
         result = explain_cause(provider, alert, tools)
 
-        assert result["error"] is None
         assert result["cause"]["kind"] == "no_evidence"
 
     def test_explain_cause_fallback(self):
@@ -128,17 +104,12 @@ class TestAnalista:
         provider = MagicMock()
         provider.generate_structured.side_effect = Exception("LLM error")
 
-        alert = {
-            "metric": "cobertura_dias",
-            "entity": "sku_789",
-            "day": "2026-10-03",
-        }
+        alert = {"detection": {"metric": "cobertura_dias", "entity": ["sku_789", "BOD-01"]}, "simulated_day": "2026-10-03"}
 
         tools = ToolRegistry()
 
         result = explain_cause(provider, alert, tools)
 
-        assert result["error"] is not None
         assert result["cause"]["kind"] == "no_evidence"
 
 
@@ -168,11 +139,7 @@ class TestEstrategA:
             model="qwen3:8b"
         )
 
-        alert = {
-            "metric": "saldo_vencido",
-            "entity": "cliente_123",
-            "day": "2026-10-03",
-        }
+        alert = {"detection": {"metric": "saldo_vencido", "entity": ["cliente_123"]}, "simulated_day": "2026-10-03"}
 
         cause = {
             "kind": "identified",
@@ -183,7 +150,6 @@ class TestEstrategA:
 
         result = propose_actions(provider, alert, cause, tools)
 
-        assert result["error"] is None
         assert result["insufficient_cause"] is False
         assert len(result["actions"]) > 0
 
@@ -191,11 +157,7 @@ class TestEstrategA:
         """Estratega returns insufficient_cause if no evidence."""
         provider = MagicMock()
 
-        alert = {
-            "metric": "margen_pct",
-            "entity": "linea_456",
-            "day": "2026-10-03",
-        }
+        alert = {"detection": {"metric": "margen_pct", "entity": ["2026-W09", "linea_456"]}, "simulated_day": "2026-10-03"}
 
         cause = {
             "kind": "no_evidence",
@@ -206,7 +168,6 @@ class TestEstrategA:
 
         result = propose_actions(provider, alert, cause, tools)
 
-        assert result["error"] is None
         assert result["insufficient_cause"] is True
         assert result["actions"] is None
 
@@ -235,7 +196,6 @@ class TestEjecutor:
 
         result = execute_action(provider, action, decision, tools)
 
-        assert result["error"] is None
         assert result["executed_action"]["type"] == "task"
         assert result["executed_action"]["actionId"] == "a1"
 
@@ -263,7 +223,6 @@ class TestEjecutor:
 
         result = execute_action(provider, action, decision, tools)
 
-        assert result["error"] is None
         assert result["executed_action"]["type"] == "email_draft"
         assert "Estimado" in result["executed_action"]["result"]
 
