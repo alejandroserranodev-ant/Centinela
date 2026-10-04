@@ -1,5 +1,5 @@
 import datetime as dt
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,6 +34,10 @@ def _alerta() -> Alert:
     )
 
 
+def _consulta(metric: str, day: str) -> dict:
+    return {"queryId": f"q_{metric}", "kpi": metric, "dia": day, "consulta": f"kpi_consultar('{metric}', '{day}')"}
+
+
 @pytest.fixture
 def guardadas(monkeypatch):
     guardadas: list[Alert] = []
@@ -43,6 +47,8 @@ def guardadas(monkeypatch):
         monkeypatch.setattr(modulo.simulacion, "dia_actual", lambda conn: DIA)
     monkeypatch.setattr(simulacion_router.simulacion, "avanzar", lambda conn, dias: DIA)
     monkeypatch.setattr(simulacion_router.simulacion, "sin_datos", lambda conn, dias: None)
+    monkeypatch.setattr(simulacion_router, "consulta_del_kpi", _consulta)
+    monkeypatch.setattr(simulacion_router, "con_consulta", lambda state, metric, day: {**state, "queries": [*(state.get("queries") or []), _consulta(metric, day)]})
     monkeypatch.setattr(alertas_router.alertas_repo, "obtener", lambda conn, id, bloquear=False: guardadas[-1] if guardadas else _alerta())
 
     def conexion():
@@ -265,8 +271,13 @@ def test_una_alerta_mayor_absorbe_una_deteccion_del_dia_que_no_corre(monkeypatch
     assert pasado["alert_briefs"][id_menor]["cause"] is None
     unida = next(a for a in guardadas if a.id == id_menor)
     assert unida.status == "merged" and unida.merged_into == id_mayor
-    assert unida.cause.reason == f"Unida a la alerta {id_mayor}: la misma causa"
+    assert unida.cause.reason == "La explica la causa de la alerta que queda."
+    consulta = _consulta(menor.metric, DIA.isoformat())
+    assert unida.pesos_at_risk.query_id == consulta["queryId"] and unida.cause.queries_reviewed == [consulta["queryId"]]
+    simulacion_router.consultas.registrar.assert_any_call(ANY, [consulta])
     restante = [a for a in guardadas if a.id == id_mayor][-1]
+    detalles = [llamada.args[4] for llamada in simulacion_router.bitacora.registrar.call_args_list]
+    assert restante.labels and f"Unida a la alerta {' · '.join(restante.labels)}: la misma causa." in next(d for d in detalles if d.startswith("Unida"))
     assert restante.status == "proposed" and [m.id for m in restante.merged_alerts] == [id_menor]
     assert restante.pesos_at_risk.value == 900
     assert f'"newAlerts": ["{id_mayor}"]' in _fin(respuesta)

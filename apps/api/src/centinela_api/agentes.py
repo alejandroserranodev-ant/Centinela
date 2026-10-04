@@ -17,6 +17,7 @@ from typing import Any
 
 from centinela_agents.action_tools import EmailDraftStub, PriceChangeDraftStub, PurchaseOrderDraftStub, TaskStub
 from centinela_agents.catalog import Catalog, KernelAccess, connect_kernel
+from centinela_agents.evidence import Ledger
 from centinela_agents.metrics import Metrics, load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.provider_factory import get_provider, get_reasoning_provider
@@ -284,6 +285,25 @@ def status_path(alert_id: str, state: dict) -> list[str]:
     ]
 
 
+def consulta_del_kpi(metric: str, day: str) -> dict[str, Any]:
+    """The kernel's call for a KPI on a day, under the queryId the leaves would record for it."""
+    kernel = get_kernel()
+    ledger = Ledger(kernel.call, kernel.catalog)
+    qid, _ = ledger.consult(metric, day)
+    return ledger.queries[qid]
+
+
+def con_consulta(state: dict, metric: str, day: str) -> dict:
+    """The state with its alert's KPI among its queries, read from the kernel when no leaf recorded it."""
+    if detection_query(state, metric):
+        return state
+    return {**state, "queries": [*(state.get("queries") or []), consulta_del_kpi(metric, day)]}
+
+
+def nombre(alerta: Alert) -> str:
+    return " · ".join(alerta.labels) or alerta.id
+
+
 def detection_query(state: dict, metric: str) -> str | None:
     """The queryId under which the leaves recorded the alert's KPI, if one did."""
     for query in state.get("queries") or []:
@@ -387,13 +407,17 @@ def merged_summary(alerta: Alert) -> MergedAlert:
     )
 
 
-def absorbed_alert(alert_id: str, detection: Detection, into: str, day_str: str) -> Alert:
-    """A detection of the day another alert's cause absorbed before its run: stored merged, never run."""
+ABSORBIDA = "La explica la causa de la alerta que queda."
+
+
+def absorbed_alert(alert_id: str, detection: Detection, into: str, day_str: str, consulta: Mapping[str, Any]) -> Alert:
+    """A detection of the day another alert's cause absorbed before its run: stored merged, never run, citing its KPI's call."""
     description = get_context().metrics.descriptions.get(detection.metric, detection.metric)
     state = {
         "status": "unida",
         "merged_into": into,
+        "queries": [dict(consulta)],
         "title": {"text": ": ".join([description, ", ".join(_entity_labels(detection.metric, detection.entity))]), "figures": []},
-        "cause": {"kind": "no_evidence", "reason": f"Unida a la alerta {into}: la misma causa", "queriesReviewed": []},
+        "cause": {"kind": "no_evidence", "reason": ABSORBIDA, "queriesReviewed": [consulta["queryId"]]},
     }
     return state_to_alert(alert_id, state, detection, day_str)

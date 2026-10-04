@@ -14,7 +14,7 @@ implement.
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
 | `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion` |
-| `src/centinela_api/main.py` | builds the app, opens CORS to any origin, mounts the routers and logs every package at INFO, so a failed leaf shows in the console |
+| `src/centinela_api/main.py` | builds the app, opens CORS to any origin, mounts the routers and logs every package at INFO |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
 | `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
 | `src/centinela_api/permisos.py` | who owns a metric, who may decide an alert and who may configure, and `vista(conn, persona, alerta)`, the alert as the person signed in reads it |
@@ -76,7 +76,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day and `ultimoDia`, the last day with data, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of a detection starts, naming the metric's `etiqueta` and the entity, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of a detection starts, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk; without `estado`, every alert but the merged ones, which `estado=unida` lists | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`, when its graph no longer waits for a decision, or while another decision resumes it; 422 for a failed check | `decide` |
@@ -99,7 +99,8 @@ as a refusal.
 
 **`/consultas/{queryId}` serves the call, never runs it**: `api.consultas` holds each
 `kpi_consultar` a leaf ran, with its KPI and day, written by the day run and by the chat, so a figure
-opens its source after the process that cited it is gone.
+opens its source after the process that cited it is gone. A KPI no leaf read gets its call from
+`src/centinela_api/agentes.py:consulta_del_kpi(metric, day)`.
 
 **The internal endpoints `/interno/*` have no caller.** `src/centinela_api/routers/interno.py`
 lets an agent write each stage over HTTP: `POST /interno/alertas` (`Vigía`), `PUT .../causa`
@@ -176,8 +177,8 @@ owner none of them leads, such as `vendedor_id`, seeds as none and leaves the me
 `gerente`. A metric the row lacks reads its seed, a stored threshold whose key left the file is
 dropped, and only a threshold that is one number is editable; the others always read the file.
 A rule and a source reach the screen through
-`src/centinela_api/configuracion.py:legible(texto)`, which names a column in business words and
-drops a view, because the file's text is also the agents' data.
+`src/centinela_api/configuracion.py:legible(texto)`, which names a column in business words,
+because the file's text is also the agents' data.
 
 **`src/centinela_api/configuracion.py:guardar(conn, nuevo, persona)` refuses with 422** an
 `execute` autonomy, a changed non-editable threshold, a negative or non-finite value, an owner
@@ -269,9 +270,9 @@ door. How the orchestrator reaches each proposal is
   stored `mergedAlerts` entry the alert it writes lacks, so a decision written while a day run adds
   a merged alert never drops it.
 - **A detection the remaining alert absorbs never runs.** When `explicar.destino_nuevo` names a
-  detection of the same day, `src/centinela_api/agentes.py:absorbed_alert(alert_id, detection, into, day_str)`
-  stores it `merged` with its detection's title and pesos at risk and the cause "Unida a la alerta
-  …: la misma causa", and the run skips it; a name that is no detection still to run is refused
+  detection of the same day, `src/centinela_api/agentes.py:absorbed_alert(alert_id, detection, into, day_str, consulta)`
+  stores it `merged` with its title, its pesos at risk under the KPI call it registers, and a cause
+  that points to the alert that remains, and the run skips it; a name that is no detection still to run is refused
   and logged. `GET /alertas` lists the alert that remains, and its detail carries each merged one's
   detection and evidence. Its pesos at risk stay its own, because two detections of one cause
   would count the same pesos twice.
@@ -384,7 +385,7 @@ figures its detail's placeholders point to.
 | `question` | `/chat`, the person's question with its email addresses and keys masked |
 | `evidence`, from the chat | `/chat`, one row per query the chat ran |
 | `answer` | `/chat`, the text of an answer with its figures and its first figure's `queryId` |
-| `costo` | `/chat`, one per model step, through `src/centinela_api/bitacora.py:registrar_costo(conn, alerta_id, actor, detalle, dia_simulado)`; `GET /bitacora` never serves it, because a person reads the log |
+| `costo` | `/chat`, one per model step, through `src/centinela_api/bitacora.py:registrar_costo(conn, alerta_id, actor, detalle, dia_simulado)`; `GET /bitacora` never serves it |
 | `refusal` | `/chat`, a question the screen flagged, one outside the chat's use, or one asking to act |
 | `configuracion` | `PUT /configuracion`, the person who saved and each change, with no alert |
 

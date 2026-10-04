@@ -3,6 +3,7 @@ from typing import Any
 
 import psycopg
 
+from .agentes import etiqueta
 from .modelos import Query
 
 DESCRIPCION_ALERTAS = {
@@ -33,5 +34,5 @@ def obtener(conn: psycopg.Connection, query_id: str) -> Query | None:
     if fuente == "alertas":
         descripcion = f"{DESCRIPCION_ALERTAS[kpi]}, día {dia.isoformat()}"
     else:
-        descripcion = f"KPI {kpi} del {dia.isoformat()}"
+        descripcion = f"{etiqueta(kpi)} del {dia.isoformat()}"
     return Query(id=id, source=fuente, sql=consulta, description=descripcion)
