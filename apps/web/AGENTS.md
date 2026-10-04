@@ -157,8 +157,9 @@ and what each shows is
   group, and the API refuses it as well ([`../api/AGENTS.md`](../api/AGENTS.md#the-settings)). A
   person `src/roles.ts:canConfigure(persona)` refuses reads the screen disabled, without the save.
 - **A merged alert is read, never decided.** The inbox lists what `GET /alertas` returns, which
-  leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta" with the
-  action that opens its `mergedInto`, and the alert that remains lists each merged one under
+  leaves `merged` out. A merged alert opened by its address shows "Unida a otra alerta", naming its
+  `mergedInto` by title with the action that opens it, and one with no cause of its own,
+  `src/alert.ts:explainedByRemaining(cause, merged)`, points its "Por qué" there. The alert that remains lists each merged one under
   "Alertas con la misma causa", `src/screens/AlertDetail.tsx:AlertDetail({ id, alone })`.
 - **An `approved` alert with no `executedAction` shows its newest `result` row**,
   `src/logEvent.ts:latestResult(events)`. At `ultimoDia` the clock offers no next day.

@@ -11,11 +11,12 @@ import {
 import { ApiError, getAlert, getQuery, listBitacora } from '../api/client';
 import type { Alert, Evidence, LogEvent, MergedAlert, Query } from '../api/types';
 import { latestResult } from '../logEvent';
+import { explainedByRemaining } from '../alert';
 import { Confidence, Labels, Severity, Status } from '../common/Badges';
 import { LinkedFigure, SentenceWithFigures } from '../common/SentenceWithFigures';
 import { SeriesChart, sourceTitle } from '../common/SeriesChart';
 import { useSimulation } from '../state/Simulation';
-import { formatDate } from '../format';
+import { fillSentence, formatDate } from '../format';
 import { HowIGotHere } from './HowIGotHere';
 import { ProposedActions } from './ProposedActions';
 
@@ -53,7 +54,7 @@ function Merged({ alert }: { alert: MergedAlert }) {
             <Proof key={e.queryId + e.claim.text} evidence={e} />
           ))}
         </ul>
-      ) : (
+      ) : explainedByRemaining(alert.cause, true) ? null : (
         <p>{alert.cause.reason}</p>
       )}
     </li>
@@ -80,6 +81,15 @@ function NotExecuted({ alert }: { alert: Alert }) {
   );
 }
 
+function Remaining({ id }: { id: string }) {
+  const [title, setTitle] = useState<string | null>(null);
+  useEffect(() => {
+    setTitle(null);
+    getAlert(id).then((a) => setTitle(fillSentence(a.title.text, a.title.figures)), () => setTitle(null));
+  }, [id]);
+  return title ? <>«{title}»</> : <>la alerta que queda</>;
+}
+
 function Outcome({ alert, onOpen }: { alert: Alert; onOpen: (id: string) => void }) {
   if (alert.status === 'approved' && !alert.executedAction) {
     return <NotExecuted alert={alert} />;
@@ -88,7 +98,7 @@ function Outcome({ alert, onOpen }: { alert: Alert; onOpen: (id: string) => void
     const into = alert.mergedInto;
     return (
       <ArenaAlert tone="info" title="Unida a otra alerta" actionLabel="Ver la alerta que queda" onAction={() => onOpen(into)}>
-        La misma causa explica las dos, así que se decide en la alerta {into}. Esta no espera ninguna decisión.
+        La misma causa explica las dos, así que se decide en <Remaining id={into} />. Esta no espera ninguna decisión.
       </ArenaAlert>
     );
   }
@@ -228,6 +238,8 @@ export function AlertDetail({ id, alone }: { id: string; alone: boolean }) {
                   </p>
                 ) : null}
               </div>
+            ) : explainedByRemaining(alert.cause, alert.status === 'merged') ? (
+              <p>La causa está en la alerta que queda, que la explica con su evidencia.</p>
             ) : (
               <ArenaAlert tone="warning" icon="ph-bold ph-question" title="No encontramos evidencia suficiente para explicar la causa">
                 {alert.cause.reason} Preferimos decirlo antes que adivinar: las consultas revisadas están en "Cómo llegué aquí".
