@@ -130,6 +130,8 @@ def split_move_problems(nodes: Mapping[str, Node], move: Split) -> list[str]:
     found: list[str] = []
     if leaf.hoja.agente != move.agente:
         found.append(f"{move.agente} splits {move.hoja}, a leaf of {leaf.hoja.agente}")
+    if move.nodo.divide != move.hoja:
+        found.append(f"{move.nodo.id} must divide {move.hoja}")
     found += fresh_problems(nodes, [move.nodo, move.nueva])
     if move.nueva.sigue != leaf.sigue:
         found.append(f"{move.nueva.id} continues to {move.nueva.sigue}, where {move.hoja} continues to {leaf.sigue}")

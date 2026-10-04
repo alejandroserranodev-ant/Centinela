@@ -95,10 +95,25 @@ def accion(metrica: str, id: str) -> str:
     return described(configuracion.TIPOS.get(fila.type, fila.type) + (f" para {dueno}" if dueno else ""), fila.policy)
 
 
-def describir(movimiento) -> str:
+def previas(nodos, movimiento) -> tuple[str, ...]:
+    if not isinstance(movimiento, Split):
+        return ()
+    nodo = next((nodo for nodo in nodos if nodo.id == movimiento.hoja), None)
+    return nodo.hoja.excluye if nodo is not None and nodo.hoja is not None else ()
+
+
+def previas_de(filas: list[Version], fila: Version) -> tuple[str, ...]:
+    padre = next((otra for otra in filas if otra.id == fila.padre), None)
+    if padre is None:
+        return ()
+    return previas(Tree.model_validate(padre.arbol).nodos, MOVE.validate_python(fila.movimiento))
+
+
+def describir(movimiento, previas: tuple[str, ...] = ()) -> str:
     if isinstance(movimiento, Split):
         metrica = movimiento.nodo.predicado.valor
-        return f"Deja de proponer en {agentes.etiqueta(metrica)}: {'; '.join(accion(metrica, id) for id in movimiento.nueva.hoja.excluye)}"
+        nuevas = [id for id in movimiento.nueva.hoja.excluye if id not in previas]
+        return f"Deja de proponer en {agentes.etiqueta(metrica)}: {'; '.join(accion(metrica, id) for id in nuevas)}"
     if isinstance(movimiento, Branch):
         return f"Vigila {agentes.etiqueta(movimiento.metrica)} en {movimiento.familia}"
     return f"Retira {movimiento.nodo}: {movimiento.motivo}"
@@ -130,7 +145,7 @@ def vigente(conn: psycopg.Connection, grounds, growth, dia: datetime.date) -> Tr
         fila = cambios[posicion]
         logger.warning("Version %s does not apply over the new base: %s", fila.id, problemas)
         insertar(conn, padre=id, origen=DESCARTADA, arbol=arbol, base=grounds.base, dia=dia, agente=fila.agente, autor=fila.autor, movimiento=fila.movimiento, retira=fila.id)
-        bitacora.registrar(conn, None, "arbol", actor(fila), f"Un cambio del árbol no se aplicó sobre la base nueva y se descartó: {describir(MOVE.validate_python(fila.movimiento))}", dia)
+        bitacora.registrar(conn, None, "arbol", actor(fila), f"Un cambio del árbol no se aplicó sobre la base nueva y se descartó: {describir(MOVE.validate_python(fila.movimiento), previas_de(filas, fila))}", dia)
     return con_version(arbol, id)
 
 
@@ -154,11 +169,11 @@ def del_dia(conn: psycopg.Connection, dia: datetime.date) -> Tree:
             if crecido.tree is None:
                 logger.warning("A draft of %s was refused: %s", crecido.agent, crecido.problems)
                 insertar(conn, padre=arbol.version, origen=DESCARTADA, arbol=arbol, base=grounds.base, dia=dia, agente=crecido.agent, movimiento=movimiento, evidencia=crecido.evidence)
-                bitacora.registrar(conn, None, "arbol", quien, f"Un cambio del árbol no pasó el validador y se descartó: {describir(crecido.move)}", dia)
+                bitacora.registrar(conn, None, "arbol", quien, f"Un cambio del árbol no pasó el validador y se descartó: {describir(crecido.move, previas(arbol.nodos, crecido.move))}", dia)
                 continue
             id = insertar(conn, padre=arbol.version, origen="expansion", arbol=crecido.tree, base=grounds.base, dia=dia, agente=crecido.agent, movimiento=movimiento, evidencia=crecido.evidence)
             arbol = con_version(crecido.tree, id)
-            bitacora.registrar(conn, None, "arbol", quien, f"Cambió el árbol de decisión: {describir(crecido.move)}. Lo sostienen {len(crecido.evidence)} alertas rechazadas.", dia)
+            bitacora.registrar(conn, None, "arbol", quien, f"Cambió el árbol de decisión: {describir(crecido.move, previas(arbol.nodos, crecido.move))}. Lo sostienen {len(crecido.evidence)} alertas rechazadas.", dia)
     return arbol
 
 
@@ -173,13 +188,13 @@ def estados(filas: list[Version]) -> dict[int, str]:
     }
 
 
-def expansion(fila: Version, estado: str, retiro: Version | None, titulos: Mapping[str, Sentence]) -> TreeExpansion:
+def expansion(fila: Version, estado: str, retiro: Version | None, titulos: Mapping[str, Sentence], antes: tuple[str, ...] = ()) -> TreeExpansion:
     return TreeExpansion(
         id=str(fila.id),
         agent=fila.agente,
         simulated_date=fila.dia_simulado.isoformat() if fila.dia_simulado else None,
         created_at=fila.creado_en.isoformat(),
-        description=describir(MOVE.validate_python(fila.movimiento)),
+        description=describir(MOVE.validate_python(fila.movimiento), antes),
         evidence=[ExpansionEvidence(alert_id=id, title=titulos.get(id) or Sentence(text=id, figures=[])) for id in fila.evidencia],
         status=estado,
         retired_by=retiro.autor["name"] if retiro and retiro.autor else None,
@@ -190,7 +205,7 @@ def expansion(fila: Version, estado: str, retiro: Version | None, titulos: Mappi
 def expansiones(filas: list[Version], titulos: Mapping[str, Sentence]) -> list[TreeExpansion]:
     estado, retirada = estados(filas), retiros(filas)
     return [
-        expansion(fila, estado[fila.id], retirada.get(fila.id) if estado[fila.id] == "retired" else None, titulos)
+        expansion(fila, estado[fila.id], retirada.get(fila.id) if estado[fila.id] == "retired" else None, titulos, previas_de(filas, fila))
         for fila in reversed(filas)
         if fila.origen == "expansion"
     ]
@@ -216,5 +231,5 @@ def retirar(conn: psycopg.Connection, id: int, motivo: str, persona: Persona, di
             raise RetiroRechazado(problemas)
         autor = {"name": persona.name, "role": persona.role}
         insertar(conn, padre=arbol.version, origen="retiro", arbol=apply_move(arbol, movimiento), base=grounds.base, dia=dia, autor=autor, movimiento=movimiento.model_dump(mode="json"), retira=id)
-        bitacora.registrar(conn, None, "arbol", ActorPerson(**autor), f"Retiró el cambio del árbol «{describir(cambio)}»: {motivo.strip()}", dia)
+        bitacora.registrar(conn, None, "arbol", ActorPerson(**autor), f"Retiró el cambio del árbol «{describir(cambio, previas_de(filas, fila))}»: {motivo.strip()}", dia)
     return next(expansion for expansion in expansiones(versiones(conn), titulos) if expansion.id == str(id))

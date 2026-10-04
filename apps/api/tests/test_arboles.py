@@ -217,3 +217,13 @@ def test_una_division_anidada_bajo_una_retirada_queda_inactive_y_no_se_retira(al
     assert [(expansion.id, expansion.status) for expansion in arboles.expansiones(almacen.filas, {})] == [("3", "inactive"), ("2", "retired")]
     with pytest.raises(arboles.RetiroRechazado):
         arboles.retirar(MagicMock(), 3, "No ayudó", GERENTE, DIA, {})
+
+
+def test_una_division_anidada_describe_solo_la_fila_que_agrega(almacen, monkeypatch):
+    rechazos = tres_rechazos(monkeypatch)
+    arboles.del_dia(MagicMock(), DIA)
+    tres_rechazos(monkeypatch, "r2", 3, rechazos)
+    arboles.del_dia(MagicMock(), DIA)
+    primera, segunda = (expansion.description for expansion in reversed(arboles.expansiones(almacen.filas, {})))
+    assert ";" not in segunda and segunda != primera
+    assert arboles.bitacora.registrar.call_args.args[4].count(";") == 0

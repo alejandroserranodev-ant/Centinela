@@ -59,6 +59,7 @@ PLANTED_MOVES = [
     ("split node at L1", split(node={"id": "proponer.division_1"}), "only an L2 or L3 node of proponer does"),
     ("split leaf of another agent", split(hoja={"agente": "analista", "decision": "explicar", "skill": "analista/contrato.md"}), "takes no new leaf of estratega/proponer on si"),
     ("split leaf of another decision", split(hoja={"decision": "revision_manual"}), "takes no new leaf of estratega/proponer on si"),
+    ("split node that divides nothing", split(node={"divide": None}), "must divide hoja.estratega.proponer"),
     ("split that drops the old leaf", split(node={"no": "hoja.estratega.revision_manual"}), "does not lead back to hoja.estratega.proponer on no"),
     ("split leaf that bypasses aprobar", split(leaf={"sigue": "hoja.ejecutor.ejecutar"}), "continues to hoja.ejecutor.ejecutar"),
     ("split leaf already in the tree", split(leaf={"id": "hoja.estratega.revision_manual"}, node={"si": "hoja.estratega.revision_manual"}), "hoja.estratega.revision_manual is already in the tree"),

@@ -85,7 +85,7 @@ versions live is [the API's page](../../../apps/api/AGENTS.md), *The tree's vers
 ## Walkthrough: a customer who paid in 30 days is 6 days late
 
 > **Decided, not built.** `detectar.cartera.retraso_habito` and the KPI it reads are in no file:
-> steps 1 and 2 need the birth of a KPI and self-expansion. From `hoja.vigia.titular` on, the walk
+> steps 1 and 2 need the birth of a KPI and `Vigía`'s draft of `agregar_rama`. From `hoja.vigia.titular` on, the walk
 > follows nodes of the base, and every model step runs only as a stub.
 
 ```mermaid

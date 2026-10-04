@@ -181,11 +181,15 @@ async def _decidir(alerta: Alert, decision: Decision, persona: Persona, conn: ps
                     "simulated_day": dia.isoformat(),
                 })
                 destino = (estado or {}).get("rejection_target")
-                if destino:
-                    with conn.transaction():
-                        rechazos.registrar(conn, id, nueva.metric, destino, [accion.id for accion in nueva.actions], decision.reason.strip(), dia)
             except Exception as e:
                 logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
+                destino = None
+            if destino:
+                try:
+                    with conn.transaction():
+                        rechazos.registrar(conn, id, nueva.metric, destino, [accion.id for accion in nueva.actions], decision.reason.strip(), dia)
+                except Exception as e:
+                    logger.error(f"Rejection evidence write failed for {id}: {e}", exc_info=True)
 
     elif isinstance(decision, DecisionRequestChanges):
         nueva = await _reproponer(conn, nueva, decision.reason, ajustes, dia)
