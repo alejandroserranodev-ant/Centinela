@@ -65,14 +65,12 @@ def classify_rejection(
         extra={"reason_len": len(reason)}
     )
 
-    # Build cause summary
     cause_kind = cause.get("kind")
     if cause_kind == "identified":
         cause_text = cause.get("sentence", "Causa identificada")
     else:
         cause_text = cause.get("reason", "Sin evidencia")
 
-    # Build actions summary
     actions_text = ""
     if actions:
         actions_text = "\n".join([
@@ -120,14 +118,13 @@ Responde SOLO con JSON válido:
                 system_prompt="Eres el Orquestador. Clasifica rechazos.",
                 user_prompt=prompt,
                 schema=classifier_schema,
-                temperature=0.0,  # Determinista
-                thinking=False,  # Thinking OFF
+                temperature=0.0,
+                thinking=False,
             )
         )
 
         destino_data = response.parsed.get("destino")
 
-        # Validate
         if destino_data not in ["causa", "propuesta", "ambos", "ninguno"]:
             logger.warning(
                 f"Orquestador: invalid destino '{destino_data}', defaulting to 'ninguno'"
@@ -148,7 +145,6 @@ Responde SOLO con JSON válido:
 
     except Exception as e:
         logger.error(f"Orquestador: classification failed: {e}")
-        # Fallback: ninguno (stay in log, no agent action)
         return {
             "destino": "ninguno",
             "error": str(e),

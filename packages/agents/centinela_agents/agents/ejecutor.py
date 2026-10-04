@@ -78,7 +78,6 @@ def execute_action(
         extra={"action_type": action_type, "action_id": action_id}
     )
 
-    # Get tools
     email_tool = tools.email_draft if hasattr(tools, 'email_draft') else None
     task_tool = tools.task if hasattr(tools, 'task') else None
     po_tool = tools.purchase_order_draft if hasattr(tools, 'purchase_order_draft') else None
@@ -86,7 +85,6 @@ def execute_action(
 
     try:
         if action_type == "email_draft":
-            # LLM writes email body (data is pre-masked)
             return _execute_email_draft(
                 provider,
                 action_id,
@@ -94,13 +92,10 @@ def execute_action(
                 email_tool
             )
         elif action_type == "task":
-            # Code creates task
             return _execute_task(action_id, parameters, task_tool)
         elif action_type == "purchase_order_draft":
-            # Code creates PO draft
             return _execute_po_draft(action_id, parameters, po_tool)
         elif action_type == "price_change_draft":
-            # Code creates price change draft
             return _execute_price_draft(action_id, parameters, price_tool)
         else:
             raise ValueError(f"Unknown action type: {action_type}")
@@ -143,14 +138,13 @@ Redacta SOLO el cuerpo del email. Sin subject, sin saludos formales iniciales.""
             LLMRequest(
                 system_prompt="Redactas emails profesionales en español para clientes.",
                 user_prompt=prompt,
-                temperature=0.0,  # Determinista
-                thinking=False,  # Thinking OFF
+                temperature=0.0,
+                thinking=False,
             )
         )
 
         body = response.text.strip()
 
-        # Create draft using tool
         if email_tool:
             draft_result = email_tool.execute(
                 recipient=recipient,
@@ -163,7 +157,6 @@ Redacta SOLO el cuerpo del email. Sin subject, sin saludos formales iniciales.""
                 parameters=parameters,
             )
         else:
-            # Stub: no tool
             executed = ExecutedAction(
                 actionId=action_id,
                 type="email_draft",
@@ -193,7 +186,6 @@ def _execute_task(
 
     logger.info(f"Ejecutor: creating task for {owner} on {cliente_id}")
 
-    # Create task using tool
     if task_tool:
         task_result = task_tool.execute(
             owner=owner,
@@ -205,7 +197,6 @@ def _execute_task(
             "owner": owner,
         }
     else:
-        # Stub: no tool
         result_data = {"owner": owner, "description": "Tarea manual"}
 
     executed = ExecutedAction(
@@ -234,7 +225,6 @@ def _execute_po_draft(
 
     logger.info(f"Ejecutor: creating PO for {proveedor_id} {sku} x{quantity}")
 
-    # Create PO using tool
     if po_tool:
         po_result = po_tool.execute(
             proveedor_id=proveedor_id,
@@ -249,7 +239,6 @@ def _execute_po_draft(
             "quantity": quantity,
         }
     else:
-        # Stub
         result_data = {"proveedor": proveedor_id, "sku": sku}
 
     executed = ExecutedAction(
@@ -277,7 +266,6 @@ def _execute_price_draft(
 
     logger.info(f"Ejecutor: creating price change {sku or linea} +{price_increase_pct}%")
 
-    # Create price change using tool
     if price_tool:
         price_result = price_tool.execute(
             sku=sku,
@@ -289,7 +277,6 @@ def _execute_price_draft(
             "increase_pct": price_increase_pct,
         }
     else:
-        # Stub
         result_data = {"increase_pct": price_increase_pct}
 
     executed = ExecutedAction(

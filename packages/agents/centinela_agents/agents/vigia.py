@@ -102,14 +102,13 @@ Solo el hecho."""
             LLMRequest(
                 system_prompt="Eres Vigía redactando títulos de alertas.",
                 user_prompt=prompt,
-                temperature=0.0,  # Determinista
-                thinking=False,  # Thinking OFF
+                temperature=0.0,
+                thinking=False,
             )
         )
 
         title_text = response.text.strip()
 
-        # Build Sentence with figures
         figures = []
         if cifra:
             figures.append(cifra)
@@ -127,7 +126,6 @@ Solo el hecho."""
 
     except Exception as e:
         logger.error(f"Vigía: title redaction failed: {e}")
-        # Fallback: metric.descripcion + entity
         fallback_text = f"{metric} en {entity_id}"
         return {
             "title": {

@@ -75,7 +75,6 @@ def propose_actions(
         extra={"metric": metric, "cause": cause_kind}
     )
 
-    # If no_evidence, return insufficient_cause fallback
     if cause_kind == "no_evidence":
         logger.info(f"Estratega: no evidence, returning insufficient_cause")
         return {
@@ -84,12 +83,10 @@ def propose_actions(
             "error": None,
         }
 
-    # Stub tools
     sql_tool = tools.sql_vistas if hasattr(tools, 'sql_vistas') else None
     policy_tool = tools.buscar_politica if hasattr(tools, 'buscar_politica') else None
     impact_tool = tools.calcular_impacto if hasattr(tools, 'calcular_impacto') else None
 
-    # Build schema for structured output
     actions_schema = {
         "type": "object",
         "properties": {
@@ -165,14 +162,13 @@ Devuelve JSON puro. Nada de markdown ni explicación."""
                 system_prompt="Eres Estratega. Responde con JSON válido.",
                 user_prompt=prompt,
                 schema=actions_schema,
-                temperature=0.3,  # Thinking ON
-                thinking=True,  # Extended thinking
+                temperature=0.3,
+                thinking=True,
             )
         )
 
         actions_data = response.parsed.get("actions", [])
 
-        # Validate each action with Pydantic
         actions = []
         for idx, action_data in enumerate(actions_data):
             try:
@@ -180,7 +176,6 @@ Devuelve JSON puro. Nada de markdown ni explicación."""
                 actions.append(action.model_dump())
             except Exception as validation_error:
                 logger.warning(f"Estratega: action {idx} validation failed: {validation_error}")
-                # Skip invalid action
                 continue
 
         if not actions:
@@ -202,7 +197,6 @@ Devuelve JSON puro. Nada de markdown ni explicación."""
 
     except Exception as e:
         logger.error(f"Estratega: proposal failed: {e}")
-        # Fallback: insufficient_cause → manual review
         return {
             "actions": None,
             "insufficient_cause": True,

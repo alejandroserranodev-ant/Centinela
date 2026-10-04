@@ -182,7 +182,6 @@ class TestOpenAIProvider:
 
                 provider = OpenAIProvider(config)
 
-                # Mock the response
                 mock_response = MagicMock()
                 mock_response.choices = [MagicMock(
                     message=MagicMock(content="Test response"),

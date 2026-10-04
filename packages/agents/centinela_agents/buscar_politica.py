@@ -20,7 +20,6 @@ class BuscarPoliticaStub(BuscarPoliticaProvider):
 
     def __init__(self):
         """Initialize stub."""
-        # Stub policy database
         self.policies = {
             "FIN-POL-004": {
                 "§3": "Cupo de crédito: el saldo abierto no debe exceder el cupo_credito establecido.",
@@ -67,8 +66,6 @@ class BuscarPoliticaStub(BuscarPoliticaProvider):
         """
         logger.info(f"Policy search: '{query}' (top_k={top_k})")
 
-        # Stub: return empty
-        # Real: embed query, search pgvector, return top_k passages
         return []
 
     def search_by_code(
@@ -88,6 +85,4 @@ class BuscarPoliticaStub(BuscarPoliticaProvider):
         """
         logger.info(f"Policy lookup: {policy_code} {section or ''}")
 
-        # Stub: return empty
-        # Real: look up in policy database
         return []

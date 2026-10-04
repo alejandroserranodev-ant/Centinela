@@ -39,21 +39,18 @@ class TestTokenUsage:
 
     def test_cost_openai_gpt4o_mini(self):
         """OpenAI gpt-4o-mini cost calculation."""
-        # gpt-4o-mini: input=0.00015, output=0.0006
         usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4o-mini", provider="openai")
         expected = (100 * 0.00015) + (50 * 0.0006)
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_openai_gpt4_turbo(self):
         """OpenAI gpt-4-turbo cost calculation."""
-        # gpt-4-turbo: input=0.01, output=0.03
         usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4-turbo", provider="openai")
         expected = (100 * 0.01) + (50 * 0.03)
         assert usage.cost() == pytest.approx(expected)
 
     def test_cost_anthropic_opus(self):
         """Anthropic Claude Opus cost calculation."""
-        # claude-opus-5-5: input=0.003, output=0.015
         usage = TokenUsage(
             prompt_tokens=100,
             completion_tokens=50,
@@ -65,7 +62,6 @@ class TestTokenUsage:
 
     def test_cost_anthropic_sonnet(self):
         """Anthropic Claude Sonnet cost calculation."""
-        # claude-sonnet-5-5: input=0.003, output=0.015
         usage = TokenUsage(
             prompt_tokens=100,
             completion_tokens=50,
@@ -77,7 +73,6 @@ class TestTokenUsage:
 
     def test_cost_anthropic_haiku(self):
         """Anthropic Claude Haiku cost calculation."""
-        # claude-haiku-4-5: input=0.00008, output=0.0004
         usage = TokenUsage(
             prompt_tokens=100,
             completion_tokens=50,
@@ -373,14 +368,12 @@ class TestAlertMetrics:
             day="2026-10-03"
         )
 
-        # Mock the start time
         past = datetime.utcnow() - timedelta(seconds=2)
         metrics.start_time = past
 
         duration_ms = metrics.duration_ms()
 
-        # Should be approximately 2000ms, allowing for execution time
-        assert duration_ms >= 1900  # At least 1.9 seconds
+        assert duration_ms >= 1900
 
     def test_duration_ms_after_finish(self):
         """Duration after finishing."""
@@ -562,15 +555,12 @@ class TestMetricsCollector:
         usage1 = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4o-mini", provider="openai")
         usage2 = TokenUsage(prompt_tokens=200, completion_tokens=100, model="gpt-4o-mini", provider="openai")
 
-        # Vigía calls
         collector.record_agent_call("Vigía", usage1, latency_ms=150.0)
         collector.record_retry("Vigía")
 
-        # Analista calls
         collector.record_agent_call("Analista", usage2, latency_ms=200.0)
         collector.record_failure("Analista")
 
-        # Finish
         collector.finish("completed")
 
         summary = collector.get_summary()
@@ -606,7 +596,6 @@ class TestLangfuseTracer:
         tracer = LangfuseTracer(enabled=False)
         metrics = AlertMetrics("alert-123", "cost_anomaly", "customer-1", "2026-10-03")
 
-        # Should not raise
         tracer.trace_alert("alert-123", metrics)
 
     def test_trace_alert_enabled(self, caplog):
@@ -624,7 +613,6 @@ class TestLangfuseTracer:
         tracer = LangfuseTracer(enabled=False)
         usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4o-mini", provider="openai")
 
-        # Should not raise
         tracer.trace_agent_call("alert-123", "Vigía", usage, 150.0)
 
     def test_trace_agent_call_enabled(self, caplog):
@@ -672,5 +660,4 @@ class TestSetupLogging:
         logger1 = setup_logging()
         logger2 = setup_logging()
 
-        # Both should be the same logger
         assert logger1.name == logger2.name

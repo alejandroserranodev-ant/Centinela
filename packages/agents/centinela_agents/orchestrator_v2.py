@@ -124,7 +124,6 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
             OutputValidationError: If output validation fails (strict mode)
             Exception: If orchestration fails
         """
-        # Initialize metrics collector
         collector = MetricsCollector(
             alert_id=alert_id,
             metric=detection.metric,
@@ -145,7 +144,6 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
                 }
             )
 
-            # Call parent start() - executes all agents
             state = self.start(
                 detection=detection,
                 alert_id=alert_id,
@@ -155,14 +153,11 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
                 proposal_rejections=proposal_rejections,
             )
 
-            # Extract and validate outputs from state
             self._validate_state_outputs(state, collector)
 
-            # Calculate metrics
             duration_ms = (time.time() - start_time) * 1000
-            collector.metrics.end_time = None  # Let duration_ms() calculate it
+            collector.metrics.end_time = None
 
-            # Log summary
             collector.finish(status="completed")
 
             logger.info(
@@ -208,7 +203,6 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
             Tuple of (alert_state, MetricsCollector)
         """
         if collector is None:
-            # Get alert state to extract metadata
             state = self.get_state(alert_id)
             collector = MetricsCollector(
                 alert_id=alert_id,
@@ -228,13 +222,10 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
                 }
             )
 
-            # Validate decision
             self.validator.validate_decision(decision)
 
-            # Resume processing
             state = self.resume(alert_id, decision)
 
-            # Validate new outputs
             self._validate_state_outputs(state, collector)
 
             collector.finish(status="completed")
@@ -276,11 +267,9 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
         Raises:
             OutputValidationError: If validation fails (strict mode)
         """
-        # Validate Analista output (cause)
         if "cause" in state and state["cause"]:
             try:
                 cause = self.validator.validate_cause(state["cause"])
-                # Record metrics for Analista
                 self._record_agent_metrics(
                     collector, "Analista", state.get("cause_latency_ms", 0)
                 )
@@ -288,7 +277,6 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
                 logger.error(f"Cause validation failed: {e}")
                 raise
 
-        # Validate Estratega output (actions)
         if "actions" in state and state["actions"]:
             for i, action_output in enumerate(state["actions"]):
                 try:
@@ -300,7 +288,6 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
                     logger.error(f"Action {i} validation failed: {e}")
                     raise
 
-        # Validate Ejecutor output (executed actions)
         if "executed" in state and state["executed"]:
             try:
                 executed = self.validator.validate_executed_action(state["executed"])
@@ -325,9 +312,7 @@ class CentinelaOrchestratorV2(CentinelaOrchestrator):
             agent_name: Agent name (Vigía, Analista, etc.)
             latency_ms: Call latency in milliseconds
         """
-        # Estimate token usage based on latency
-        # In production, this would come from LLM response
-        estimated_tokens = max(100, int(latency_ms * 0.5))  # Heuristic
+        estimated_tokens = max(100, int(latency_ms * 0.5))
 
         usage = TokenUsage(
             prompt_tokens=int(estimated_tokens * 0.3),

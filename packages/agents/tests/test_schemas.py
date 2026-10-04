@@ -232,7 +232,7 @@ class TestAction:
             description="Evaluar aumento según FIN-POL-004 §3",
             type="task",
             parameters={"owner": "Jefe de cartera", "cliente_id": "cliente_456"},
-            impact=None,  # Task has no impact formula
+            impact=None,
             confidence=confidence
         )
 
@@ -411,7 +411,6 @@ class TestSchemaIntegration:
 
     def test_cause_to_action_flow(self):
         """Analista produces Cause, Estratega produces Action."""
-        # Analista output
         fig_cause = Figure(value=30, unit="days", queryId="q_dias_retraso")
         evidence = Evidence(
             claim="El cliente acumula {0} sin pagar",
@@ -424,7 +423,6 @@ class TestSchemaIntegration:
             evidence=[evidence]
         )
 
-        # Estratega output (using same data)
         fig_action = Figure(value=100000, unit="COP", queryId="q_saldo_vencido")
         action_conf = Confidence(level="high")
         action = Action(
@@ -437,7 +435,6 @@ class TestSchemaIntegration:
             confidence=action_conf
         )
 
-        # Both should serialize/deserialize
         cause_json = cause.model_dump_json()
         action_json = action.model_dump_json()
 
@@ -449,7 +446,6 @@ class TestSchemaIntegration:
 
     def test_action_to_execution_flow(self):
         """Estratega produces Action, Ejecutor produces ExecutedAction."""
-        # Estratega output
         conf = Confidence(level="medium")
         action = Action(
             id="draft_001",
@@ -461,13 +457,11 @@ class TestSchemaIntegration:
             confidence=conf
         )
 
-        # Decision
         decision = Decision(
             kind="approve",
             actionId="draft_001"
         )
 
-        # Ejecutor output
         executed = ExecutedAction(
             actionId="draft_001",
             type="email_draft",
@@ -475,7 +469,6 @@ class TestSchemaIntegration:
             parameters={"recipient": "cliente_X"}
         )
 
-        # All serialize
         action_json = action.model_dump_json()
         decision_json = decision.model_dump_json()
         executed_json = executed.model_dump_json()

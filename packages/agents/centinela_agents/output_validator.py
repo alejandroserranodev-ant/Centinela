@@ -66,7 +66,6 @@ class OutputValidator:
             logger.warning(error)
             return None
 
-        # Security checks - only on text fields, not the dict
         try:
             if isinstance(cause, CauseIdentified):
                 self._check_security(cause.sentence)
@@ -78,7 +77,6 @@ class OutputValidator:
             logger.warning(error)
             return None
 
-        # Domain validation
         try:
             if isinstance(cause, CauseIdentified):
                 assert len(cause.evidence) > 0, "Identified cause must have evidence"
@@ -104,7 +102,6 @@ class OutputValidator:
             logger.warning(error)
             return None
 
-        # Security checks
         try:
             self._check_security(action.title)
             self._check_security(action.description)
@@ -114,7 +111,6 @@ class OutputValidator:
             logger.warning(error)
             return None
 
-        # Domain validation
         try:
             valid_types = ["email_draft", "task", "purchase_order_draft", "price_change_draft"]
             assert action.type in valid_types, f"Invalid action type: {action.type}"
@@ -140,7 +136,6 @@ class OutputValidator:
             logger.warning(error)
             return None
 
-        # Security check
         try:
             if isinstance(executed.result, str):
                 self._check_security(executed.result)
@@ -150,7 +145,6 @@ class OutputValidator:
             logger.warning(error)
             return None
 
-        # Domain validation
         try:
             valid_types = ["email_draft", "task", "purchase_order_draft", "price_change_draft", "nota_manual"]
             assert executed.type in valid_types, f"Invalid type: {executed.type}"
@@ -195,15 +189,12 @@ class OutputValidator:
 
     def _check_security(self, text: str) -> None:
         """Check for security issues."""
-        # Check unfilled placeholders
         placeholders = re.findall(r'\{[^}]+\}', text)
         if placeholders:
             raise OutputValidationError("security", f"Unfilled placeholders: {placeholders}", text)
 
-        # Check for SQL injection keywords
         if re.search(r"(UNION|DROP|DELETE|INSERT|UPDATE|SELECT)\s", text, re.IGNORECASE):
             raise OutputValidationError("security", "SQL injection pattern detected", text)
 
-        # Check for prompt injection keywords
         if re.search(r"(ignore|override|bypass|system.*override)", text, re.IGNORECASE):
             raise OutputValidationError("security", "Prompt injection pattern detected", text)

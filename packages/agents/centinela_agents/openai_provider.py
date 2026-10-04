@@ -58,7 +58,6 @@ class OpenAIProvider(LLMProvider):
                 "Or create .env file and use: from dotenv import load_dotenv; load_dotenv()"
             )
 
-        # Validate API key format
         if not api_key.startswith("sk-"):
             logger.warning("API key does not start with 'sk-', may be invalid")
 
@@ -82,7 +81,6 @@ class OpenAIProvider(LLMProvider):
     def _health_check(self) -> bool:
         """Internal health check implementation."""
         try:
-            # List models to verify API access
             self.client.models.list()
             logger.debug("OpenAI API health check passed")
             return True
@@ -115,7 +113,6 @@ class OpenAIProvider(LLMProvider):
         if request.max_tokens:
             kwargs["max_tokens"] = request.max_tokens
 
-        # Note: thinking (extended thinking) requires gpt-4o or later, not all models
         if request.thinking and "4o" in self.config.model.lower():
             kwargs["thinking"] = {"type": "enabled"}
 
@@ -172,13 +169,12 @@ class OpenAIProvider(LLMProvider):
             "messages": messages,
             "temperature": request.temperature or self.config.temperature,
             "top_p": request.top_p or self.config.top_p,
-            "response_format": {"type": "json_object"},  # OpenAI JSON mode
+            "response_format": {"type": "json_object"},
         }
 
         if request.max_tokens:
             kwargs["max_tokens"] = request.max_tokens
 
-        # Note: thinking requires gpt-4o or later
         if request.thinking and "4o" in self.config.model.lower():
             kwargs["thinking"] = {"type": "enabled"}
 

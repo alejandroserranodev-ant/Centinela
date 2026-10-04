@@ -88,7 +88,6 @@ class CentinelaOrchestrator:
         self.tree = tree
         self.metrics = metrics
 
-        # Build leaf functions (agents)
         self.leaves = {
             ("vigia", "titular"): lambda state: redact_title(provider, state),
             ("analista", "explicar"): lambda state: explain_cause(provider, state, tools),
@@ -106,7 +105,6 @@ class CentinelaOrchestrator:
             ),
         }
 
-        # Compile tree to LangGraph
         self.compiler = Compiler(
             leaves=self.leaves,
             metrics=metrics,

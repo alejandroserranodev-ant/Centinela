@@ -55,12 +55,10 @@ class SqlVistasStub(SqlVistasProvider):
             extra={"queryId": query_id}
         )
 
-        # Stub: return empty result
-        # Real: would query database
         return SqlQuery(
             queryId=query_id,
             rows=[],
-            error=None  # Or error if query failed
+            error=None
         )
 
     def query_by_name(self, query_name: str, simulated_day: str) -> SqlQuery:
@@ -85,8 +83,6 @@ class SqlVistasStub(SqlVistasProvider):
             extra={"queryId": query_id}
         )
 
-        # Stub: return empty
-        # Real: look up query_name in catalog, execute with simulated_day
         return SqlQuery(
             queryId=query_id,
             rows=[],

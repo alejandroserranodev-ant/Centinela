@@ -149,7 +149,7 @@ class PurchaseOrderDraftStub(PurchaseOrderDraftTool):
             sku=sku,
             quantity=quantity,
             warehouse=warehouse,
-            estimated_arrival=None  # Stub: would calculate from supplier lead time
+            estimated_arrival=None
         )
 
 
@@ -198,5 +198,5 @@ class PriceChangeDraftStub(PriceChangeDraftTool):
             sku=sku,
             linea=linea,
             price_increase_pct=price_increase_pct,
-            new_price=None  # Stub: would calculate from current list price
+            new_price=None
         )

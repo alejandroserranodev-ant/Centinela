@@ -72,11 +72,9 @@ def explain_cause(
         extra={"metric": metric, "entity": entity}
     )
 
-    # Stub: no real tools yet
     sql_tool = tools.sql_vistas if hasattr(tools, 'sql_vistas') else None
     policy_tool = tools.buscar_politica if hasattr(tools, 'buscar_politica') else None
 
-    # Build schema for structured output
     cause_schema = {
         "type": "object",
         "oneOf": [
@@ -151,15 +149,13 @@ Devuelve JSON puro. Nada de markdown, backticks ni explicación."""
                 system_prompt="Eres Analista. Responde con JSON válido.",
                 user_prompt=prompt,
                 schema=cause_schema,
-                temperature=0.3,  # Thinking ON (reasoning)
-                thinking=True,  # Extended thinking
+                temperature=0.3,
+                thinking=True,
             )
         )
 
-        # Validate with Pydantic
         cause_data = response.parsed
 
-        # Try to parse as CauseIdentified first, then CauseNoEvidence
         try:
             if cause_data.get("kind") == "identified":
                 cause = CauseIdentified.model_validate(cause_data)
@@ -183,7 +179,6 @@ Devuelve JSON puro. Nada de markdown, backticks ni explicación."""
 
     except Exception as e:
         logger.error(f"Analista: explanation failed: {e}")
-        # Fallback: no_evidence
         return {
             "cause": CauseNoEvidence(
                 kind="no_evidence",

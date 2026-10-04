@@ -51,7 +51,6 @@ class OllamaProvider(LLMProvider):
     def health_check(self) -> bool:
         """Check that Ollama is running and the model is available."""
         try:
-            # Check server is alive
             resp = requests.get(
                 f"{self.base_url}/api/tags",
                 timeout=5,
@@ -59,11 +58,9 @@ class OllamaProvider(LLMProvider):
             if resp.status_code != 200:
                 return False
 
-            # Check model is in tags
             data = resp.json()
             models = [m.get("name", "") for m in data.get("models", [])]
 
-            # Model name from config (e.g., "qwen3:8b")
             if self.config.model not in models:
                 raise ValueError(
                     f"Model '{self.config.model}' not found in Ollama. "
@@ -158,7 +155,7 @@ class OllamaProvider(LLMProvider):
             "stream": False,
             "temperature": request.temperature or self.config.temperature,
             "top_p": request.top_p or self.config.top_p,
-            "format": request.schema,  # JSON schema constraint
+            "format": request.schema,
         }
 
         if request.thinking:

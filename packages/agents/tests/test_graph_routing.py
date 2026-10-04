@@ -26,7 +26,6 @@ class TestGraphCompilation:
 
     def test_compile_tree_minimal(self):
         """Compile a minimal tree."""
-        # Minimal tree with just root and end
         tree = Tree(
             version=1,
             leyes=[],
@@ -52,7 +51,6 @@ class TestGraphCompilation:
             )
         )
 
-        # Mock dependencies
         leaves = {("vigia", "titular"): lambda x: {"title": {"text": "Test", "figures": []}}}
         metrics = MagicMock(spec=Metrics)
         metrics.catalog = {}
@@ -71,7 +69,6 @@ class TestGraphCompilation:
             checkpointer=checkpointer,
         )
 
-        # Should not raise
         graph = compiler.graph(tree)
         assert graph is not None
 
@@ -111,12 +108,10 @@ class TestGraphCompilation:
             checkpointer=checkpointer,
         )
 
-        # First call
         graph1 = compiler.graph(tree)
-        # Second call with same tree should return cached
         graph2 = compiler.graph(tree)
 
-        assert graph1 is graph2  # Same object
+        assert graph1 is graph2
 
 
 class TestGraphRouting:
@@ -124,7 +119,6 @@ class TestGraphRouting:
 
     def test_start_alert_begins_in_detectar(self):
         """Starting an alert begins in detectar.raiz."""
-        # Minimal tree
         tree = Tree(
             version=1,
             leyes=[],
@@ -162,7 +156,6 @@ class TestGraphRouting:
 
         graph = compiler.graph(tree)
 
-        # Create detection
         detection = Detection(
             entry="detectar.raiz",
             metric="test_metric",
@@ -172,7 +165,6 @@ class TestGraphRouting:
             row={},
         )
 
-        # Start alert
         state = start_alert(
             graph,
             detection,
@@ -274,7 +266,7 @@ class TestDecisionValidation:
             "simulated_day": "2026-10-03",
             "reason": "Try again",
         }
-        state = {"actions": [], "proposal_returns": 1}  # Already returned once
+        state = {"actions": [], "proposal_returns": 1}
 
         problem = decision_problem(decision, state)
 
@@ -287,7 +279,6 @@ class TestGraphState:
 
     def test_state_status_transitions(self):
         """State transitions follow lifecycle."""
-        # Tree with vigia and then end
         tree = Tree(
             version=1,
             leyes=[],
@@ -336,9 +327,7 @@ class TestGraphState:
 
         state = start_alert(graph, detection, alert_id="a1", day="2026-10-03")
 
-        # Should start in "nueva" status
         assert state["status"] in ("nueva", "sin_alerta")
-        # Should have transitions recorded
         assert len(state.get("transitions", [])) > 0
 
 

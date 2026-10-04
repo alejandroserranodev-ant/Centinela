@@ -23,7 +23,6 @@ class TestVigia:
 
     def test_redact_title_success(self):
         """Vigía redacts title from detection."""
-        # Mock provider
         provider = MagicMock()
         provider.generate_text.return_value = LLMResponse(
             text="Cliente cliente_123 tiene 45 días de retraso.",
@@ -32,7 +31,6 @@ class TestVigia:
             model="qwen3:8b"
         )
 
-        # Mock detection
         detection = {
             "metric": "saldo_vencido",
             "entity_type": "cliente_id",
@@ -62,7 +60,7 @@ class TestVigia:
         result = redact_title(provider, detection)
 
         assert result["error"] is not None
-        assert "margen_pct" in result["title"]["text"]  # Fallback text
+        assert "margen_pct" in result["title"]["text"]
 
 
 class TestAnalista:
@@ -191,7 +189,7 @@ class TestEstrategA:
 
     def test_propose_actions_no_evidence(self):
         """Estratega returns insufficient_cause if no evidence."""
-        provider = MagicMock()  # Not called
+        provider = MagicMock()
 
         alert = {
             "metric": "margen_pct",
@@ -218,7 +216,7 @@ class TestEjecutor:
 
     def test_execute_task(self):
         """Ejecutor creates task."""
-        provider = MagicMock()  # Not called for task
+        provider = MagicMock()
 
         action = {
             "id": "a1",
@@ -351,4 +349,4 @@ class TestOrquestador:
         result = classify_rejection(provider, reason, cause, actions)
 
         assert result["error"] is not None
-        assert result["destino"] == "ninguno"  # Fallback
+        assert result["destino"] == "ninguno"
