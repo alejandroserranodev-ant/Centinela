@@ -48,6 +48,11 @@ from .walk import Context, Detection
 logger = logging.getLogger(__name__)
 
 
+def rejection_target(provider: LLMProvider, state: Mapping[str, Any]) -> str:
+    reason = (state.get("decision") or {}).get("reason") or ""
+    return classify_rejection(provider, reason, state.get("cause") or {}, state.get("actions"))["destino"]
+
+
 class CentinelaOrchestrator:
     """
     Complete orchestrator for Centinela alert processing.
@@ -110,7 +115,7 @@ class CentinelaOrchestrator:
             metrics=metrics,
             catalog=catalog,
             reader=reader,
-            classify=lambda state: classify_rejection(provider, state),
+            classify=lambda state: rejection_target(provider, state),
             checkpointer=checkpointer,
             owners=owners,
         )

@@ -313,11 +313,11 @@ that calls a model, with [`skills/orquestador/contrato.md`](./skills/orquestador
 host hands it to `compile_tree` as `classify`; its target is one of
 `centinela_agents/graph.py:REJECTION_TARGETS`, and decides who reads the reason on the next run of
 the same metric: `causa` to `Analista`, `propuesta` to `Estratega`, `ambos` to both, and `ninguno`
-to no agent, the reason staying in the `bitácora`. `centinela_agents/orchestrator.py` hands it
-`centinela_agents/agents/orquestador.py:classify_rejection(provider, reason, cause, actions)` with
-two arguments where it takes four, and the function returns a mapping where `classify` returns a
-target, so `centinela_agents/graph.py:classified(classify, state)` answers `ninguno` for every
-rejection and no agent reads a reason. `apps/api` keeps the reason with its target, metric and entity,
+to no agent, the reason staying in the `bitácora`. `centinela_agents/orchestrator.py:rejection_target(provider, state)`
+is that `classify`: it hands
+`centinela_agents/agents/orquestador.py:classify_rejection(provider, reason, cause, actions)` the
+decision's reason, the cause and the actions, and returns its `destino`;
+`centinela_agents/graph.py:classified(classify, state)` answers `ninguno` when it fails. `apps/api` keeps the reason with its target, metric and entity,
 and hands it in split into `cause_rejections` and `proposal_rejections`, so each agent learns only
 from its own mistakes.
 

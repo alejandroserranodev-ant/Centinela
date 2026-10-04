@@ -29,14 +29,17 @@ provider from `centinela_agents/provider_factory.py:get_provider(provider_name, 
 demonstration rows, and LangGraph's `InMemorySaver`. That page is
 [`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md).
 
-## The classifier does not classify
+## The classifier
 
-The orchestrator passes `classify=lambda state: classify_rejection(provider, state)`, two
-arguments to a function that takes four, and the function returns a dict where the compiler
-expects a string. `centinela_agents/graph.py:classified(classify, state)` catches the error and
-returns `ninguno`, so every rejection reason lands in `ninguno` and reaches no agent.
+The orchestrator passes `classify=lambda state: rejection_target(provider, state)`.
+`centinela_agents/orchestrator.py:rejection_target(provider, state)` reads the decision's reason,
+the cause and the actions from the state, calls
+`centinela_agents/agents/orquestador.py:classify_rejection(provider, reason, cause, actions)` and
+returns its `destino`, the string `centinela_agents/graph.py:classified(classify, state)` checks
+against `REJECTION_TARGETS`.
 
 ## Tests
 
 `uv run pytest tests/test_graph_routing.py` compiles small trees and walks them with mocked
-leaves; `tests/test_graph.py` and `tests/test_orq.py` test `centinela_agents/graph.py` itself.
+leaves; `tests/test_graph.py` and `tests/test_orq.py` test `centinela_agents/graph.py` itself;
+`tests/test_orchestrator.py` tests the classifier the orchestrator wires, over a mocked provider.
