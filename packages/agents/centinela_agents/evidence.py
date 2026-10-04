@@ -6,6 +6,7 @@ from typing import Any, Mapping
 from .catalog import Catalog, KernelCall, KpiReader
 from .metrics import Metrics
 from .predicate import is_kpi, kpi_column
+from .query_registry import register as _registry_register
 from .schema import Node
 
 MONEY = ("pesos_en_riesgo", "saldo", "ventas", "costo", "precio", "valor", "margen_bruto", "descuento_en_exceso", "exceso_semana_anterior", "cupo")
@@ -88,8 +89,16 @@ class Ledger:
         if "rechazado" in answer:
             raise RuntimeError(f"the kernel refused {kpi} on {day}: {answer['rechazado']['guarda']}: {answer['rechazado']['detalle']}")
         qid = query_id(answer["consulta"], day)
+        rows = list(answer["filas"])
         self.queries[qid] = {"queryId": qid, "kpi": kpi, "dia": day, "consulta": answer["consulta"]}
-        return qid, list(answer["filas"])
+        _registry_register(
+            id=qid,
+            source=kpi,
+            sql=answer["consulta"],
+            description=f"KPI {kpi} — {day}. {len(rows)} registro(s).",
+            rows=[dict(r) for r in rows[:20]],
+        )
+        return qid, rows
 
     def add(self, kpi: str, row: Mapping[str, Any], qid: str, columns: tuple[str, ...] | None = None) -> list[Fact]:
         entity_columns = self.catalog.kpis[kpi].entity

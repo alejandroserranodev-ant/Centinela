@@ -17,7 +17,7 @@ ol {
 }
 
 .text-muted {
-  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
+  color: color-mix(in oklab, var(--ink-muted) 78%, transparent);
   font-size: var(--fs-sm);
 }
 
@@ -26,7 +26,7 @@ ol {
   font-size: var(--fs-xs);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
+  color: color-mix(in oklab, var(--ink-muted) 78%, transparent);
 }
 
 .severity {
@@ -165,7 +165,7 @@ ol {
 .link {
   align-self: start;
   font-size: var(--fs-sm);
-  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-muted), transparent);
+  color: var(--color-primary);
 }
 
 .figure-link {
@@ -314,7 +314,7 @@ ol {
 .collapsible > summary {
   cursor: pointer;
   font-size: var(--fs-sm);
-  color: color-mix(in oklab, var(--ink-muted) var(--level-ink-quiet), transparent);
+  color: var(--color-primary);
   padding-block: var(--sp-1);
 }
 
@@ -342,6 +342,62 @@ ol {
   line-height: var(--lh-body);
   overflow-x: auto;
   white-space: pre;
+}
+
+.query__table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(280px, 38vh);
+  border: var(--bw-surface) solid var(--edge-surface);
+  border-radius: var(--r-field);
+}
+
+.query__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+
+.query__table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--fill-surface-sunken);
+}
+
+.query__table th {
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  font-weight: var(--fw-medium);
+  color: var(--ink-muted);
+  border-bottom: var(--bw-surface) solid var(--edge-surface);
+  white-space: nowrap;
+}
+
+.query__table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: var(--bw-surface) solid var(--edge-surface);
+  color: var(--ink-body);
+}
+
+.query__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.query__table tbody tr:hover {
+  background: var(--fill-surface-raised);
+}
+
+.query__source {
+  font-size: var(--fs-sm);
+}
+
+/* HowIGotHere inline list: cap height so many queries don't push page endlessly */
+.query-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: var(--sp-2);
 }
 
 .chart {
@@ -421,4 +477,33 @@ ol {
   font-weight: var(--fw-heading);
   font-size: var(--fs-md);
   color: var(--ink-heading);
+}
+
+/* ─── Contrast overrides ─── */
+
+/* Secondary button: the library uses --edge-control (#dfe6e9) which is
+   nearly invisible against surface/dialog backgrounds. Use a stronger border. */
+.arena-button__root--variant-secondary {
+  border-color: color-mix(in oklab, var(--color-base-content) 28%, transparent);
+}
+.arena-button__root--variant-secondary:hover {
+  border-color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+}
+
+/* Ghost icon button (dialog close ×, toolbar icons): strengthen the quiet border */
+.arena-icon-button__root--variant-ghost {
+  border-color: color-mix(in oklab, var(--color-base-content) 22%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
+}
+
+/* Figure-link (clickable numbers → "Ver de dónde sale"):
+   make the dotted underline solid and more visible */
+.figure-link {
+  text-decoration-style: solid;
+  text-decoration-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+  color: var(--ink-heading);
+}
+.figure-link:hover {
+  color: var(--color-primary);
+  text-decoration-color: var(--color-primary);
 }
