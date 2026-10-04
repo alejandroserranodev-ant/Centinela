@@ -10,16 +10,12 @@ Re-derive the boxes this page indexes with
 
 ## The day run, from detection to the inbox
 
-- **Raising an alert again when its severity rises a tier**, and a definition of severity:
-  [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#vigía-detects).
 - **The impact formulas of `calcular_impacto`, and the view and policy tools of `Analista`**:
   [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#what-a-leaf-may-use).
-- **One day run at a time, and the earlier alerts and rejection reasons handed to each run**:
+- **The rejection reasons handed to each run**:
   [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-clock).
 - **Merging an alert into the one that explains it (`unida`)**:
   [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle).
-- **Retries, timeouts and the step that fails**:
-  [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#how-a-step-runs).
 
 ## What an agent may use
 
@@ -45,7 +41,7 @@ Re-derive the boxes this page indexes with
 
 ## Cost, trace and proof
 
-- **Cost and trace per alert**: [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#cost-trace-and-log).
+- **The log events of each agent's output**: [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#cost-trace-and-log).
 - **The evaluation cases and their runner**: [`evals/AGENTS.md`](./evals/AGENTS.md#the-cases-of-each-agent).
 - **The tree's growth and the approved-KPI file**:
   [`packages/agents/arbol/AGENTS.md`](./packages/agents/arbol/AGENTS.md#how-the-tree-grows) and

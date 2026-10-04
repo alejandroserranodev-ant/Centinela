@@ -26,10 +26,11 @@ Each arrow is a call, and nothing calls back up the chain. The rule and what hol
 
 ## One alert, from the clock to the log
 
-> **Decided, not built.** The severity of earlier alerts and the rejection reasons kept for a
-> metric handed to each run, `calcular_impacto`, and action tools that keep their drafts. Of this diagram, `apps/api`
-> advances the day, walks `detectar` over the kernel's KPIs, runs the model leaves, which read the
-> kernel, to the pause at `aprobar.decision`, records the decision and resumes.
+> **Decided, not built.** The rejection reasons kept for a metric handed to each run,
+> `calcular_impacto`, and action tools that keep their drafts. Of this diagram, `apps/api`
+> advances the day and drives the day run, which walks `detectar` over the kernel's KPIs and runs
+> the model leaves, which read the kernel, to the pause at `aprobar.decision`; `apps/api` records
+> each alert and the decision, and resumes.
 
 ```mermaid
 sequenceDiagram
@@ -49,20 +50,22 @@ sequenceDiagram
   P->>W: advance the simulated day
   W->>A: POST /simulacion/avanzar, with the token
   A->>A: reads the saved settings: watched metrics, thresholds, owners, autonomy
-  A->>O: day run: the simulated day, the thresholds, the open alerts as earlier alerts
+  A->>O: run_day: the simulated day, the thresholds, every earlier alert, the watched metrics, the cap
   O->>V: detect
   V->>T: read each measure on the simulated day
   T-->>V: figures, each with its query
-  V-->>O: detected alerts, against the thresholds of metricas.yaml
-  Note over O: one alert at a time, largest pesos at risk first
-  O-->>A: proposes nueva, then en análisis
+  V-->>O: detected alerts, with severity, against the thresholds of metricas.yaml
+  Note over O: drops what an earlier alert covers, then one alert at a time, largest pesos at risk first
+  O-->>A: yields a step as each agent starts and ends
   O->>N: explain
   N->>T: query views, search policies
   N-->>O: a Cause with evidence, or no_evidence
   O->>E: propose
   E->>T: calcular_impacto
   E-->>O: one to three Actions with impact
-  O-->>A: proposes propuesta, then pauses before Ejecutor
+  O-->>A: yields an AlertRun: nueva, en análisis, propuesta, paused before Ejecutor
+  A->>A: records the alert, its entity and its cost
+  A-->>O: the Verdict of what it recorded, before the next alert runs
   A-->>W: SSE: the alert reaches the inbox
   P->>W: approve, edit, reject or request changes
   W->>A: POST /alertas/{id}/decision
@@ -76,7 +79,7 @@ sequenceDiagram
   Note over A: every step lands in the bitácora
 ```
 
-*Draws: `AGENTS.md` § How the parts connect; `packages/agents/AGENTS.md` § The day run; `packages/agents/AGENTS.md` § The alert graph; `apps/api/AGENTS.md` § Decisions and roles*
+*Draws: `AGENTS.md` § How the parts connect; `packages/agents/AGENTS.md` § The day run; `packages/agents/AGENTS.md` § The orchestrator; `packages/agents/AGENTS.md` § The alert graph; `apps/api/AGENTS.md` § Decisions and roles*
 
 Each step, and the section of the page that owns it:
 
@@ -88,8 +91,7 @@ Each step, and the section of the page that owns it:
   risk come from, [packages/agents](../../../packages/agents/AGENTS.md), *`Vigía` detects*; the
   nodes it walks, [the tree](../../../packages/agents/arbol/AGENTS.md), *The stages*.
 - **Order and merging**: [packages/agents](../../../packages/agents/AGENTS.md), *The day run*.
-- **Explanation**: [packages/agents](../../../packages/agents/AGENTS.md), *`Analista` explains,
-  and answers the chat*.
+- **Explanation**: [packages/agents](../../../packages/agents/AGENTS.md), *`Analista` explains*.
 - **Proposal**: [packages/agents](../../../packages/agents/AGENTS.md), *`Estratega` proposes*; the
   figures, [packages/tools](../../../packages/tools/AGENTS.md), *The impact calculator*.
 - **Approval**: the checks on a decision, [apps/api](../../../apps/api/AGENTS.md), *Decisions and

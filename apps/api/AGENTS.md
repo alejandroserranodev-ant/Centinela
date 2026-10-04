@@ -13,7 +13,7 @@ implement.
 | File | Why it exists |
 |---|---|
 | `pyproject.toml` | the `centinela-api` package, built with setuptools from `src/`; it depends on `centinela-agents`, which `[tool.uv.sources]` points at `../../packages/agents`; its `dev` extra adds pytest and httpx, and its pytest config declares the `integracion` marker |
-| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion` |
+| `sql/01_esquema.sql` | creates the schema `api`: `api.simulacion`, `api.alertas`, `api.bitacora`, `api.consultas` with its `fuente`, `api.configuracion`; `api.alertas` holds `entidad`, the values of the KPI's entity, which coverage compares, and `costos`, the alert's `cost`, an object by agent over a default of `'[]'` |
 | `src/centinela_api/main.py` | builds the app, opens CORS to any origin, mounts the routers and logs every package at INFO |
 | `src/centinela_api/config.py` | loads the root's `.env` and `.env.local` and holds `DSN_ADMIN`, `AGENT_SECRET_KEY`, `AUTH_SECRET_KEY` and the raw `CENTINELA_USUARIOS` |
 | `src/centinela_api/auth.py` | the profiles of `CENTINELA_USUARIOS`, the password check, the signed token and `persona_actual(authorization)`, the dependency every route but the sign-in and `/interno/*` reads its person from; `python -m centinela_api.auth hash` hashes a password read from stdin |
@@ -76,7 +76,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/auth/login` | `Credenciales` in, a `Sesion` out: the token and the `Persona` it belongs to | 401 "Correo o contraseña incorrectos", the same for an unknown email and a wrong password | `login` |
 | GET | `/auth/sesion` | the `Persona` of the token | 401 | `getSession` |
 | GET | `/simulacion/dia-actual` | the simulated day and `ultimoDia`, the last day with data, as `SimulatedDay` | | `getSimulatedDay` |
-| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of a detection starts, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
+| POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams one `step`, an `AgentStep`, as each agent of an alert starts and as it ends, opening with the detection, an `alert` event with each `Alert` stored or updated once it is recorded, with the person's `decidedBy` and `canDecide`, and one `end` with `simulatedDay` and `newAlerts`, the alerts that remain to decide | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock, and 409 past the last day with data | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk; without `estado`, every alert but the merged ones, which `estado=unida` lists | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
 | POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`, when its graph no longer waits for a decision, or while another decision resumes it; 422 for a failed check | `decide` |
@@ -133,7 +133,7 @@ become rows here when it is planned.
 thresholds of `data/metricas.yaml`, which the saved settings replace, the kernel `get_kernel()` connects through
 `packages/agents/centinela_agents/catalog.py:connect_kernel(env)`, a `ToolRegistry` of the four action stubs and an
 `InMemorySaver`. The routers call
-`start`, `resume` and `ask` through `asyncio.to_thread`, because the graph runs synchronously and the
+`run_day`, `resume` and `ask` through `asyncio.to_thread`, because the graph runs synchronously and the
 event loop keeps streaming SSE meanwhile. Running in-process saves a service boundary, its
 transport and its secret, and is the answer to whether the agents run here or as a service.
 
@@ -152,18 +152,19 @@ transport and its secret, and is the answer to whether the agents run here or as
   states.
 - **`avanzar` drives the day run of `packages/agents`**: it hands `run_day` every stored alert as
   an `Earlier`, through `src/centinela_api/agentes.py:earlier_of(alerta, entidad)`, the metrics
-  `src/centinela_api/agentes.py:metricas_del_dia(ajustes)` names and the cap
+  `src/centinela_api/agentes.py:metricas_del_dia(ajustes)` names, the watched ones of
+  `API_METRICS`, because the `Alert` model's `Metric` accepts no other, and the cap
   `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. It records each
   `AlertRun` with `src/centinela_api/routers/simulacion.py:_registrar(conn, corrida, dia, day_str, nota)`
   and sends back the verdict: not recorded when the lifecycle refuses a transition, the refused
-  merge target, and the absorbed alerts it stored. Why the order, the cap and the id is
+  merge target, and the absorbed alerts it stored. It reads each result through
+  `src/centinela_api/routers/simulacion.py:_siguiente(dia_en_curso, veredicto)`, because a
+  `StopIteration` cannot cross `asyncio.to_thread`. Why the order, the cap and the id is
   [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#the-day-run).
-- **`state_to_alert(alert_id, state, detection, day_str)` reads the graph's state**: the title,
-  the cause and the actions with the figures the leaves cited, and the cause's confidence. A figure
-  with no `queryId` is dropped, never given one. Severity and pesos at risk come from the
-  detection, the pesos under the `queryId` of the detection's KPI call.
-- **Only the metrics `API_METRICS` names become alerts**, because the `Alert` model's `Metric`
-  accepts no other.
+- **`src/centinela_api/agentes.py:state_to_alert(alert_id, state, detection, day_str)` reads the
+  graph's state**: the title, the cause and the actions with the figures the leaves cited, and the
+  cause's confidence. A figure with no `queryId` is dropped, never given one. Severity and pesos at
+  risk come from the detection.
 
 ## The settings
 
@@ -186,11 +187,11 @@ outside `owners` and a list of metrics that differs, then writes the row and a `
 of the `bitácora` naming each change by the metric's name, the threshold's label and the action
 type's Spanish name, because a person reads it.
 
-**Settings take effect on the next day run and the next decision.** `avanzar` reads them once,
-drops the unwatched metrics and detects on `src/centinela_api/agentes.py:with_thresholds(ctx, thresholds)`.
+**Settings take effect on the next day run and the next decision.** `avanzar` reads them once
+and detects on `src/centinela_api/agentes.py:with_thresholds(ctx, thresholds)`.
 `avanzar` and the decision route hand the same thresholds to
 `packages/agents/centinela_agents/orchestrator.py:CentinelaOrchestrator.use_thresholds(thresholds)`
-before `start` or `resume`, so the re-check before `Ejecutor` reads them too. The orchestrator is
+before the day run or the resume, so the re-check before `Ejecutor` reads them too. The orchestrator is
 never rebuilt, because its `InMemorySaver` holds the paused alerts. An owner decides as described
 under decisions and roles, and an action type at `inform` cannot be approved.
 
@@ -211,15 +212,14 @@ recorded, and one cause would raise two alerts.
 before it moves the clock and frees it when the stream ends, fails or the client leaves; the
 response's background task frees it for a stream that never starts.
 
-**`avanzar` hands each run the alerts its `Analista` may name as the same cause**: every stored
-alert in `proposed`, the one status whose graph waits for a person, by id, with its Spanish state,
-its metric, its entity and its cause's sentence, `src/centinela_api/agentes.py:brief_of_alert(alerta)`, and each detection of the day not
-yet run as `nueva`, which the day run itself briefs. Each alert the run records joins the list for
-the next.
+**`avanzar` hands the day run every earlier alert** with its Spanish state, its severity, its
+entity and, for one in `proposed`, its brief, `src/centinela_api/agentes.py:brief_of_alert(alerta)`:
+its metric, its entity and its cause's sentence, for `Analista` to name as the same cause. A row
+stored before `entidad` existed has none and covers nothing.
 
-> **Decided, not built.** The API also hands each run the severity of every earlier alert and the
-> rejection reasons kept for the alert's metric, each with the target the orchestrator classified
-> it to, the metric and the entity. `avanzar` hands neither.
+> **Decided, not built.** The API hands the day run the rejection reasons kept for each metric,
+> each with the target the orchestrator classified it to, the metric and the entity. `avanzar`
+> hands none.
 
 ## The alert lifecycle
 
@@ -270,10 +270,10 @@ door. How the orchestrator reaches each proposal is
   stored `mergedAlerts` entry the alert it writes lacks, so a decision written while a day run adds
   a merged alert never drops it.
 - **A detection the remaining alert absorbs never runs.** When `explicar.destino_nuevo` names a
-  detection of the same day, `src/centinela_api/agentes.py:absorbed_alert(alert_id, detection, into, day_str, consulta)`
-  stores it `merged` with its title, its pesos at risk under the KPI call it registers, and a cause
-  that points to the alert that remains, and the run skips it; a name that is no detection still to run is refused
-  and logged. `GET /alertas` lists the alert that remains, and its detail carries each merged one's
+  detection of the same day, `src/centinela_api/agentes.py:absorbed_alert(alert_id, detection, into, day_str)`
+  stores it `merged` with its title, its pesos at risk under its detection's KPI call, and a cause
+  that points to the alert that remains, and the run skips it; the run hands over only a
+  detection still to run. `GET /alertas` lists the alert that remains, and its detail carries each merged one's
   detection and evidence. Its pesos at risk stay its own, because two detections of one cause
   would count the same pesos twice.
 
@@ -403,14 +403,15 @@ no row of its own.
   built before: its `ALTER`s on `api.bitacora` give the table the shape a new one has, so there is
   no migration tool. *No gate holds this.*
 
-> **Decided, not built.** The three rules below, where the code differs as each one says.
+- **An alert carries its cost**: the day run stores the `cost` the orchestrator counts per alert
+  in `api.alertas.costos`. The decision route writes no cost yet, so a resume's model calls are
+  not added. *No gate holds this.*
+- **Timeouts and retries are explicit**, as
+  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#how-a-step-runs) states them,
+  and "not enough evidence" is a valid response, not an error. A failed alert of a day is logged
+  and the day goes on. *No gate holds this.*
 
-- **An alert carries its cost**: the API persists the tokens and model calls the orchestrator
-  counts per alert, as `/chat` already logs each step of a chat answer. `api.alertas.costos` exists and nothing writes it;
-  `_registrar_costo` records a step's cost sent by `X-Cost-Json` as a `costo` row and swallows
-  any error.
-- **Timeouts and retries are explicit**, as the orchestrator's graph states them, and "not enough
-  evidence" is a valid response, not an error. The code logs a failed detection or resume and
-  skips it.
+> **Decided, not built.** The rule below, where the code differs as it says.
+
 - **The project is a uv project**, with its lockfile beside this page, as `packages/agents` and
   `packages/tools` are. It is a setuptools package installed with pip.

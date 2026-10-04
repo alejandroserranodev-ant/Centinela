@@ -62,12 +62,15 @@ steps.
    `apps/api/src/centinela_api/ciclo_vida.py:recorrer(estados)` checks the statuses the graph took
    it through, which `apps/api/src/centinela_api/agentes.py:status_path(alert_id, state)` reads
    from its `transitions`: a path that does not start at `new` or skips a transition is refused,
-   and the alert is logged and skipped. One transaction, in
+   logged, and answered with a verdict that it was not recorded, which ends that alert. One
+   transaction, in
    `apps/api/src/centinela_api/routers/simulacion.py:_registrar(conn, corrida, dia, day_str, nota)`, then stores it with
    `apps/api/src/centinela_api/alertas.py:guardar(conn, alerta)` and writes one `alert` row, actor `vigia`, with
    `apps/api/src/centinela_api/bitacora.py:registrar(conn, alerta_id, tipo, actor, detalle, dia_simulado, query_id, figures)`,
-   under the KPI's `queryId` and with the title's figures, its entity and its cost, then one `evidence` row per query in `queries`.
-   An alert the graph ends `unida` is stored `merged` into the alert that remains, and a detection
+   under the KPI's `queryId` and with the title's figures, then stores the alert's entity and its
+   `cost` and writes one `evidence` row per query in `queries`. An alert the graph ends `unida` is
+   stored `merged` into the alert that remains while that one is still `proposed`; otherwise the
+   verdict names the refused target and the run starts the alert again without it. A detection
    it absorbed is stored `merged` without running, as the lifecycle in
    [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-alert-lifecycle) states.
 5. Each stored alert goes out as an `alert` event carrying the `Alert` with the signed-in person's
@@ -78,7 +81,8 @@ steps.
    writes each event's name on its `event:` line.
 
 A second `POST /simulacion/avanzar` while a day runs is answered 409 and starts nothing, because
-the router holds one lock for the whole stream. An error in one detection is logged and skips that alert. An error before the loop, such as a
+the router holds one lock for the whole stream. An alert whose graph raises is yielded as failed,
+streamed as a `step` saying its analysis did not finish, and the day goes on. An error before the loop, such as a
 provider with no `LLM_MODEL`, is logged too, and the stream still ends with no new alerts.
 
 ## One decision

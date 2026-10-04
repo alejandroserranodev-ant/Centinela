@@ -7,14 +7,14 @@ person's decision, the compiler of the chat's subtree to a graph that never paus
 leaves `centinela_agents/orchestrator.py:CentinelaOrchestrator`
 hands that compiler. Each leaf reads the kernel's `kpi_consultar` in code, loads its skill as the
 model's instructions, and calls the provider
-`centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` returns.
-`apps/api` builds that orchestrator in its own process and runs the day. `uv run pytest` holds the
-tree and the graph with stub leaves, and the leaves with a mocked provider and kernel;
-`uv run pytest -m modelo` runs the five agents against OpenAI and the kernel. What is decided,
-not built: the retry and the token cap, cost in an alert's state, Langfuse traces, the end of a
-leaf as an `AgentStep`, log events beyond `same_cause_dropped`, a policy search in the chat,
-and self-expansion. Each section that states one opens
-with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
+`centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)` returns,
+behind a meter of its retry, cost and token cap. The day run,
+`centinela_agents/day.py:run_day(graph, ctx, day, earlier, watched, limit, cause_rejections, proposal_rejections, tracer)`,
+is a generator `apps/api` drives in its own process. `uv run pytest` holds the tree and the graph
+with stub leaves, and the leaves with a mocked provider and kernel; `uv run pytest -m modelo` runs
+the five agents against OpenAI and the kernel. What is decided, not built: log events beyond
+`same_cause_dropped`, a policy search in the chat, and self-expansion. Each section that states one
+opens with the marker. How the tree is written is [`arbol/AGENTS.md`](./arbol/AGENTS.md); how an agent's
 instructions are written is [`skills/AGENTS.md`](./skills/AGENTS.md); what the challenge asks of
 each agent is [`../../docs/challenge/AGENTS.md`](../../docs/challenge/AGENTS.md); how a provider
 is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
@@ -35,15 +35,19 @@ is configured is [`../../SETUP_OPENAI.md`](../../SETUP_OPENAI.md).
 | `centinela_agents/validator.py` | every refusal of a tree, and the loading of the base |
 | `centinela_agents/state.py` | the state of an alert, the state of a chat question, and the fields a node may read |
 | `centinela_agents/walk.py` | the walk of `detectar`, and the check that a detection still breaks |
+| `centinela_agents/severity.py` | the severity and the `tramo` of a KPI row, and the refusals of a `severidad` or `tramos` block |
+| `centinela_agents/day.py` | the alert id, the coverage by earlier alerts, the order of a day and the day run |
+| `centinela_agents/metered.py` | the retry, the cost and the token cap of a model call |
+| `centinela_agents/tracing.py` | the tracer the host injects |
 | `centinela_agents/graph.py` | the compilers of the alert graph and of the chat graph, the interrupt, the resume, the fallbacks |
 | `centinela_agents/failures.py` | the exceptions that name a leaf's failure |
 | `centinela_agents/llm_provider.py`, `centinela_agents/ollama_provider.py`, `centinela_agents/openai_provider.py`, `centinela_agents/provider_factory.py` | the provider interface, its two implementations, and the choice between them by environment ([`PHASE_1_SETUP.md`](./PHASE_1_SETUP.md)) |
 | `centinela_agents/schema.py` | also the output models of the leaves: `Cause`, `Action`, `ExecutedAction`, `Decision` ([`PHASE_2_SETUP.md`](./PHASE_2_SETUP.md)) |
 | `centinela_agents/tools.py`, `centinela_agents/sql_vistas.py`, `centinela_agents/buscar_politica.py`, `centinela_agents/calcular_impacto.py`, `centinela_agents/action_tools.py` | the tool interfaces, their registry, the action stubs `Ejecutor` drafts with, and stubs of three tools no leaf calls ([`PHASE_3_SETUP.md`](./PHASE_3_SETUP.md)) |
 | `centinela_agents/agents/` | the model leaves: `centinela_agents/agents/vigia.py`, `centinela_agents/agents/analista.py`, `centinela_agents/agents/estratega.py`, `centinela_agents/agents/ejecutor.py`, `centinela_agents/agents/chat.py`, and `centinela_agents/agents/orquestador.py`, the rejection classifier ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)) |
-| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `resume`, `ask` and `use_thresholds`, which swaps the thresholds the compiled graph reads and keeps the paused alerts ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
+| `centinela_agents/orchestrator.py` | the leaves and the classifier wired into `Compiler`, with `start`, `run_day`, `resume`, `ask` and `use_thresholds`, which swaps the thresholds the compiled graph reads and keeps the paused alerts ([`PHASE_5_SETUP.md`](./PHASE_5_SETUP.md)) |
 | `centinela_agents/security.py` | masking, secret detection, the screen of a prompt injection and a prompt builder by trust level; `Ejecutor` masks an email's prompt with it, and `Chat` screens and wraps a question with it ([`PHASE_6_SETUP.md`](./PHASE_6_SETUP.md)) |
-| `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
+| `centinela_agents/observability.py` | token, cost and latency counters per alert and agent, and a tracer that only logs; no running path uses it ([`PHASE_7_SETUP.md`](./PHASE_7_SETUP.md)) |
 | `centinela_agents/output_validator.py` | checks of a leaf's output that only the tests run ([`PHASE_9_SETUP.md`](./PHASE_9_SETUP.md)) |
 | `skills/` | what each agent is told ([`skills/AGENTS.md`](./skills/AGENTS.md)) |
 | `tests/` | the validator's planted violations, the walk of `detectar`, the `ORQ-` cases of [`../../evals/AGENTS.md`](../../evals/AGENTS.md) that need no `apps/api` and no model, and the unit tests of each module above, `tests/test_evals.py` among them ([`PHASE_8_SETUP.md`](./PHASE_8_SETUP.md)); `tests/test_modelo.py` runs the five agents against the model and the kernel |
@@ -192,18 +196,13 @@ agent its share.
 - **Ceiling:** it fires only where the walk of `detectar` reaches a leaf. Pesos at risk are the
   KPI's `pesos_en_riesgo` column, computed in SQL. One alert per metric and entity, whatever state
   the earlier one is in, because a rejected or executed alert whose rule still breaks would
-  otherwise return every simulated day. *Decided, not built:* it raises again when severity rises a
-  tier above the highest earlier alert.
-- **Its title** cites, as figures, the columns the walk compared and `pesos_en_riesgo`, each with
-  the `queryId` of the reading.
+  otherwise return every simulated day; it raises again only when its severity is higher than the
+  highest earlier alert's, `centinela_agents/day.py:covered(detection, earlier)`.
+- **Severity and `tramo`** are the metric's `severidad` and `tramos` blocks of `data/metricas.yaml`
+  applied to the KPI row, `centinela_agents/severity.py:severity_of(metric, row, metrics)`. The
+  detection reads its KPI through `centinela_agents/evidence.py:Ledger`, so its `cifra` and
+  `pesos_en_riesgo` carry the reading's `queryId`, and its title cites them as figures.
 - **Never:** explains, proposes, reads a policy.
-
-> **Limit.** Severity has no definition anywhere in the tree: `apps/web/src/api/types.ts:Severity`
-> types it, and no metric, KPI or rule computes it, while raising again and [the order](#the-day-run)
-> rest on it. The earlier alerts that
-> `centinela_agents/graph.py:start_alert(graph, detection, *, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections)`
-> receives carry a state, a metric, an entity and a cause, and no severity, so no step can compare
-> one.
 
 ### `Analista` explains
 
@@ -296,7 +295,8 @@ and the only context is the alert it is anchored to.
 - **Leaves:** `ejecutar`, for an action whose type has a tool in `packages/tools`, and
   `nota_manual`, for one that has none. Either receives the alert id, the approved action with an
   edit's `parameters`, and the recorded decision, and nothing else of the state,
-  `centinela_agents/graph.py:leaf_node(node, function, ctx)`.
+  `centinela_agents/graph.py:leaf_node(node, function, ctx, token_cap)`; the alert id because an
+  action is keyed by alert and action, so a second run has no effect.
 - **Tools:** none for its model. The leaf calls the action tool in code, a draft or a sandbox
   effect; the model writes the body of an approved `email_draft` and the text of a manual note.
 - **Ceiling: no discretion.** It passes the approved `parameters` unchanged. The stubs of
@@ -312,16 +312,27 @@ It is the only part that knows which step an alert is in. It walks the tree and 
 to decide: every route is a branch of the tree, and the interpreter decides only how a step runs.
 It is code, except the step that classifies a rejection reason.
 
-- **Input:** to start an alert, `start_alert` above: the detection, the alert id, the simulated
-  day, the earlier alerts with their briefs, and the rejection reasons `apps/api` kept for the metric, already split
-  by the agent that reads them. To resume one,
-  `centinela_agents/graph.py:resume(graph, alert_id, decision)` with the decision `apps/api`
+- **Input:** to run a day, `run_day` with the simulated day, the earlier alerts as
+  `centinela_agents/day.py:Earlier`, the watched metrics, the cap and the rejection reasons by
+  metric. To start one alert,
+  `centinela_agents/graph.py:stream_alert(graph, detection, alert_id, day, earlier_alerts, alert_briefs, cause_rejections, proposal_rejections, tracer)`,
+  which `start_alert` runs to its end: the detection, the alert id, the simulated day, the earlier
+  alerts with their briefs, and the metric's rejection reasons, already split by the agent that
+  reads them. To resume one,
+  `centinela_agents/graph.py:resume(graph, alert_id, decision, tracer)` with the decision `apps/api`
   recorded. The version of the tree comes through `centinela_agents/graph.py:Compiler`. A start on
   an alert whose thread has ended runs on a fresh thread, `centinela_agents/graph.py:fresh(graph, alert_id)`,
   so nothing of the earlier run stays, and a start on one that awaits a decision is refused.
 - **Tools: none.** No step needs a query, a policy or an action, so the graph gives it no tool.
-- **Output:** the state of each alert's graph: the transitions it proposes, the log events, the
-  target of a rejection reason.
+- **Output:** `run_day` yields a `centinela_agents/day.py:Step` per step, then per alert a
+  `centinela_agents/day.py:AlertRun`, the graph's state (the transitions it proposes, the log
+  events, the target of a rejection reason) with the later detections it absorbed, or a
+  `centinela_agents/day.py:AlertFailed` when the graph raised, which takes no verdict, and the day
+  goes on. The caller answers each `AlertRun` with a `centinela_agents/day.py:Verdict`:
+  `recorded` false ends that alert, because the record wins over the checkpoint; `refused_merge`
+  names a target the caller would not join, with no absorption, and the alert runs again on a
+  fresh thread without it; `absorbed` names the later detections the caller stored `unida`, which
+  the run drops.
 - **Ceiling:** it moves an alert only along a branch of the tree and passes each agent's output on
   unchanged. The only text a person reads that it writes is the fallback of a failed step.
 - **Never:** detects, explains, proposes, executes, computes a figure, opens a database connection,
@@ -357,7 +368,7 @@ declare is dropped without a trace, so the leaves return none.
 | Field | Written by | Read by |
 |---|---|---|
 | `alert_id`, `simulated_day`, `entry` (the leaf `detectar` reached) | `start_alert` | every node, `apps/api` |
-| `detection`: `metric`, `entity`, `path` (each node of `detectar` and its branch), `row` (the KPI row) | `start_alert` | the leaves, `ejecutar.vigente` through `still_breaks` |
+| `detection`: `metric`, `entity`, `path` (each node of `detectar` and its branch), `row` (the KPI row), `cifra`, `regla`, `fuente_umbral`, `severity`, `tramo`, `pesos_en_riesgo` | `start_alert`, from the detection | the leaves, `ejecutar.vigente` through `still_breaks` |
 | `earlier_alerts`: the state of each earlier alert, by id | `start_alert` | `estado.same_cause_as.status`, `Analista` |
 | `alert_briefs`: the metric, entity and cause of each earlier alert, by id | `start_alert` | `Analista` |
 | `cause_rejections`, `proposal_rejections` | `start_alert`; a `request_changes` adds to the second | `Analista`, `Estratega` |
@@ -371,7 +382,8 @@ declare is dropped without a trace, so the leaves return none.
 | `status`: the state the graph last proposed or the decision set | the orchestrator | the orchestrator |
 | `transitions`: each `[alert id, state]` the graph proposes | the orchestrator | `apps/api` |
 | `camino`, `next_node`, `failures`, `events` | the orchestrator | `apps/api`; `next_node` the edges |
-| `queries`: each `kpi_consultar` a leaf ran, with its `queryId`, KPI, day and SQL | the leaves of `Vigía`, `Analista` and `Estratega` | the fallback of `explicar`, for `queriesReviewed`; `apps/api`, which logs each as `evidence` |
+| `queries`: the detection's reading, then each `kpi_consultar` a leaf ran, with its `queryId`, KPI, day and SQL | `start_alert`, then the leaves of `Vigía`, `Analista` and `Estratega` | the fallback of `explicar`, for `queriesReviewed`; `apps/api`, which logs each as `evidence` |
+| `cost`: by agent, the prompt tokens, completion tokens, calls and cached answers | each leaf node | `apps/api`, which persists it |
 
 ### How a step runs
 
@@ -392,12 +404,15 @@ decision names. The graph never passes the gate on a decision `apps/api` did not
 listed action, which is the case manual review exists for. A `request_changes` is capped at one per
 alert by [`apps/api`](../../apps/api/AGENTS.md#decisions-and-roles), which states why. **A decision never expires**: no policy states a deadline, so the interrupt waits.
 
-> **Decided, not built.** A step fails when its model call fails twice: the call is retried once on
-> a timeout, a connection error or an output its schema refuses. A step also fails when the alert
-> reaches its token cap, checked after each call, and every model step left on that alert then
-> takes its fallback. The timeout per call and the token cap are settings of the graph, sized to the
-> machine that runs Ollama. A failure is to carry its `attempts`. A transition `apps/api` refuses
-> ends that alert's run, because the record wins over the checkpoint.
+**A step fails when its model call fails twice.** The orchestrator wraps each provider in
+`centinela_agents/metered.py:MeteredProvider(inner)`, and `leaf_node` opens
+`centinela_agents/metered.py:metering(agent, spent, cap)` around each leaf, so a call is retried
+once on a timeout, a connection error or an output its schema refuses. The timeout is the
+provider's `ModelConfig.timeout_seconds`, because its HTTP client is the only place that can stop a
+call. The cap is `centinela_agents/orchestrator.py:TOKEN_CAP` tokens per alert, checked before
+each call, and once it is reached every model step left takes its fallback. A cached answer
+charges nothing, and a failure carries its `attempts`. The rejection classifier runs in an end
+node, not a leaf, so its call is neither retried nor counted in `cost`.
 
 ### Routing
 
@@ -416,7 +431,7 @@ from its own mistakes.
 
 ### The chat graph
 
-**A question walks its own graph**, `centinela_agents/graph.py:compile_chat(tree, *, leaves, metrics, catalog, reader)`,
+**A question walks its own graph**, `centinela_agents/graph.py:compile_chat(tree, *, leaves, metrics, catalog, reader, token_cap)`,
 compiled from `conversar.raiz` with the same predicate, leaf and end nodes as the alert graph, no
 checkpointer and no interrupt, because a question never waits for a person.
 `centinela_agents/state.py:ChatState` holds the question, the day, the anchored alert with its
@@ -430,16 +445,23 @@ does not wait for the day run.
 
 ### The day run
 
-**The day run is `apps/api`'s, and keeps no checkpoint.** Advancing the clock walks `detectar` for
-every row of every KPI on the simulated day, `centinela_agents/walk.py:detect(ctx, day)`, drops each
-detection whose alert exists, orders the rest, and runs the alert graph of each **in series**, as
-[`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md#the-agents-run-in-this-process) says. It
-names an alert by metric and entity, so a detection an earlier alert covers proposes the same id
-and is dropped.
+**The day run is `run_day`, a generator, because the dependency rule of
+[the root page](../../AGENTS.md#how-the-parts-connect) lets `apps/api` call `packages/agents` and
+forbids the reverse**: it yields each result and waits for the caller's verdict. It walks
+`detectar` for every row of every KPI on the simulated day, `centinela_agents/walk.py:detect(ctx, day)`,
+keeps the watched metrics, drops what `covered` covers, orders the rest with
+`centinela_agents/day.py:ordered(detections, day, limit)`, and runs the alert graph of each **in
+series**. An alert's merge candidates are only the earlier alerts in `propuesta`, the one state
+whose graph waits, and the day's detections not yet run; one the caller records in `propuesta`
+joins them. Its id is `centinela_agents/day.py:alert_id(metric, entity, day)`, a hash, because
+entity values hold spaces and accents and the id travels in URLs and thread ids, so a day run
+twice proposes the same ids.
 
-**The order is the largest `pesos_en_riesgo` of each metric, then the rest by pesos, and a day raises at most
-`CENTINELA_ALERTAS_POR_DIA` alerts**, three by default. In series, because a local model is loaded once and
-parallel requests share its memory and compute, and in the cloud the order of the inbox is the
+**The order is the largest `pesos_en_riesgo` of each metric, then the rest by pesos, then severity,
+then id, and a day raises at most the cap its caller passes**, `CENTINELA_ALERTAS_POR_DIA` in
+`apps/api`, three by default. A null pesos sorts last, because an unmeasured exposure cannot claim
+the inbox first; severity and id order a tie the same way on every run. In series, because a local
+model is loaded once and parallel requests share its memory and compute, and in the cloud the order of the inbox is the
 order of the run. A metric first, because a metric with hundreds of rows would otherwise fill every
 day. By pesos, because the largest exposure reaches the
 inbox first, and because a merge keeps the alert analysed first, which is the larger:
@@ -454,23 +476,21 @@ of model; the rest fire again on a later day, when the earlier ones are in the i
 completion tokens and the latency in `costs`, `centinela_agents/agents/chat.py:costed(provider, request, step)`,
 and `apps/api` logs it.
 
-**Each leaf streams its start and end**, labelled by `centinela_agents/graph.py:STEP_LABELS`,
-through `centinela_agents/graph.py:stream_alert(graph, detection, alert_id, day)`.
+**Each leaf writes its start and its end to the graph's stream**, with
+`centinela_agents/graph.py:STEP_LABELS` and whether it failed, and `run_day` passes them on as
+`Step`s, opening each alert with its detection's step: a stream, not a callback, for the dependency
+rule. The orchestrator's own steps write none, because `apps/web/src/api/types.ts:Agent` names the
+agents alone.
 
-> **Decided, not built.** An alert's state has no `cost`, no trace is opened, and the only event the graph writes is `same_cause_dropped`, in
+**Tracing is a handler the host injects**, `centinela_agents/tracing.py:langfuse_tracer(env)`:
+Langfuse's LangChain handler, which is why `langchain` is a dependency beside `langfuse`, when
+`LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, and none otherwise, because a trace
+observes and never decides. A trace groups by session: the alert id for an alert's start and
+resume, its own for a chat question. The detection runs no graph, so it has no trace.
+
+> **Decided, not built.** The only event the graph writes is `same_cause_dropped`, in
 > `centinela_agents/graph.py:effects(node_id, branch, state)`.
-> `centinela_agents/observability.py:MetricsCollector` counts tokens, cost and latency per agent,
-> and `centinela_agents/observability.py:LangfuseTracer` logs instead of tracing; no running path
-> uses them.
 
-- **After each model call the orchestrator adds Ollama's `prompt_eval_count`, `eval_count` and one
-  call to the alert's `cost`, under the agent that made it.** `apps/api` persists it.
-- **Each alert is one Langfuse trace, its id the alert id**, opened when the day run hands the
-  detection to the alert graph; the resume adds its spans to the same trace. The detection of a day
-  is a trace of its own, and so is each chat question.
-- **An `AgentStep` marks when an agent's leaf starts and ends**, with a Spanish `description`, never
-  for the orchestrator's own steps, because `apps/web/src/api/types.ts:Agent` names the agents
-  alone.
 - **Each output reaches `apps/api` as a log event** of `apps/web/src/api/types.ts:LogEventType`: a
   detection and a merge as `alert`, a `Cause` as `evidence`, the actions as `proposal`, an executed
   draft as `action` then `result`. The target of a rejection reason joins the `decision` event
@@ -478,10 +498,11 @@ through `centinela_agents/graph.py:stream_alert(graph, detection, alert_id, day)
 
 ### What is not the orchestrator's
 
-`apps/api` checks that a decision's role may make it and that an edit keeps the action's keys,
-calls the resume, keeps the rejection reasons, validates and persists each transition the
-orchestrator proposes, stores the checkpoint, persists cost, streams `AgentStep` and owns the
-`bitácora`: its page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action and
+`apps/api` consumes the day run and answers each result with the verdict of what it recorded,
+checks that a decision's role may make it and that an edit keeps the action's keys, calls the
+resume, keeps the rejection reasons, validates and persists each transition the orchestrator
+proposes, stores the checkpoint, persists cost, streams the steps and owns the `bitácora`: its
+page is [`apps/api`](../../apps/api/AGENTS.md). Idempotency of an action and
 masking personal data are decided to be `packages/tools`'; `centinela_agents/action_tools.py` and
 `centinela_agents/security.py` hold them in this package instead.
 
