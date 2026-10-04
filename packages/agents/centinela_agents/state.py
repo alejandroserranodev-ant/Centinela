@@ -14,6 +14,11 @@ STATE_FIELDS = DERIVED_FIELDS | frozenset(
         "estado.actions",
         "estado.decision.kind",
         "estado.executed_action",
+        "estado.chat.sospechosa",
+        "estado.chat.intent",
+        "estado.chat.alert_id",
+        "estado.chat.kpi",
+        "estado.chat.figuras",
     }
 )
 
@@ -46,6 +51,21 @@ class AlertState(TypedDict, total=False):
     transitions: Annotated[list, operator.add]
     failures: Annotated[list, operator.add]
     events: Annotated[list, operator.add]
+
+
+class ChatState(TypedDict, total=False):
+    question: str
+    day: str
+    alert: dict[str, Any] | None
+    cause: dict[str, Any] | None
+    actions: list[dict[str, Any]] | None
+    chat: dict[str, Any]
+    answer: dict[str, Any] | None
+    queries: list[Any]
+    next_node: str
+    fin: str
+    camino: Annotated[list, operator.add]
+    failures: Annotated[list, operator.add]
 
 
 def subject(state: Mapping[str, Any]) -> tuple[str, str, str]:

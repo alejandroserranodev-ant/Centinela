@@ -258,3 +258,64 @@ nodos:
     predicado: { lee: estado.executed_action, op: existe }
     si: fin.ejecutada
     no: fin.fallo_ejecucion
+  - id: conversar.raiz
+    fundamento: owasp-llm01.3
+    predicado: { lee: estado.chat.sospechosa, op: "=", valor: true }
+    si: fin.chat_rechazada
+    no: hoja.chat.clasificar
+  - id: hoja.chat.clasificar
+    hoja: { agente: chat, decision: clasificar, skill: chat/contrato.md }
+    sigue: conversar.fuera_de_alcance
+  - id: conversar.fuera_de_alcance
+    fundamento: iso42001.anexo-a.uso-previsto
+    predicado: { lee: estado.chat.intent, op: "=", valor: fuera_de_alcance }
+    si: fin.chat_fuera_de_alcance
+    no: conversar.accion
+  - id: conversar.accion
+    fundamento: owasp-llm06.7
+    predicado: { lee: estado.chat.intent, op: "=", valor: accion }
+    si: fin.chat_fuera_de_alcance
+    no: conversar.politica
+  - id: conversar.politica
+    fundamento: iso31000.6.4.3
+    predicado: { lee: estado.chat.intent, op: "=", valor: politica }
+    si: fin.chat_sin_evidencia
+    no: conversar.anclada
+  - id: conversar.anclada
+    fundamento: iso31000.6.2
+    predicado: { lee: estado.chat.alert_id, op: existe }
+    si: conversar.alerta.explicar
+    no: conversar.dato
+  - id: conversar.alerta.explicar
+    fundamento: iso31000.6.2
+    predicado: { lee: estado.chat.intent, op: "=", valor: explicar }
+    si: conversar.alerta.causa
+    no: conversar.alerta.que_hacer
+  - id: conversar.alerta.causa
+    fundamento: iso31000.6.2
+    predicado: { lee: estado.cause.kind, op: "=", valor: identified }
+    si: hoja.chat.responder
+    no: fin.chat_sin_evidencia
+  - id: conversar.alerta.que_hacer
+    fundamento: iso31000.6.2
+    predicado: { lee: estado.chat.intent, op: "=", valor: que_hacer }
+    si: conversar.alerta.acciones
+    no: conversar.dato
+  - id: conversar.alerta.acciones
+    fundamento: iso31000.6.2
+    predicado: { lee: estado.actions, op: existe }
+    si: hoja.chat.responder
+    no: fin.chat_sin_evidencia
+  - id: conversar.dato
+    fundamento: iso31000.6.4.3
+    predicado: { lee: estado.chat.kpi, op: existe }
+    si: hoja.chat.responder
+    no: fin.chat_sin_evidencia
+  - id: hoja.chat.responder
+    hoja: { agente: chat, decision: responder, skill: chat/contrato.md }
+    sigue: conversar.con_evidencia
+  - id: conversar.con_evidencia
+    fundamento: owasp-llm05.1
+    predicado: { lee: estado.chat.figuras, op: existe }
+    si: fin.chat_respondida
+    no: fin.chat_sin_evidencia

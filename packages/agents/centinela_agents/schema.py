@@ -2,15 +2,16 @@ from typing import Any, Iterable, Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
-STAGES = ("detectar", "explicar", "proponer", "aprobar", "ejecutar", "cerrar", "medir")
+STAGES = ("detectar", "explicar", "proponer", "aprobar", "ejecutar", "cerrar", "medir", "conversar")
 FAMILIES = ("cartera", "margen", "inventario", "comercial", "abastecimiento", "clientes")
 AGENT_DECISIONS = {
     "vigia": ("detectar", "titular", "proponer_kpi", "expandir"),
-    "analista": ("explicar", "responder_chat", "expandir"),
+    "analista": ("explicar", "expandir"),
     "estratega": ("proponer", "revision_manual", "expandir"),
     "ejecutor": ("ejecutar", "nota_manual", "expandir"),
+    "chat": ("clasificar", "responder"),
 }
-AGENT_STAGE = {"vigia": "detectar", "analista": "explicar", "estratega": "proponer", "ejecutor": "ejecutar"}
+AGENT_STAGE = {"vigia": "detectar", "analista": "explicar", "estratega": "proponer", "ejecutor": "ejecutar", "chat": "conversar"}
 ENDS = frozenset(
     {
         "fin.sin_alerta",
@@ -20,9 +21,14 @@ ENDS = frozenset(
         "fin.ya_no_aplica",
         "fin.ejecutada",
         "fin.fallo_ejecucion",
+        "fin.chat_respondida",
+        "fin.chat_sin_evidencia",
+        "fin.chat_fuera_de_alcance",
+        "fin.chat_rechazada",
     }
 )
 ROOT = "detectar.raiz"
+CHAT_ROOT = "conversar.raiz"
 GATE = "aprobar.decision"
 VIGENTE = "ejecutar.vigente"
 Operator = Literal[">", ">=", "<", "<=", "=", "!=", "en", "existe"]
@@ -251,3 +257,12 @@ class RejectionClassifierOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     destino: Literal["causa", "propuesta", "ambos", "ninguno"]
+
+
+class ChatAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str
+    figures: list[Figure] = Field(default_factory=list)
+    enough_evidence: bool
+    assumptions: list[str] = Field(default_factory=list)

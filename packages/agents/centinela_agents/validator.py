@@ -8,7 +8,8 @@ from pydantic import ValidationError
 from .catalog import Catalog, thresholds_named
 from .metrics import Metrics, load_metrics, threshold_shape_problem
 from .predicate import KPI_PATH, STATE_PATH
-from .schema import AGENT_DECISIONS, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, reachable, stage_of
+from .graph import BOUND_NODES
+from .schema import AGENT_DECISIONS, CHAT_ROOT, ENDS, GATE, ROOT, STAGES, VIGENTE, Node, Tree, branches, index, level, reachable, stage_of
 from .state import STATE_FIELDS
 from .yaml_loader import load_yaml
 
@@ -57,6 +58,7 @@ def problems(data: Mapping[str, Any], grounds: Grounds) -> list[str]:
         *cycle_problems(nodes),
         *end_problems(nodes),
         *reach_problems(nodes),
+        *chat_problems(nodes),
         *operand_problems(tree, grounds.catalog),
         *candidate_problems(nodes, grounds.catalog),
         *threshold_problems(tree, grounds),
@@ -228,14 +230,39 @@ def end_problems(nodes: Mapping[str, Node]) -> list[str]:
             if node_id not in finishing and any(target in ENDS or target in finishing for _, target in branches(node)):
                 finishing.add(node_id)
                 grown = True
-    return [f"{node_id} reaches no fin" for node_id in sorted(reachable(nodes, [ROOT])) if node_id in nodes and node_id not in finishing]
+    return [f"{node_id} reaches no fin" for node_id in sorted(reachable(nodes, [ROOT, CHAT_ROOT])) if node_id in nodes and node_id not in finishing]
 
 
 def reach_problems(nodes: Mapping[str, Node]) -> list[str]:
     if ROOT not in nodes:
         return []
-    reached = reachable(nodes, [ROOT])
-    return [f"{node_id} is unreachable from {ROOT}" for node_id in sorted(nodes) if node_id not in reached]
+    reached = reachable(nodes, [ROOT, CHAT_ROOT])
+    return [f"{node_id} is unreachable from {ROOT} and {CHAT_ROOT}" for node_id in sorted(nodes) if node_id not in reached]
+
+
+def chat_problems(nodes: Mapping[str, Node]) -> list[str]:
+    root = nodes.get(CHAT_ROOT)
+    if root is None:
+        return [f"the tree lacks its root {CHAT_ROOT}"]
+    found: list[str] = []
+    if root.predicado is None or root.predicado.lee != "estado.chat.sospechosa":
+        read = root.predicado.lee if root.predicado is not None else "nothing"
+        found.append(f"{CHAT_ROOT} reads {read}; the chat's first node reads estado.chat.sospechosa")
+    alert, chat = reachable(nodes, [ROOT]), reachable(nodes, [CHAT_ROOT])
+    for node_id in sorted(chat):
+        node = nodes.get(node_id)
+        if node_id == GATE:
+            found.append(f"{CHAT_ROOT} reaches {GATE}")
+        elif node_id in BOUND_NODES:
+            found.append(f"{CHAT_ROOT} reaches {node_id}, an orchestrator write")
+        elif node is not None and node.hoja is not None and node.hoja.agente != "chat":
+            found.append(f"{CHAT_ROOT} reaches the leaf {node_id} of {node.hoja.agente}")
+    for node_id in sorted(alert):
+        node = nodes.get(node_id)
+        if node is not None and node.hoja is not None and node.hoja.agente == "chat":
+            found.append(f"{ROOT} reaches the leaf {node_id} of chat")
+    found += [f"{ROOT} and {CHAT_ROOT} both reach {node_id}" for node_id in sorted(alert & chat)]
+    return found
 
 
 def operand_problems(tree: Tree, catalog: Catalog) -> list[str]:
@@ -317,7 +344,7 @@ def leaf_problems(tree: Tree, skills: Path) -> list[str]:
             continue
         allowed = AGENT_DECISIONS.get(leaf.agente)
         if allowed is None:
-            found.append(f"{node.id} names agent {leaf.agente}, outside vigia, analista, estratega and ejecutor")
+            found.append(f"{node.id} names agent {leaf.agente}, outside vigia, analista, estratega, ejecutor and chat")
         elif leaf.decision not in allowed:
             found.append(f"{node.id} takes {leaf.decision}, outside the decisions of {leaf.agente}")
         path = (skills / leaf.skill).resolve()

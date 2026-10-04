@@ -4,6 +4,7 @@
 import pytest
 
 from centinela_agents.metrics import Metrics, load_metrics
+from centinela_agents.schema import GATE
 from centinela_agents.validator import InvalidTree, checked_base, load_base, load_registry, problems
 from support import ARBOL, METRICAS, SKILLS, KERNEL_CATALOG, base_data, grounds, node_of
 
@@ -78,6 +79,12 @@ def add_orphan(data):
     data["nodos"].append(dict(ORPHAN))
 
 
+def drop_node(node_id):
+    def plant(data):
+        data["nodos"].remove(node_of(data, node_id))
+    return plant
+
+
 PLANTED = [
     ("schema", set_key("explicar.misma_causa", "color", "rojo"), "schema:"),
     ("two values", set_predicate("detectar.cartera.saldo_vencido.dias", valor=15), "compares with an umbral and a valor at once"),
@@ -105,7 +112,7 @@ PLANTED = [
     ("umbral on a state field", set_predicate("explicar.con_evidencia", valor=None, umbral="saldo_vencido"), "bounds a state field with an umbral"),
     ("missing skill", set_leaf("hoja.vigia.titular", skill="vigia/inexistente.md"), "which is no file under packages/agents/skills"),
     ("decision outside the list", set_leaf("hoja.vigia.titular", decision="proponer"), "outside the decisions of vigia"),
-    ("unknown agent", set_leaf("hoja.vigia.titular", agente="orquestador"), "outside vigia, analista, estratega and ejecutor"),
+    ("unknown agent", set_leaf("hoja.vigia.titular", agente="orquestador"), "outside vigia, analista, estratega, ejecutor and chat"),
     ("L0 changed", set_law(0, "iso31000.6.6"), "L0 differs from the base"),
     ("L1 changed", set_predicate("aprobar.decision", valor=["approve"]), "L1 node aprobar.decision differs from the base"),
     ("base leaf redirected", set_key("hoja.vigia.titular", "sigue", "explicar.con_evidencia"), "leaf hoja.vigia.titular differs from the base"),
@@ -125,6 +132,13 @@ PLANTED = [
     ("orphan entry", add_orphan, "hoja.vigia.huerfana is unreachable from detectar.raiz"),
     ("base leaf decision changed", set_leaf("hoja.vigia.titular", decision="detectar"), "leaf hoja.vigia.titular differs from the base"),
     ("return the interpreter does not count", add_return, "cycle"),
+    ("chat reaches the gate", set_key("conversar.dato", "si", GATE), "conversar.raiz reaches aprobar.decision"),
+    ("chat reaches an estratega leaf", set_key("conversar.dato", "si", "hoja.estratega.proponer"), "conversar.raiz reaches the leaf hoja.estratega.proponer of estratega"),
+    ("chat reaches an orchestrator write", set_key("conversar.dato", "si", "proponer.retorno_disponible"), "conversar.raiz reaches proponer.retorno_disponible, an orchestrator write"),
+    ("chat ends at an alert's end", set_key("conversar.dato", "no", "fin.sin_alerta"), "detectar.raiz and conversar.raiz both reach fin.sin_alerta"),
+    ("alert walk enters the chat", set_key("detectar.raiz", "no", "hoja.chat.clasificar"), "detectar.raiz reaches the leaf hoja.chat.clasificar of chat"),
+    ("chat root screens nothing", set_predicate("conversar.raiz", lee="estado.chat.intent"), "conversar.raiz reads estado.chat.intent; the chat's first node reads estado.chat.sospechosa"),
+    ("chat without its root", drop_node("conversar.raiz"), "the tree lacks its root conversar.raiz"),
     ("kpi read on another metric's row", set_key("detectar.cartera.concentracion_vencida_pct.participacion", "no", "detectar.cartera.saldo_vencido.cupo"), "reads saldo_vencido where the candidate may be concentracion_vencida_pct"),
 ]
 
