@@ -1,6 +1,7 @@
 import { API_BASE_URL, API_HEADERS, getDecisionHeaders } from './config';
 import type {
   AdvanceEvent,
+  AgentStep,
   Alert,
   AlertFilter,
   ChatEvent,
@@ -67,6 +68,7 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let currentEvent = '';
 
   try {
     while (true) {
@@ -78,19 +80,23 @@ export async function* advanceDay(days = 1): AsyncGenerator<AdvanceEvent> {
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6));
-            const event = data.event as string;
-            if (event === 'end') {
+            if (currentEvent === 'end') {
               yield {
                 event: 'end',
                 data: { simulatedDay: data.simulatedDay, newAlerts: data.newAlerts },
               };
+            } else if (currentEvent === 'agent_step') {
+              yield { event: 'step', data: data as AgentStep };
             }
           } catch (e) {
             console.error('Failed to parse SSE event:', line, e);
           }
+          currentEvent = '';
         }
       }
     }
