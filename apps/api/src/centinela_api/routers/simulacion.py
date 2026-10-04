@@ -42,7 +42,6 @@ async def avanzar(
 
         try:
             ctx = get_context()
-            # Only process metrics the API Alert model supports
             detections = [d for d in detect(ctx, day_str) if d.metric in API_METRICS]
             orq = get_orchestrator()
 
@@ -57,8 +56,6 @@ async def avanzar(
                 }
 
                 try:
-                    # Run the orchestrator (Vigía → Analista → Estratega → GATE) in a thread
-                    # so the event loop stays responsive between SSE yields.
                     state = await asyncio.to_thread(
                         orq.start,
                         detection,

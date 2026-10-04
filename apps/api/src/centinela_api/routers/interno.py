@@ -63,7 +63,6 @@ async def crear_alerta(
         executed_action=None,
     )
 
-    # Crear en BD
     with conn.transaction():
         alertas_repo.guardar(conn, nueva)
         actor = ActorAgent(agent="vigia")
@@ -101,13 +100,11 @@ async def ingresar_causa(
     if alerta is None:
         raise HTTPException(404, "Alerta no existe")
 
-    # Validar transición
     try:
         transicionar(alerta.status, "analyzing")
     except Exception as e:
         raise HTTPException(409, str(e)) from e
 
-    # Actualizar
     nueva = alerta.model_copy(
         update={"status": "analyzing", "cause": entrada.cause}
     )
@@ -145,13 +142,11 @@ async def ingresar_propuesta(
     if alerta is None:
         raise HTTPException(404, "Alerta no existe")
 
-    # Validar transición
     try:
         transicionar(alerta.status, "proposed")
     except Exception as e:
         raise HTTPException(409, str(e)) from e
 
-    # Actualizar
     nueva = alerta.model_copy(update={"status": "proposed", "actions": entrada.actions})
     dia = simulacion.dia_actual(conn)
     actor = ActorAgent(agent="estratega")
@@ -190,18 +185,15 @@ async def ejecutar_accion(
     if alerta.status != "approved":
         raise HTTPException(409, f"Alerta no aprobada, status={alerta.status}")
 
-    # Validar que la acción exista
     accion = next((a for a in alerta.actions if a.id == entrada.action_id), None)
     if accion is None:
         raise HTTPException(400, "Acción no pertenece a esta alerta")
 
-    # Validar transición
     try:
         transicionar(alerta.status, "executed")
     except Exception as e:
         raise HTTPException(409, str(e)) from e
 
-    # Actualizar
     nueva = alerta.model_copy(
         update={
             "status": "executed",

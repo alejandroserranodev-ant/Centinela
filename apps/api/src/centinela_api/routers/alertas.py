@@ -84,9 +84,6 @@ async def decidir(
         for tipo, detalle in eventos:
             bitacora.registrar(conn, nueva.id, tipo, actor, detalle, dia)
 
-    # Resume the orchestrator to run Ejecutor (approve/edit) or close (reject).
-    # If the graph state is missing (e.g. server restarted), log and continue —
-    # the decision is already persisted in the DB.
     if isinstance(decision, (DecisionApprove, DecisionEdit)):
         try:
             orq = get_orchestrator()

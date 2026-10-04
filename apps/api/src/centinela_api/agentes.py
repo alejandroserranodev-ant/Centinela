@@ -35,15 +35,11 @@ from .modelos import (
 
 logger = logging.getLogger(__name__)
 
-# --- Paths ---
-# agentes.py lives at: apps/api/src/centinela_api/agentes.py
-# parents[4] = project root
 _ROOT = Path(__file__).resolve().parents[4]
 _ARBOL = _ROOT / "packages" / "agents" / "arbol" / "base.yaml"
 _METRICAS = _ROOT / "data" / "metricas.yaml"
 
 
-# --- KPI Catalog (mirrors packages/agents/tests/support.py VIEW_CATALOG) ---
 
 def _kpi(entity: list, *columns: str) -> Kpi:
     return Kpi(entity=tuple(entity), columns=frozenset({*entity, *columns}))
@@ -62,13 +58,11 @@ VIEW_CATALOG = Catalog({
     "veces_intervalo_habitual": _kpi(["cliente_id"], "pedidos", "ultima_compra", "intervalo_prom_dias", "dias_sin_comprar", "veces_intervalo_habitual"),
 })
 
-# Metrics supported by the API Alert model
 API_METRICS = frozenset({
     "margen_pct", "saldo_vencido", "dias_pago_prom",
     "cobertura_dias", "descuento_en_exceso", "veces_intervalo_habitual",
 })
 
-# --- Demo KPI rows (satisfy detection predicates in arbol/base.yaml) ---
 _DEMO_ROWS: dict[str, list[dict]] = {
     "saldo_vencido": [
         {
@@ -77,7 +71,7 @@ _DEMO_ROWS: dict[str, list[dict]] = {
             "cupo_credito": 5_000_000,
             "saldo_abierto": 1_200_000,
             "saldo_vencido": 800_000,
-            "max_dias_vencido": 20,     # > 15 → detectar.cartera.saldo_vencido.dias
+            "max_dias_vencido": 20,
             "plazo_dias": 30,
             "dias_pago_prom_120d": 35,
         },
@@ -90,7 +84,7 @@ _DEMO_ROWS: dict[str, list[dict]] = {
             "clase_abc": "A",
             "existencia": 50,
             "demanda_prom_30d": 20.0,
-            "cobertura_dias": 2.5,      # < 10 for class A → detectar.inventario.cobertura_dias.minima
+            "cobertura_dias": 2.5,
             "unidades_pendientes": 0,
         },
     ],
@@ -102,7 +96,6 @@ def _demo_reader(metric: str, day: str) -> list[dict]:
     return _DEMO_ROWS.get(metric, [])
 
 
-# --- Lazy singletons ---
 
 _orchestrator: CentinelaOrchestrator | None = None
 _context: Context | None = None
@@ -134,8 +127,8 @@ def _build_orchestrator() -> CentinelaOrchestrator:
     tree = _load_tree()
     metrics = load_metrics(_METRICAS)
     provider = get_provider()
-    tools = ToolRegistry()          # all tool providers optional; agents degrade gracefully
-    checkpointer = InMemorySaver()  # per-process state; lost on restart
+    tools = ToolRegistry()
+    checkpointer = InMemorySaver()
     return CentinelaOrchestrator(
         provider=provider,
         tools=tools,
@@ -147,7 +140,6 @@ def _build_orchestrator() -> CentinelaOrchestrator:
     )
 
 
-# --- Graph state → API Alert conversion ---
 
 _STATUS_MAP: dict[str, str] = {
     "nueva": "new",
@@ -195,7 +187,7 @@ def _derive_pesos_at_risk(metric: str, row: dict) -> float:
         return ventas * caida / 100
     if metric == "cobertura_dias":
         demanda = float(row.get("demanda_prom_30d") or 0)
-        return demanda * 10 * 30_000  # rough: 10 days of stock * avg unit price
+        return demanda * 10 * 30_000
     return 0.0
 
 
