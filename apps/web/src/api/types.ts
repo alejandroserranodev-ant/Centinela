@@ -92,6 +92,7 @@ export interface Alert {
   status: AlertStatus;
   severity: Severity;
   metric: Metric;
+  labels: string[];
   title: Sentence;
   pesosAtRisk: Figure;
   recoverablePerMonth: Figure | null;

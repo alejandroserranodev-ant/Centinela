@@ -115,6 +115,7 @@ class Alert(Esquema):
     status: AlertStatus = Field(..., description="Current status in lifecycle: new → analyzing → proposed → approved/rejected → executed")
     severity: Severity = Field(..., description="Alert severity: critical, high, medium, or low")
     metric: Metric = Field(..., description="Metric that triggered this alert")
+    labels: list[str] = Field(default_factory=list, description="Identity labels a person reads, the metric's short name first then the affected entity (e.g. ['Margen', 'línea Hogar'])")
     title: Sentence = Field(..., description="Alert title with initial impact figures")
     pesos_at_risk: Figure = Field(..., description="Pesos at risk (COP)")
     recoverable_per_month: Figure | None = Field(None, description="Potential monthly recovery if action taken")

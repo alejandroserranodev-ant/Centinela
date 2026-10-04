@@ -2,9 +2,11 @@
 # Vigía lee estas métricas a través del kernel, centinela.k_<métrica>(dia), y el Analista además a través de las vistas SQL; nunca se recalculan con el modelo de lenguaje.
 moneda: COP
 fecha_corte: "máximo de inventario_diario.fecha (o el día del reloj simulado)"
+nombres_dimensiones: { linea: línea, linea_n: línea, cliente_id: cliente, sku: SKU, bodega_id: bodega, vendedor_id: vendedor, pedido_id: pedido, oc_id: orden de compra, mes_factura: mes, semana: semana }
 metricas:
   margen_pct:
     descripcion: Margen bruto sobre ventas netas
+    etiqueta: Margen
     formula: 1 - sum(costo_total) / sum(valor_neto)
     vista: v_margen_semanal_linea
     dimensiones: [semana, linea]
@@ -53,6 +55,7 @@ metricas:
       salida: { valor: margen_pct, base: margen_pct_base, delta: caida_pts }
   saldo_vencido:
     descripcion: Valor de facturas abiertas con fecha de vencimiento anterior al corte
+    etiqueta: Cartera vencida
     vista: v_cartera_cliente
     umbral_alerta: "max_dias_vencido > 15 (política de crédito) o saldo_abierto > cupo_credito"
     umbrales: { max_dias_vencido: 15, saldo_abierto: { columna: cupo_credito } }
@@ -83,6 +86,7 @@ metricas:
       salida: { valor: saldo_vencido }
   concentracion_vencida_pct:
     descripcion: Participación del cliente en la cartera vencida total
+    etiqueta: Concentración vencida
     formula: saldo_vencido del cliente / sum(saldo_vencido) de todos los clientes
     vista: v_cartera_cliente
     umbral_alerta: "> 10% de la cartera vencida total"
@@ -110,6 +114,7 @@ metricas:
       salida: { valor: saldo_vencido }
   dias_pago_prom:
     descripcion: Días promedio entre factura y pago, por mes de pago
+    etiqueta: Días de pago
     vista: v_dias_pago_mensual
     umbral_alerta: "aumento > 50% frente al promedio histórico del cliente"
     umbrales: { aumento_pct: 50 }
@@ -141,6 +146,7 @@ metricas:
       salida: { valor: dias_pago_prom, base: dias_pago_prom_base, delta: aumento_pct }
   cobertura_dias:
     descripcion: Existencia / demanda promedio diaria de los últimos 30 días
+    etiqueta: Cobertura de inventario
     vista: v_cobertura_inventario
     umbral_alerta: "< 10 días en clase A (política de inventario); crítico < 5 días con pedidos pendientes"
     umbrales: { cobertura_dias: { por: clase_abc, valores: { A: 10, B: 7 } } }
@@ -189,6 +195,7 @@ metricas:
       salida: { valor: demanda_prom_30d }
   variacion_costo_pct:
     descripcion: Variación del costo unitario de un SKU frente a su costo anterior
+    etiqueta: Variación de costo
     vista: v_costo_sku
     umbral_alerta: "> 5% sin un cambio de precio_lista en v_precio_sku dentro de 10 días hábiles"
     umbrales: { variacion_pct: 5, dias_habiles_sin_traslado: 10 }
@@ -262,6 +269,7 @@ metricas:
       salida: { valor: costo_unitario }
   dias_retraso:
     descripcion: Días entre la fecha esperada de una orden de compra y su recepción o el corte
+    etiqueta: Retraso de proveedor
     vista: v_ordenes_compra
     umbral_alerta: "> 0 en una orden no recibida"
     umbrales: { dias_retraso: 0, recibida: false }
@@ -289,6 +297,7 @@ metricas:
       salida: { valor: fecha_recibida }
   descuento_en_exceso:
     descripcion: Descuento otorgado por encima del tope del segmento sin aprobación especial
+    etiqueta: Descuentos fuera de política
     vista: v_descuentos_fuera_politica
     umbral_alerta: "cualquier línea; agrupar por vendedor y semana"
     umbrales: { descuento_en_exceso: 0 }
@@ -317,6 +326,7 @@ metricas:
       salida: { valor: descuento_en_exceso }
   margen_bruto_negativo:
     descripcion: Líneas de pedido vendidas por debajo del costo
+    etiqueta: Margen negativo
     vista: v_ventas
     umbral_alerta: "margen_bruto < 0"
     umbrales: { margen_bruto: 0 }
@@ -344,6 +354,7 @@ metricas:
       salida: { valor: margen_bruto }
   veces_intervalo_habitual:
     descripcion: Días sin comprar / intervalo habitual entre pedidos del cliente
+    etiqueta: Cliente inactivo
     vista: v_actividad_cliente
     umbral_alerta: "> 3 veces el intervalo habitual en clientes con 10 o más pedidos"
     umbrales: { pedidos: 10, veces_intervalo_habitual: 3 }

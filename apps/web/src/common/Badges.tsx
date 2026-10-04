@@ -1,12 +1,11 @@
-import { ArenaBadge, ArenaTag } from '@dravensoft/arena-react';
-import type { ArenaTone } from '@dravensoft/arena-react';
+import { ArenaTag } from '@dravensoft/arena-react';
 import type { AlertStatus, ConfidenceLevel, Severity as SeverityLevel } from '../api/types';
 
-const SEVERITY: Record<SeverityLevel, { text: string; tone: ArenaTone }> = {
-  critical: { text: 'Crítica', tone: 'danger' },
-  high: { text: 'Alta', tone: 'warning' },
-  medium: { text: 'Media', tone: 'info' },
-  low: { text: 'Baja', tone: 'neutral' },
+const SEVERITY: Record<SeverityLevel, string> = {
+  critical: 'Crítica',
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
 };
 
 const CONFIDENCE: Record<ConfidenceLevel, string> = {
@@ -26,16 +25,20 @@ export const STATUS: Record<AlertStatus, string> = {
 };
 
 export function Severity({ level }: { level: SeverityLevel }) {
-  const { text, tone } = SEVERITY[level];
   return (
-    <ArenaBadge tone={tone} dot>
-      {text}
-    </ArenaBadge>
+    <span className={`severity severity--${level}`}>
+      {level === 'critical' ? <i className="ph-fill ph-warning" aria-hidden /> : null}
+      {SEVERITY[level]}
+    </span>
   );
 }
 
 export function Confidence({ level }: { level: ConfidenceLevel }) {
   return <ArenaTag>{CONFIDENCE[level]}</ArenaTag>;
+}
+
+export function Labels({ labels }: { labels: string[] }) {
+  return labels.map((label) => <ArenaTag key={label}>{label}</ArenaTag>);
 }
 
 export function Status({ status }: { status: AlertStatus }) {
