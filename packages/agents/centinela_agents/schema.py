@@ -123,14 +123,12 @@ class Figure(BaseModel):
     unit: str | None = None
     queryId: str
 
-
 class Sentence(BaseModel):
     """Natural language statement with optional supporting figures."""
     model_config = ConfigDict(extra="forbid")
 
     text: str
     figures: list[Figure] = Field(default_factory=list)
-
 
 class Evidence(BaseModel):
     """
