@@ -25,7 +25,7 @@ the kit delivers the dataset free to use for the challenge.
 | `metricas.yaml` | the single definition of each metric: formula, view, dimensions, alert threshold as text (`umbral_alerta`) and per KPI column (`umbrales`), the policy section the threshold comes from, and how its pesos at risk are computed. Each metric's short label (`etiqueta`) and the file's `nombres_dimensiones` are the words a person reads on an alert's identity labels |
 | `metricas.yaml`, a `kernel:` block | the definition the kernel compiles for a base metric, in the language of `kernel/lenguaje.schema.json`. An entry with a block also carries `descripcion` and the ISO 22400-2 fields `unidad`, `rango`, `tendencia`, `temporalidad` and `audiencia`, and keeps `formula` as the readable one |
 | `kernel/lenguaje.schema.json` | the kernel's language as a JSON Schema: the closed keys of a `kernel:` block with their bounds, and the fields of a KPI's card under `$defs/ficha` |
-| `kernel/fuentes.yaml` | what the kernel may read: each table's key, its readable columns with their type, the role of each date column, its `fuga` columns with the values known when a row is created, and the columns it excludes with the reason; and each source's joins, closings, dimensions and `fechada_por` |
+| `kernel/fuentes.yaml` | what the kernel may read: each table's key, its readable columns with their type, the role of each date column, its `fuga` columns with the values known when a row is created, and the columns it excludes with the reason, and its `personales`, the columns that identify a client, a supplier or a seller; and each source's joins, closings, dimensions and `fechada_por` |
 | `sql/05_kpis.generated.sql` | written by the kernel's generator ([`../GENERATED.md`](../GENERATED.md)): the roles `centinela_lector`, `centinela_kernel` and `centinela_propietario` with their grants, `fecha_corte()` made readable through the views, and one function `centinela.k_<metric>(dia date)` per metric with a `kernel:` block |
 | `docker-compose.yml` | a disposable PostgreSQL 16 with the pgvector extension available, which policy search needs, on port 5432; it runs `sql/01_esquema.sql` to `sql/05_kpis.generated.sql` against `csv/` on its first start, keeping the database in the volume `pgdata`, and pgAdmin on port 5050 |
 | `diccionario_de_datos.xlsx` | tables, fields, types and examples |
@@ -217,8 +217,8 @@ base, while an entity with no row in the window yields no row.
 reads it only with `=`, `!=` or `en` on the values known when a row is created, `Cancelado` for
 `pedidos.estado` and none for `ordenes_compra.estado`. The dataset generator decides a cancellation
 when it creates the order, while `Pendiente de despacho` is the state at the end. A column holding a
-person's name, such as `vendedores.nombre`, is excluded, because personal data is
-[masked](../packages/tools/AGENTS.md#masking) before an agent sees it.
+person's name, such as `vendedores.nombre`, is excluded, and the values of the `personales` columns
+are [masked](../packages/tools/AGENTS.md#masking) before a model reads them.
 
 **A KPI with no `fuente_umbral` is descriptive**: evidence for `Analista` and `Estratega`, and an
 operand no `detectar` node may compare, because no threshold exists that a document does not

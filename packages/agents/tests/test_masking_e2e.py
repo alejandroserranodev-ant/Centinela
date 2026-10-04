@@ -13,7 +13,7 @@ from centinela_agents.metrics import load_metrics
 from centinela_agents.orchestrator import CentinelaOrchestrator
 from centinela_agents.tools import ToolRegistry
 from centinela_agents.walk import Context
-from support import DAY, DECISION_DAY, KERNEL_CATALOG, METRICAS, approve, base_tree, reader_from
+from support import DAY, DECISION_DAY, KERNEL_CATALOG, METRICAS, approve, base_tree, reader_from, saldo_detection
 
 PLACEHOLDER = re.compile(r"\b(?:CLIENTE|VENDEDOR|NOMBRE)_[A-Z]{6,}\b")
 CLEAR = ("CLI-001", "CLI-002", "VEN-01", "Ferretería López")
@@ -29,10 +29,11 @@ ROWS = {DAY: DAY_ROWS, DECISION_DAY: DAY_ROWS}
 
 
 class Recording(LLMProvider):
-    def __init__(self, chat_entity=None):
+    def __init__(self, chat_entity=None, same_cause=False):
         super().__init__(ModelConfig(provider="fake", model="fake"))
         self.requests = []
         self.chat_entity = chat_entity
+        self.same_cause = same_cause
 
     def health_check(self) -> bool:
         return True
@@ -55,7 +56,8 @@ class Recording(LLMProvider):
         elif "sentences" in fields:
             parsed = {"sentences": [{"text": f"{self.first(request)} debe {{0}}.", "figures": ["f1"]}], "assumptions": []}
         elif "sentence" in fields:
-            parsed = {"kind": "identified", "sentence": f"{self.first(request)} dejó de pagar {{0}}", "sentence_figures": ["f1"], "evidence": [], "reason": "", "confidence": "high", "assumptions": []}
+            candidate = re.search(r"^- id: (\S+)", request.user_prompt, re.MULTILINE) if self.same_cause else None
+            parsed = {"kind": "identified", "sentence": f"{self.first(request)} dejó de pagar {{0}}", "sentence_figures": ["f1"], "evidence": [], "reason": "", "confidence": "high", "assumptions": [], "same_cause_as": candidate.group(1) if candidate else None}
         elif "actions" in fields:
             row = re.search(r"^(\S+): \[email_draft\]", request.user_prompt, re.MULTILINE)
             parsed = {"actions": [{"row": row.group(1), "title": "Recordar el pago", "description": "Escribir al cliente."}], "insufficient_cause": False}
@@ -97,7 +99,7 @@ def in_clear(strings):
     return [value for value in CLEAR for text in strings if value.lower() in text.lower()]
 
 
-def test_a_day_run_sends_no_personal_value_and_one_placeholder_per_entity():
+def test_orq_a_day_run_sends_no_personal_value_and_one_placeholder_per_entity():
     provider = Recording()
     runs = day_runs(orchestrator(provider))
     assert len(runs) == 2
@@ -128,7 +130,7 @@ def test_the_state_keeps_the_masked_prompts_of_its_model_steps():
         assert in_clear([prompt["user"] for prompt in recorded] + [prompt["system"] for prompt in recorded]) == []
 
 
-def test_an_approval_resumed_with_no_day_run_masks_the_ejecutor_prompt():
+def test_orq_an_approval_resumed_with_no_day_run_masks_the_ejecutor_prompt():
     provider = Recording()
     orq = orchestrator(provider)
     run = day_runs(orq)[0]
@@ -153,3 +155,14 @@ def test_a_typed_id_is_masked_before_the_model_and_chosen_back_from_the_rows():
 def test_a_placeholder_no_row_holds_chooses_no_entity():
     reply = orchestrator(Recording(chat_entity="CLIENTE_QQQQQQ")).ask("¿Cuánto debe cli-001?", DAY)
     assert reply["chat"]["entity"] is None
+
+
+def test_orq_two_alerts_of_one_client_merge_with_the_client_never_in_a_prompt():
+    provider = Recording(same_cause=True)
+    orq = orchestrator(provider)
+    detection = saldo_detection(row=saldo("CLI-001"))
+    first = orq.start(detection, alert_id="B1", day=DAY)
+    brief = {"metric": "dias_pago_prom", "entity": ["cliente CLI-001"], "cause": first["cause"]["sentence"]}
+    second = orq.start(detection, alert_id="A1", day=DAY, earlier_alerts={"B1": "propuesta"}, alert_briefs={"B1": brief})
+    assert first["status"] == "propuesta" and second["fin"] == "fin.unida" and second["merged_into"] == "B1"
+    assert in_clear(texts(provider.requests)) == []
