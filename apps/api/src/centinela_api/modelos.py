@@ -246,8 +246,14 @@ class DecisionReject(Esquema):
     reason: str = Field(..., description="Reason for rejection")
 
 
+class DecisionRequestChanges(Esquema):
+    """Human decision: ask Estratega to propose again with a reason."""
+    kind: Literal["request_changes"] = Field("request_changes", description="Discriminator: request changes decision")
+    reason: str = Field(..., description="What the person wants changed in the proposal")
+
+
 Decision = Annotated[
-    Union[DecisionApprove, DecisionEdit, DecisionReject], Field(discriminator="kind")
+    Union[DecisionApprove, DecisionEdit, DecisionReject, DecisionRequestChanges], Field(discriminator="kind")
 ]
 
 

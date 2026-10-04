@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import uuid
 from typing import Annotated
@@ -7,8 +8,8 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import alertas as alertas_repo
-from .. import bitacora, ciclo_vida, configuracion, decisiones, permisos, simulacion
-from ..agentes import get_orchestrator
+from .. import bitacora, ciclo_vida, configuracion, consultas, decisiones, permisos, simulacion
+from ..agentes import converted_actions, get_orchestrator
 from ..ciclo_vida import ESTADO_A_STATUS
 from ..auth import persona_actual
 from ..db import obtener_conexion
@@ -19,9 +20,11 @@ from ..modelos import (
     AlertEstadoEnum,
     Decision,
     Persona,
+    Settings,
     DecisionApprove,
     DecisionEdit,
     DecisionReject,
+    DecisionRequestChanges,
     ExecutedAction,
 )
 
@@ -146,4 +149,53 @@ async def decidir(
         except Exception as e:
             logger.error(f"Orchestrator reject failed for {id}: {e}", exc_info=True)
 
+    elif isinstance(decision, DecisionRequestChanges):
+        nueva = await _reproponer(conn, nueva, decision.reason, ajustes, dia)
+
     return permisos.vista(conn, persona, nueva)
+
+
+async def _reproponer(
+    conn: psycopg.Connection, alerta: Alert, motivo: str, ajustes: Settings, dia: datetime.date
+) -> Alert:
+    estratega = ActorAgent(agent="estratega")
+    try:
+        orq = get_orchestrator()
+        orq.use_thresholds(configuracion.umbrales(ajustes))
+        vistas = {q["queryId"] for q in orq.get_state(alerta.id).get("queries") or []}
+        state = await asyncio.to_thread(orq.resume, alerta.id, {
+            "id": f"dec_{uuid.uuid4().hex[:8]}",
+            "kind": "request_changes",
+            "reason": motivo.strip(),
+            "simulated_day": dia.isoformat(),
+        })
+        acciones = converted_actions(state)
+        if not acciones:
+            raise ValueError("Estratega no devolvió acciones")
+    except Exception as e:
+        logger.error(f"Orchestrator request_changes failed for {alerta.id}: {e}", exc_info=True)
+        with conn.transaction():
+            bitacora.registrar(
+                conn, alerta.id, "proposal", estratega,
+                f"No hubo nueva propuesta tras la solicitud de cambios; se conservan las acciones anteriores: {e}",
+                dia,
+            )
+        return alerta
+
+    nueva = alerta.model_copy(update={"actions": acciones})
+    nuevas = [q for q in state.get("queries") or [] if q.get("queryId") not in vistas]
+    with conn.transaction():
+        alertas_repo.guardar(conn, nueva)
+        bitacora.registrar(
+            conn, nueva.id, "proposal", estratega,
+            f"Nueva propuesta tras la solicitud de cambios: {len(acciones)} acción(es)",
+            dia,
+        )
+        consultas.registrar(conn, nuevas)
+        for query in nuevas:
+            bitacora.registrar(
+                conn, nueva.id, "evidence", ActorAgent(agent="analista"),
+                f"{query['kpi']} el {query['dia']}: {query['consulta']}",
+                dia, query["queryId"],
+            )
+    return nueva

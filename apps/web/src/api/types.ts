@@ -38,7 +38,6 @@ export type AutonomyLevel = Settings['autonomy'][string];
 export type QuerySource = Query['source'];
 export type InboxSummary = Schemas['InboxSummary'];
 export type AdvanceEnd = Schemas['AdvanceEnd'];
-export type ApiDecision = Schemas['DecisionApprove'] | Schemas['DecisionEdit'] | Schemas['DecisionReject'];
 
 export interface SseEvent<E extends string, D> {
   event: E;
@@ -54,7 +53,11 @@ export type ChatEvent =
   | SseEvent<'step', AgentStep>
   | SseEvent<'end', ChatMessage>;
 
-export type Decision = ApiDecision | { kind: 'request_changes'; reason: string };
+export type Decision =
+  | Schemas['DecisionApprove']
+  | Schemas['DecisionEdit']
+  | Schemas['DecisionReject']
+  | Schemas['DecisionRequestChanges'];
 
 export interface AlertFilter {
   status?: AlertStatus;

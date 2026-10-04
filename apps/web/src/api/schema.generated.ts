@@ -923,6 +923,22 @@ export interface components {
             reason: string;
         };
         /**
+         * DecisionRequestChanges
+         * @description Human decision: ask Estratega to propose again with a reason.
+         */
+        DecisionRequestChanges: {
+            /**
+             * @description Discriminator: request changes decision (enum property replaced by openapi-typescript)
+             * @enum {string}
+             */
+            kind: "request_changes";
+            /**
+             * Reason
+             * @description What the person wants changed in the proposal
+             */
+            reason: string;
+        };
+        /**
          * Evidence
          * @description Supporting data for a claim: statement + historical series.
          */
@@ -1443,7 +1459,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DecisionApprove"] | components["schemas"]["DecisionEdit"] | components["schemas"]["DecisionReject"];
+                "application/json": components["schemas"]["DecisionApprove"] | components["schemas"]["DecisionEdit"] | components["schemas"]["DecisionReject"] | components["schemas"]["DecisionRequestChanges"];
             };
         };
         responses: {

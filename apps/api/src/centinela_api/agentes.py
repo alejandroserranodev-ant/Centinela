@@ -247,6 +247,10 @@ def _convert_action(action_data: dict) -> Action | None:
         return None
 
 
+def converted_actions(state: dict) -> list[Action]:
+    return [a for a in (_convert_action(a) for a in (state.get("actions") or [])) if a]
+
+
 def status_path(alert_id: str, state: dict) -> list[str]:
     """The API statuses the graph took the alert through, in order."""
     return [
@@ -292,7 +296,7 @@ def state_to_alert(alert_id: str, state: dict, detection: Detection, day_str: st
 
     cause_data = state.get("cause") or {}
     cause = _convert_cause(cause_data)
-    actions = [a for a in (_convert_action(a) for a in (state.get("actions") or [])) if a]
+    actions = converted_actions(state)
     cause_confidence = cause_data.get("confidence") if isinstance(cause_data, dict) else None
     confidence = (
         Confidence(level=cause_confidence.get("level", "low"), assumptions=list(cause_confidence.get("assumptions") or []))

@@ -1,9 +1,12 @@
 from collections.abc import Mapping
 
 from . import ciclo_vida
-from .modelos import Alert, AutonomyLevel, Decision, DecisionApprove, DecisionEdit, LogEventType
+from .modelos import Alert, AutonomyLevel, Decision, DecisionApprove, DecisionEdit, DecisionRequestChanges, LogEventType
 
 SOLO_INFORMA = "Este tipo de acción solo informa: no se aprueba desde Centinela"
+
+
+CAMBIOS_YA_PEDIDOS = "Ya se pidieron cambios una vez: queda aprobar, editar o rechazar"
 
 
 class ConflictoEstado(Exception):
@@ -27,6 +30,15 @@ def aplicar(
         ciclo_vida.transicionar(alerta.status, "rejected")
         nueva = alerta.model_copy(update={"status": "rejected"})
         return nueva, [("decision", f"Rechazada. Motivo: {motivo}")]
+
+    if isinstance(decision, DecisionRequestChanges):
+        motivo = decision.reason.strip()
+        if not motivo:
+            raise DecisionInvalida("Para pedir cambios hace falta un motivo")
+        if alerta.changes_requested:
+            raise ConflictoEstado(CAMBIOS_YA_PEDIDOS)
+        nueva = alerta.model_copy(update={"changes_requested": True})
+        return nueva, [("decision", f"Cambios solicitados. Motivo: {motivo}")]
 
     accion = next((a for a in alerta.actions if a.id == decision.action_id), None)
     if accion is None:

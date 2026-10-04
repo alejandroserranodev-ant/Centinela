@@ -214,9 +214,7 @@ a table view.
   vocabulary reaches a manager's screen.
 - **A rejection and a request for changes go through `src/screens/ReasonDialog.tsx:ReasonDialog()`**,
   which sends nothing without a reason, and the reason travels in the `Decision`.
-- **What the client sends and reads matches the API.** *No gate holds this*, and one place
-  breaks it: `decide` sends a `request_changes` as a `reject` carrying the same reason, because
-  the API has no `request_changes`, so asking for another proposal closes the alert as rejected.
+- **What the client sends and reads matches the API.** *No gate holds this.*
 - **Every screen works by keyboard and at phone width**, with no horizontal scroll.
 - **Arena's rules hold in every source file**: tokens only, no class of ours on an Arena
   component, one primary action per view, danger as outline. `npm run arena:audit` holds the ones

@@ -124,7 +124,7 @@ export async function decide(id: string, decision: Decision): Promise<Alert> {
       ? { kind: 'edit', actionId: decision.actionId, parameters: decision.parameters }
       : decision.kind === 'approve'
         ? { kind: 'approve', actionId: decision.actionId }
-        : { kind: 'reject', reason: decision.reason };
+        : { kind: decision.kind, reason: decision.reason };
 
   return fetchJson<Alert>(`${API_BASE_URL}/alertas/${id}/decision`, {
     method: 'POST',

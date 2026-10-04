@@ -79,7 +79,7 @@ continuar", with `WWW-Authenticate: Bearer`, when the token is missing, altered 
 | POST | `/simulacion/avanzar?dias=1` | advances the clock and runs the day; streams `step` events, each an `AgentStep`, per detection, an `alert` event with the stored `Alert` once it is recorded, and one `end` with `simulatedDay` and `newAlerts` | 422 when `dias` is below one; 409 `Ya hay un día en curso` while another run holds the lock | `advanceDay` |
 | GET | `/alertas?estado=propuesta` | the alerts, filtered by the Spanish `estado`, ordered by pesos at risk | 422 for an unknown `estado` | `listAlerts` |
 | GET | `/alertas/{id}` | one alert: cause, evidence and actions | 404 for an unknown alert | `getAlert` |
-| POST | `/alertas/{id}/decision` | `approve`, `edit` or `reject` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
+| POST | `/alertas/{id}/decision` | `approve`, `edit`, `reject` or `request_changes` | 404; 403 for a person who may not decide it; 409 when the alert is not `proposed`; 422 for a failed check | `decide` |
 | POST | `/chat` | a question of at most `MAX_QUESTION` characters and its optional `alertId`, answered by one SSE `step` per node the chat walked and one `end` with a `ChatMessage` and its `outcome` | 404 for an unknown alert; 422 for an empty or longer question | `chat` |
 | GET | `/bandeja/resumen` | the inbox totals, as `InboxSummary` | | `getInboxSummary` |
 | GET | `/consultas/{queryId}` | the call behind a figure, as `Query`, whose `source` is `kernel` or `alertas` | 404 for an unknown query | `getQuery` |
@@ -290,15 +290,20 @@ the person's name and role, commit in one transaction before the orchestrator re
 runs without a recorded decision; an approval or an edit then resumes into `Ejecutor`, and a
 rejection resumes to close the graph.
 
+**A `request_changes` carries a reason, and is capped at one per alert**, because a person who
+still disagrees after one new proposal has the decision in hand: an edit says what to change and a
+rejection says why, and both close the alert. `aplicar` refuses a blank reason (422) and a second
+request (409 "Ya se pidieron cambios una vez"). The alert stays `propuesta` with
+`changesRequested` set while the decision route resumes the graph, `Estratega` proposes again
+with the reason among the rejection reasons it reads, and `src/centinela_api/routers/alertas.py:_reproponer(conn, alerta, motivo, ajustes, dia)`
+stores the new actions with a `proposal` row of `Estratega` and the `evidence` rows of the new
+queries. When the resume fails or returns no action, the alert keeps its previous actions and a
+`proposal` row records the failure.
+
 > **Decided, not built.** The rules below, where the code differs as each one says.
 
 - **An edit keeps the keys of the action's `parameters`, adding none and dropping none**, because
   `Ejecutor` passes them unchanged. `aplicar` merges the edit into them, so a new key passes.
-- **A `request_changes` carries a reason, and is capped at one per alert**, because a person who
-  still disagrees after one new proposal has the decision in hand: an edit says what to change
-  and a rejection says why, and both close the alert. The alert stays `propuesta` while
-  `Estratega` proposes again, and the reason joins the rejection reasons `Estratega` reads. The
-  `Decision` union has no such kind.
 
 **Personal data reaches the models unmasked.** `src/centinela_api/masking.py:mask_dict_for_model(data)`
 replaces client and vendor ids and names with a hash-suffixed placeholder, the same for the same

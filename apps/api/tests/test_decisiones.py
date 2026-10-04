@@ -1,6 +1,6 @@
 import pytest
 
-from centinela_api.decisiones import SOLO_INFORMA, ConflictoEstado, DecisionInvalida, aplicar
+from centinela_api.decisiones import CAMBIOS_YA_PEDIDOS, SOLO_INFORMA, ConflictoEstado, DecisionInvalida, aplicar
 from centinela_api.modelos import (
     Action,
     Alert,
@@ -10,6 +10,7 @@ from centinela_api.modelos import (
     DecisionApprove,
     DecisionEdit,
     DecisionReject,
+    DecisionRequestChanges,
     Figure,
     Sentence,
 )
@@ -86,3 +87,25 @@ def test_una_accion_que_solo_informa_no_se_aprueba(decision):
 def test_una_accion_que_solo_informa_se_puede_rechazar():
     alerta, _ = aplicar(_alerta(), DecisionReject(reason="no aplica"), INFORMA_TAREAS)
     assert alerta.status == "rejected"
+
+
+def test_pedir_cambios_deja_la_alerta_propuesta_y_marca_la_solicitud():
+    alerta, eventos = aplicar(_alerta(), DecisionRequestChanges(reason=" Prefiero una llamada "), PROPONE)
+    assert alerta.status == "proposed" and alerta.changes_requested
+    assert eventos == [("decision", "Cambios solicitados. Motivo: Prefiero una llamada")]
+
+
+def test_pedir_cambios_requiere_motivo():
+    with pytest.raises(DecisionInvalida):
+        aplicar(_alerta(), DecisionRequestChanges(reason="  "), PROPONE)
+
+
+def test_pedir_cambios_una_segunda_vez_es_un_conflicto():
+    pedida = _alerta().model_copy(update={"changes_requested": True})
+    with pytest.raises(ConflictoEstado, match=CAMBIOS_YA_PEDIDOS):
+        aplicar(pedida, DecisionRequestChanges(reason="Otra vez"), PROPONE)
+
+
+def test_pedir_cambios_exige_una_alerta_propuesta():
+    with pytest.raises(ConflictoEstado):
+        aplicar(_alerta("approved"), DecisionRequestChanges(reason="Tarde"), PROPONE)

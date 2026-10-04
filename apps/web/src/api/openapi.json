@@ -1121,6 +1121,29 @@
         "title": "DecisionReject",
         "type": "object"
       },
+      "DecisionRequestChanges": {
+        "additionalProperties": false,
+        "description": "Human decision: ask Estratega to propose again with a reason.",
+        "properties": {
+          "kind": {
+            "const": "request_changes",
+            "default": "request_changes",
+            "description": "Discriminator: request changes decision",
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "description": "What the person wants changed in the proposal",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DecisionRequestChanges",
+        "type": "object"
+      },
       "Evidence-Input": {
         "additionalProperties": false,
         "description": "Supporting data for a claim: statement + historical series.",
@@ -2070,7 +2093,8 @@
                   "mapping": {
                     "approve": "#/components/schemas/DecisionApprove",
                     "edit": "#/components/schemas/DecisionEdit",
-                    "reject": "#/components/schemas/DecisionReject"
+                    "reject": "#/components/schemas/DecisionReject",
+                    "request_changes": "#/components/schemas/DecisionRequestChanges"
                   },
                   "propertyName": "kind"
                 },
@@ -2083,6 +2107,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/DecisionReject"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DecisionRequestChanges"
                   }
                 ],
                 "title": "Decision"
