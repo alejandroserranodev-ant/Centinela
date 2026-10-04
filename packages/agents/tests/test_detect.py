@@ -1,9 +1,11 @@
 from centinela_agents.catalog import Catalog, Kpi
 from centinela_agents.metrics import load_metrics
-from centinela_agents.walk import Context, detect, still_breaks
+from centinela_agents.evidence import query_id
+from centinela_agents.graph import start_alert
+from centinela_agents.walk import Context, detect, detection_state, still_breaks
 import pytest
 
-from support import METRICAS, KERNEL_CATALOG, SALDO_ROW, base_tree
+from support import METRICAS, KERNEL_CATALOG, SALDO_ROW, Recorder, base_tree, compiled, reader_from
 
 DAY = "2026-03-02"
 LATER = "2026-03-05"
@@ -127,3 +129,35 @@ def test_still_breaks_refuses_two_rows_of_one_entity():
     state, ctx = state_of(BY_DAYS, [late, {**late, "max_dias_vencido": 0}])
     with pytest.raises(ValueError, match="CLI-001"):
         still_breaks(state, ctx)
+
+
+SALDO_WITH_PESOS = {**SALDO_ROW, "pesos_en_riesgo": 800000}
+
+
+def detected(rows):
+    ctx = Context.of(base_tree(), load_metrics(METRICAS), KERNEL_CATALOG, reader_from({DAY: rows}))
+    return detect(ctx, DAY)
+
+
+def test_a_detection_carries_every_field_of_the_alert_state_with_the_query_of_its_reading():
+    (detection,) = detected({"saldo_vencido": [SALDO_WITH_PESOS]})
+    qid = query_id(f"kpi_consultar('saldo_vencido', '{DAY}')", DAY)
+    assert detection.query["queryId"] == qid and detection.query["kpi"] == "saldo_vencido"
+    assert detection.figure == {"value": 20, "unit": "days", "queryId": qid}
+    assert detection.pesos == {"value": 800000, "unit": "COP", "queryId": qid}
+    assert (detection.severity, detection.tranche) == ("high", "tramo_2")
+    assert detection.rule.startswith("max_dias_vencido > 15")
+    assert detection.threshold_source == "FIN-POL-004 §3 y §4"
+
+
+def test_a_detection_with_no_pesos_column_carries_no_pesos():
+    (detection,) = detected({"saldo_vencido": [SALDO_ROW]})
+    assert detection.pesos is None
+
+
+def test_the_alert_state_starts_with_the_detection_and_its_query():
+    (detection,) = detected({"saldo_vencido": [SALDO_WITH_PESOS]})
+    state = start_alert(compiled(Recorder()), detection, alert_id="A1", day=DAY)
+    assert state["detection"] == detection_state(detection)
+    assert set(state["detection"]) == {"metric", "entity", "path", "row", "cifra", "regla", "fuente_umbral", "severity", "tramo", "pesos_en_riesgo"}
+    assert detection.query["queryId"] in [query["queryId"] for query in state["queries"]]

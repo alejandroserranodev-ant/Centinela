@@ -12,7 +12,7 @@ from .failures import SchemaRefused, StepTimeout, TokenCapReached
 from .metrics import Metrics
 from .schema import CHAT_ROOT, ENDS, GATE, ROOT, Leaf, Node, Tree, reachable
 from .state import AlertState, ChatState, approved_action
-from .walk import Context, Detection, state_holds
+from .walk import Context, Detection, detection_state, state_holds
 
 logger = logging.getLogger(__name__)
 
@@ -280,12 +280,8 @@ def start_alert(graph, detection: Detection, *, alert_id: str, day: str, earlier
         "entry": detection.entry,
         "earlier_alerts": earlier,
         "alert_briefs": {other: dict(brief) for other, brief in (alert_briefs or {}).items() if other in earlier},
-        "detection": {
-            "metric": detection.metric,
-            "entity": list(detection.entity),
-            "path": [list(step) for step in detection.path],
-            "row": dict(detection.row),
-        },
+        "detection": detection_state(detection),
+        "queries": [dict(detection.query)] if detection.query else [],
         "status": "nueva",
         "transitions": [[alert_id, "nueva"]],
         "analyst_returns": 0,

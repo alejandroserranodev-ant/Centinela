@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from .catalog import Catalog, KpiReader, thresholds_named
-from .metrics import Metrics
+from .catalog import Catalog, KernelCall, KpiReader, thresholds_named
+from .evidence import Ledger, call_from_reader, unit_of
+from .metrics import Metrics, is_number
 from .predicate import compare, is_kpi, kpi_column, threshold_value
 from .schema import ROOT, Node, Predicate, Tree, index
+from .severity import severity_of, tranche_of
 from .state import approved_action, field_value
 
 
@@ -15,10 +17,11 @@ class Context:
     catalog: Catalog
     reader: KpiReader
     owners: Mapping[str, str] = field(default_factory=dict)
+    call: KernelCall | None = None
 
     @classmethod
-    def of(cls, tree: Tree, metrics: Metrics, catalog: Catalog, reader: KpiReader, owners: Mapping[str, str] | None = None) -> "Context":
-        return cls(index(tree), metrics, catalog, reader, dict(owners or {}))
+    def of(cls, tree: Tree, metrics: Metrics, catalog: Catalog, reader: KpiReader, owners: Mapping[str, str] | None = None, call: KernelCall | None = None) -> "Context":
+        return cls(index(tree), metrics, catalog, reader, dict(owners or {}), call)
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,13 @@ class Detection:
     entry: str
     path: tuple[tuple[str, str], ...]
     row: Mapping[str, Any]
+    severity: str = "high"
+    tranche: str | None = None
+    figure: Mapping[str, Any] | None = None
+    pesos: Mapping[str, Any] | None = None
+    rule: str = ""
+    threshold_source: str = ""
+    query: Mapping[str, Any] | None = None
 
 
 def kpi_holds(predicate: Predicate, row: Mapping[str, Any], ctx: Context) -> bool:
@@ -72,15 +82,56 @@ def walk_from(start: str, state: Mapping[str, Any], row: Mapping[str, Any], ctx:
 
 
 def detect(ctx: Context, day: str) -> list[Detection]:
+    ledger = Ledger(ctx.call or call_from_reader(ctx.reader), ctx.catalog)
     found: list[Detection] = []
     for metric, kpi in ctx.catalog.kpis.items():
-        for row in ctx.reader(metric, day):
+        qid, rows = ledger.consult(metric, day)
+        for row in rows:
             candidate = {"candidato": {"metrica": metric, "descriptivo": kpi.descriptive}}
             target, path = walk_from(ROOT, candidate, row, ctx)
             if target in ctx.nodes:
-                entity = tuple(row.get(column) for column in kpi.entity)
-                found.append(Detection(metric, entity, target, tuple(path), dict(row)))
+                found.append(detection_of(metric, target, path, row, ledger.queries[qid], ctx))
     return found
+
+
+def compared_column(path: list[tuple[str, str]], ctx: Context) -> str | None:
+    columns = [kpi_column(ctx.nodes[node_id].predicado.lee)[1] for node_id, branch in path if branch == "si" and is_kpi(ctx.nodes[node_id].predicado.lee)]
+    return columns[-1] if columns else None
+
+
+def detection_of(metric: str, target: str, path: list[tuple[str, str]], row: Mapping[str, Any], query: Mapping[str, Any], ctx: Context) -> Detection:
+    qid = query["queryId"]
+    column = compared_column(path, ctx)
+    value, pesos = row.get(column) if column else None, row.get("pesos_en_riesgo")
+    return Detection(
+        metric,
+        tuple(row.get(name) for name in ctx.catalog.kpis[metric].entity),
+        target,
+        tuple(path),
+        dict(row),
+        severity=severity_of(metric, row, ctx.metrics) if metric in ctx.metrics.severities else "high",
+        tranche=tranche_of(metric, row, ctx.metrics),
+        figure={"value": value, "unit": unit_of(column), "queryId": qid} if is_number(value) else None,
+        pesos={"value": pesos, "unit": "COP", "queryId": qid} if is_number(pesos) else None,
+        rule=ctx.metrics.rules.get(metric, ""),
+        threshold_source=ctx.metrics.threshold_sources.get(metric, ""),
+        query=dict(query),
+    )
+
+
+def detection_state(detection: Detection) -> dict[str, Any]:
+    return {
+        "metric": detection.metric,
+        "entity": list(detection.entity),
+        "path": [list(step) for step in detection.path],
+        "row": dict(detection.row),
+        "cifra": detection.figure,
+        "regla": detection.rule,
+        "fuente_umbral": detection.threshold_source,
+        "severity": detection.severity,
+        "tramo": detection.tranche,
+        "pesos_en_riesgo": detection.pesos,
+    }
 
 
 def still_breaks(state: Mapping[str, Any], ctx: Context) -> bool:
