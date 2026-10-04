@@ -26,3 +26,5 @@ packages = ["centinela_agents"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not modelo'"
+markers = ["modelo: calls the model and the kernel of the root .env and .env.local; skipped when either is unusable"]

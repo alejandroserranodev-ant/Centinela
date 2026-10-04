@@ -114,9 +114,6 @@ class OpenAIProvider(LLMProvider):
         if request.max_tokens:
             kwargs["max_tokens"] = request.max_tokens
 
-        if request.thinking and "4o" in self.config.model.lower():
-            kwargs["thinking"] = {"type": "enabled"}
-
         try:
             response = self.client.chat.completions.create(**kwargs)
         except APITimeoutError as e:
@@ -140,10 +137,11 @@ class OpenAIProvider(LLMProvider):
         self, request: LLMStructuredRequest
     ) -> LLMStructuredResponse:
         """
-        Generate structured JSON using OpenAI API with JSON mode.
+        Generate structured JSON using OpenAI's json_schema response format.
 
-        OpenAI enforces JSON schema through response_format constraint
-        and a system instruction. Output is guaranteed valid JSON.
+        The schema goes in response_format, not in the prompt, so the system prompt stays the
+        skill alone and OpenAI's prompt cache keeps its prefix. strict is off, because the
+        leaves' schemas leave fields optional, which strict mode refuses.
 
         Args:
             request: LLMStructuredRequest with JSON schema
@@ -154,14 +152,8 @@ class OpenAIProvider(LLMProvider):
         Raises:
             ValueError: if output does not match schema (manual validation needed)
         """
-        schema_str = json.dumps(request.schema)
-        system_with_schema = (
-            f"{request.system_prompt}\n\n"
-            f"You MUST respond with valid JSON matching this schema:\n{schema_str}"
-        )
-
         messages = [
-            {"role": "system", "content": system_with_schema},
+            {"role": "system", "content": request.system_prompt},
             {"role": "user", "content": request.user_prompt},
         ]
 
@@ -170,14 +162,14 @@ class OpenAIProvider(LLMProvider):
             "messages": messages,
             "temperature": request.temperature or self.config.temperature,
             "top_p": request.top_p or self.config.top_p,
-            "response_format": {"type": "json_object"},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "salida", "schema": request.schema, "strict": False},
+            },
         }
 
         if request.max_tokens:
             kwargs["max_tokens"] = request.max_tokens
-
-        if request.thinking and "4o" in self.config.model.lower():
-            kwargs["thinking"] = {"type": "enabled"}
 
         try:
             response = self.client.chat.completions.create(**kwargs)

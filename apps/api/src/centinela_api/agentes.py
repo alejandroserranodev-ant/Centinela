@@ -46,7 +46,7 @@ API_METRICS = frozenset({
     "margen_pct", "saldo_vencido", "dias_pago_prom",
     "cobertura_dias", "descuento_en_exceso", "veces_intervalo_habitual",
 })
-ALERTS_PER_DAY = int(os.environ.get("CENTINELA_ALERTAS_POR_DIA", "3"))
+ALERTS_PER_DAY = "CENTINELA_ALERTAS_POR_DIA"
 
 _kernel: KernelAccess | None = None
 _orchestrator: CentinelaOrchestrator | None = None
@@ -115,9 +115,9 @@ def pesos_of(detection: Detection) -> float:
 
 
 def prioritized(detections: list[Detection], known: set[str]) -> list[Detection]:
-    """The day's new detections of the API's metrics, the most pesos at risk first, at most ALERTS_PER_DAY."""
+    """The day's new detections of the API's metrics, the most pesos at risk first, at most CENTINELA_ALERTAS_POR_DIA."""
     fresh = [d for d in detections if d.metric in API_METRICS and alert_id_of(d) not in known]
-    return sorted(fresh, key=pesos_of, reverse=True)[:ALERTS_PER_DAY]
+    return sorted(fresh, key=pesos_of, reverse=True)[: int(os.environ.get(ALERTS_PER_DAY, "3"))]
 
 
 _STATUS_MAP: dict[str, str] = {

@@ -10,9 +10,10 @@ Re-derive the boxes this page indexes with
 
 ## The day run, from detection to the inbox
 
-- **Detection on the simulated day through the kernel**, instead of the demo rows `apps/api` hands
-  the walk: [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-agents-run-in-this-process) and
-  [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#the-day-run).
+- **Raising an alert again when its severity rises a tier**, and a definition of severity:
+  [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#vigía-detects).
+- **The impact formulas of `calcular_impacto`, and the view and policy tools of `Analista`**:
+  [`packages/agents/AGENTS.md`](./packages/agents/AGENTS.md#what-a-leaf-may-use).
 - **One day run at a time, and the earlier alerts and rejection reasons handed to each run**:
   [`apps/api/AGENTS.md`](./apps/api/AGENTS.md#the-clock).
 - **Merging an alert into the one that explains it (`unida`)**:

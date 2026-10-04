@@ -33,10 +33,11 @@ catch every exception themselves ([`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md)).
   `eval_count`.
 - **`centinela_agents/openai_provider.py:OpenAIProvider(config, skip_health_check)`** uses the
   `openai` client with `OPENAI_API_KEY` and calls `models.list()` on construction unless told to
-  skip it. A structured request asks for `response_format` `json_object` with the schema in the
-  prompt, not a strict JSON schema. Its client waits `timeout_seconds` of the config, and a call
-  past it raises `TimeoutError`. This provider sends the prompt off the machine,
-  against the level's rule that models run locally ([`AGENTS.md`](./AGENTS.md)).
+  skip it. A structured request sends the schema as a non-strict `json_schema` response format,
+  leaving the system prompt the skill alone. It ignores the thinking flag, which OpenAI's chat
+  models do not take. Its client waits `timeout_seconds` of the config, and a call past it raises
+  `TimeoutError`. It is the provider the agents run on, for the reason
+  [`AGENTS.md`](./AGENTS.md#models) gives.
 
 ## The factory
 

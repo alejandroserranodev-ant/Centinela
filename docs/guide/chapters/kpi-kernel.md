@@ -11,9 +11,10 @@ the one part of the design no level page states: how a new KPI is born.
 ## The tools, and who consults the kernel at each stage
 
 > **Decided, not built.** In this diagram, approved KPIs and `apps/api`'s catalogue, the calls of
-> `Analista` and `calcular_impacto`, `kpi_dry_run` for `proponer_kpi`, and `kpi_catalogo` for a
-> person. What runs is the generation of the base KPIs, `kpi_consultar` in `detectar` and in
-> `ejecutar.vigente`, and `kpi_catalogo` for the tree's validator.
+> `calcular_impacto`, `kpi_dry_run` for `proponer_kpi`, and `kpi_catalogo` for a person. What runs
+> is the generation of the base KPIs, `kpi_consultar` in `detectar`, in the leaves of `Vigía`,
+> `Analista` and `Estratega` and in `ejecutar.vigente`, and `kpi_catalogo` for the tree's
+> validator.
 
 ```mermaid
 flowchart TB

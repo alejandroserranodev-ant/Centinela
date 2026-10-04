@@ -67,7 +67,7 @@ class TestSecretDetection:
 
     def test_detect_openai_key(self):
         """Detect OpenAI API key."""
-        text = "key: sk-proj-dABcSRLVnt9kUU46bbBz8iyzu"
+        text = "key: sk-proj-EXAMPLEnotARealKey0000000"
         secrets = detect_secrets(text)
 
         assert len(secrets) > 0

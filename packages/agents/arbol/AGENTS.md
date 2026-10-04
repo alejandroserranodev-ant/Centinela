@@ -6,8 +6,8 @@ a leaf and an end are written, what the validator refuses, and where each kind o
 What runs: the base below is parsed, validated, walked in `detectar` and compiled to the LangGraph
 graph, and `uv run pytest` holds all four. The leaves the compiled graph calls are the model
 functions `centinela_agents/orchestrator.py:CentinelaOrchestrator` hands it. What is decided, not built: a client's own version of
-the tree, its growth by self-expansion, and the caps on that growth; each section that states one
-opens with the marker. How the compiled graph runs an alert is [`../AGENTS.md`](../AGENTS.md).
+the tree, its growth by self-expansion, the caps on that growth, and the impact formulas; each
+section that states one opens with the marker. How the compiled graph runs an alert is [`../AGENTS.md`](../AGENTS.md).
 
 ## Why each file exists
 
@@ -45,8 +45,8 @@ does not measure, such as a price in force, comes from a `v_*` view.
 | Stage | Who decides | Consults the kernel for |
 |---|---|---|
 | `detectar` | `Vigía`, in code | the KPI a threshold compares: `centinela_agents/walk.py:detect(ctx, day)` |
-| `explicar` | `Analista` | testing each hypothesis, with base, approved and descriptive KPIs. *Partly built*: a model leaf answers, and consults no KPI; the skill names no kernel tool |
-| `proponer` | `Estratega` | the figures an impact is computed from, through `calcular_impacto`. *Partly built*: a model leaf answers, and its model writes the impact without calling `calcular_impacto` |
+| `explicar` | `Analista` | the alert's KPI and every KPI that shares its entity, read in code by the leaf, `centinela_agents/agents/analista.py:explain_cause(provider, state, sources)`; the model cites them |
+| `proponer` | `Estratega` | the alert's KPI, whose row fills each action's parameters and whose `pesos_en_riesgo` is its impact. *Decided, not built*: the formulas of `calcular_impacto` |
 | `aprobar` | a person | nothing; the gate reads the recorded decision |
 | `ejecutar` | `Ejecutor` | that the KPI which justified the action still breaks its threshold, in code, at [`ejecutar.vigente`](#the-node-ejecutarvigente). `Ejecutor`'s model consults nothing |
 | `cerrar` | `apps/api` | nothing: it is the set of ends, which `apps/api` closes |

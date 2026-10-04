@@ -5,11 +5,13 @@ A day advance runs the agents in process only when LLM_MODEL is set; without it,
 Needs the Postgres from data/docker-compose.yml with data/sql/01..03 and
 apps/api/sql/01_esquema.sql already applied; it skips itself when DSN_ADMIN reaches no database.
 """
+import json
 import os
 from urllib.parse import quote
 
 import psycopg
 import pytest
+import requests
 from fastapi.testclient import TestClient
 
 from centinela_api import alertas as alertas_repo
@@ -122,9 +124,77 @@ def test_aprobar_mueve_el_estado_y_queda_en_la_bitacora(cliente):
     assert decision["actor"] == {"kind": "person", "name": NOMBRE_GERENTE, "role": "gerente"}
 
 
-def test_simulacion_avanzar_devuelve_el_evento_end():
+def test_simulacion_avanzar_devuelve_el_evento_end(monkeypatch):
+    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "0")
     with TestClient(app) as cliente:
         with cliente.stream("POST", "/simulacion/avanzar", params={"dias": 1}) as respuesta:
             assert respuesta.status_code == 200
             texto = "".join(respuesta.iter_text())
     assert "event: end" in texto
+
+
+def _modelo_responde() -> bool:
+    if os.environ.get("LLM_PROVIDER", "ollama") == "openai":
+        return bool(os.environ.get("OPENAI_API_KEY"))
+    try:
+        requests.get(f"{os.environ.get('OLLAMA_API_URL', 'http://localhost:11434')}/api/tags", timeout=2).raise_for_status()
+    except requests.RequestException:
+        return False
+    return bool(os.environ.get("LLM_MODEL"))
+
+
+def _evento_end(texto: str) -> dict:
+    bloque = next(b for b in texto.split("\n\n") if b.startswith("event: end"))
+    return json.loads(bloque.split("data: ", 1)[1])
+
+
+def _query_ids(alerta: dict) -> set[str]:
+    figuras = [*alerta["title"]["figures"], alerta["pesosAtRisk"]]
+    if alerta["cause"]["kind"] == "identified":
+        figuras += alerta["cause"]["sentence"]["figures"]
+        figuras += [f for e in alerta["cause"]["evidence"] for f in e["claim"]["figures"]]
+    figuras += [a["impact"]["figure"] for a in alerta["actions"] if a["impact"]]
+    return {f["queryId"] for f in figuras}
+
+
+@pytest.mark.skipif(not _modelo_responde(), reason="the model provider of the root .env is unusable")
+def test_un_dia_real_cita_el_kernel_y_aprobar_ejecuta_y_rechazar_clasifica(monkeypatch):
+    monkeypatch.setenv("CENTINELA_ALERTAS_POR_DIA", "2")
+    nuevas: list[str] = []
+    try:
+        with TestClient(app) as cliente:
+            with cliente.stream("POST", "/simulacion/avanzar", params={"dias": 1}) as respuesta:
+                nuevas = _evento_end("".join(respuesta.iter_text()))["newAlerts"]
+            assert len(nuevas) == 2
+
+            for id_alerta in nuevas:
+                alerta = cliente.get(f"/alertas/{id_alerta}").json()
+                eventos = cliente.get("/bitacora", params={"alertId": id_alerta}).json()
+                consultadas = {e["queryId"] for e in eventos if e["type"] == "evidence"}
+                assert _query_ids(alerta) <= consultadas
+                assert alerta["pesosAtRisk"]["value"] > 0
+
+            aprobada = cliente.get(f"/alertas/{nuevas[0]}").json()
+            assert aprobada["status"] == "proposed" and aprobada["actions"]
+            respuesta = cliente.post(
+                f"/alertas/{nuevas[0]}/decision",
+                json={"kind": "approve", "actionId": aprobada["actions"][0]["id"]},
+                headers=CABECERAS_GERENTE,
+            )
+            assert respuesta.json()["status"] == "executed"
+            eventos = cliente.get("/bitacora", params={"alertId": nuevas[0]}).json()
+            assert any(e["type"] == "result" and e["actor"] == {"kind": "agent", "agent": "ejecutor"} for e in eventos)
+
+            respuesta = cliente.post(
+                f"/alertas/{nuevas[1]}/decision",
+                json={"kind": "reject", "reason": "La acción propuesta no aplica a este cliente."},
+                headers=CABECERAS_GERENTE,
+            )
+            assert respuesta.json()["status"] == "rejected"
+            assert respuesta.json()["executedAction"] is None
+    finally:
+        with conectar() as conn:
+            for id_alerta in nuevas:
+                conn.execute("DELETE FROM api.bitacora WHERE alerta_id = %s", (id_alerta,))
+                conn.execute("DELETE FROM api.alertas WHERE id = %s", (id_alerta,))
+            conn.commit()

@@ -4,8 +4,9 @@ This page covers `centinela_agents/security.py`. The file keeps its historical n
 beside [`AGENTS.md`](./AGENTS.md) because the team keeps the file structure; `AGENTS.md` is the
 level page and links here.
 
-**No leaf, orchestrator or API path calls this module**; only its tests import it. A prompt
-reaches the model unmasked and unchecked. Masking personal data is decided for `packages/tools`
+**`Ejecutor` masks the prompt of an email draft with `mask_data`; no other path calls this
+module.** Every other prompt reaches the model unmasked and unchecked; it carries identifiers and
+figures, never a name, because the kernel's columns hold none. Masking personal data is decided for `packages/tools`
 ([`../tools/AGENTS.md`](../tools/AGENTS.md)), and `apps/api` holds its own unwired masking
 ([`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md)).
 

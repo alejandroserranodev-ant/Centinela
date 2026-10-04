@@ -5,9 +5,9 @@ implement them. The file keeps its historical name and sits beside [`AGENTS.md`]
 because the team keeps the file structure; `AGENTS.md` is the level page and links here.
 
 The tools an agent calls belong to `packages/tools`
-([`../tools/AGENTS.md`](../tools/AGENTS.md)). These interfaces re-declare them inside
-`packages/agents`, and no module here imports `centinela_tools`; no stub opens a database
-connection.
+([`../tools/AGENTS.md`](../tools/AGENTS.md)). The leaves read its kernel directly, through
+`centinela_agents/evidence.py`; these interfaces re-declare the other tools inside
+`packages/agents`, and no stub opens a database connection.
 
 ## The interfaces
 
@@ -24,8 +24,8 @@ connection.
 `centinela_agents/tools.py:ToolRegistry` holds one optional instance of each, and
 `get_tools_for_agent(agent)` names which tools each agent may use: none for `vigia`, SQL and
 policy search for `analista`, those plus impact for `estratega`, the four action tools for
-`ejecutor`. `apps/api` builds the orchestrator with an empty registry, so every tool is `None` at
-runtime.
+`ejecutor`. `apps/api` builds the registry with the four action stubs and nothing else, so the
+SQL, policy and impact tools are `None` at runtime and no leaf calls them.
 
 ## The stubs
 
@@ -36,10 +36,11 @@ runtime.
   formula, with an assumption saying so, and an error for an unknown one; the SQL it holds per
   formula never runs.
 - `centinela_agents/action_tools.py` holds `EmailDraftStub`, `TaskStub`, `PurchaseOrderDraftStub`
-  and `PriceChangeDraftStub`, which return a draft whose id is a random suffix. Two calls for the
-  same action return two ids: no stub is idempotent.
+  and `PriceChangeDraftStub`, which keep nothing and return a draft named by
+  `centinela_agents/action_tools.py:stable_id(prefix, parts)` over its inputs, so two calls for the
+  same action return the same id.
 
-Only the tests construct the stubs.
+`apps/api` constructs the action stubs; only the tests construct the other three.
 
 ## Tests
 

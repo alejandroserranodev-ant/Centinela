@@ -4,8 +4,9 @@ This level is the only door into Centinela: the web, the jury and any script rea
 through it. What runs here is a FastAPI app over its own PostgreSQL schema `api`. It serves the
 brief's minimal endpoints, owns the simulated clock, the alert lifecycle and the `bitácora`, and
 runs the orchestrator of `packages/agents` in its own process on each day advance and each
-decision. The KPIs the orchestrator reads on that path are demo rows, not the kernel, so no alert
-comes from the dataset. The sections marked below hold decisions the code does not implement.
+decision. Detection and the agents read the kernel's KPIs on the simulated day, so every alert and
+every figure comes from the dataset. The sections marked below hold decisions the code does not
+implement.
 
 ## Why each file exists
 
@@ -33,16 +34,16 @@ comes from the dataset. The sections marked below hold decisions the code does n
 From this directory, with Python 3.12 or later, because `packages/agents` asks for it:
 
 ```bash
-pip install -e ../../packages/agents -e ".[dev]"
+pip install -e ../../packages/tools -e ../../packages/agents -e ".[dev]"
 psql "$DSN_ADMIN" -f sql/01_esquema.sql
 uvicorn centinela_api.main:app --reload
 pytest
 pytest -m integracion
 ```
 
-- **`centinela-agents` is a declared dependency that no index serves**, so pip installs it only
-  from the path the same command names, and a plain `pip install -e .` stops with no matching
-  distribution. `uv pip install -e ".[dev]"` reads the path from `[tool.uv.sources]` and needs
+- **`centinela-agents`, and the `centinela-tools` it declares, are dependencies no index
+  serves**, so pip installs them only from the paths the same command names, and a plain
+  `pip install -e .` stops with no matching distribution. `uv pip install -e ".[dev]"` reads the path from `[tool.uv.sources]` and needs
   none. `tests/test_manifest.py` fails when a module imports a distribution the manifest does not
   declare.
 - **`sql/01_esquema.sql` runs after the dataset's SQL files**, because the clock seeds
@@ -113,26 +114,29 @@ become rows here when it is planned.
 
 **`src/centinela_api/agentes.py` builds the orchestrator once, lazily**, in
 `get_orchestrator()`: `CentinelaOrchestrator` from `packages/agents`, with the provider of
-`get_provider()`, the tree `packages/agents/arbol/base.yaml`, the thresholds of
-`data/metricas.yaml`, an empty `ToolRegistry` and an `InMemorySaver`. The routers call
+`get_provider()` and `get_reasoning_provider()`, the tree `packages/agents/arbol/base.yaml`, the
+thresholds of `data/metricas.yaml`, the kernel `get_kernel()` connects through
+`packages/agents/centinela_agents/catalog.py:connect_kernel(env)`, a `ToolRegistry` of the four action stubs and an
+`InMemorySaver`. The routers call
 `start` and `resume` through `asyncio.to_thread`, because the graph runs synchronously and the
 event loop keeps streaming SSE meanwhile. Running in-process saves a service boundary, its
 transport and its secret, and is the answer to whether the agents run here or as a service.
 
 - **The checkpointer is `InMemorySaver`**, the saver that needs no schema. A paused alert lives
-  only in this process: after a restart its decision is recorded but the resume finds no state,
-  logs a warning, and the alert stays `approved` with no action run.
-- **Detection reads demo rows.** `get_context()` and the orchestrator get `_demo_reader(metric, day)`,
-  which returns the same rows of `saldo_vencido` and `cobertura_dias` whatever the day, so every
-  advance raises those alerts again under new ids. It costs every alert its link to the data, and
-  is paid when the reader is the kernel's `kpi_consultar`
-  ([`../../packages/tools/AGENTS.md`](../../packages/tools/AGENTS.md)).
-- **`VIEW_CATALOG` copies the catalogue of `packages/agents/tests/support.py`**, so the two drift
-  apart unless both are edited.
-- **`state_to_alert(alert_id, state, detection, day_str)` fills what the graph does not return**:
-  severity and pesos at risk from heuristics over the detected row, confidence `medium`, and no
-  recoverable per month. These figures cite the query id `q_detect`, which no query catalogue
-  holds.
+  only in this process: after a restart its decision is recorded but the resume finds no state, a
+  `result` row of `ejecutor` records that the approved action did not run, and the alert stays
+  `approved`.
+- **A day raises the alerts `src/centinela_api/agentes.py:prioritized(detections, known)` keeps**:
+  the detections of `API_METRICS` whose alert does not exist, the most `pesos_en_riesgo` first, at
+  most `CENTINELA_ALERTAS_POR_DIA`, read on each call so a test can lower it. An alert's id is
+  `src/centinela_api/agentes.py:alert_id_of(detection)`, a hash of metric and entity, so one alert
+  per metric and entity holds by the primary key. Why the cap and the order is
+  [`../../packages/agents/AGENTS.md`](../../packages/agents/AGENTS.md#the-day-run).
+- **`state_to_alert(alert_id, state, detection, day_str)` reads the graph's state**: the title,
+  the cause and the actions with the figures the leaves cited, pesos at risk from the KPI's
+  `pesos_en_riesgo` under the `queryId` the leaves recorded, and the cause's confidence. A figure
+  with no `queryId` is dropped, never given one. Severity alone is a heuristic over the detected
+  row, because nothing in the tree defines it.
 - **Only the metrics `API_METRICS` names become alerts**, because the `Alert` model's `Metric`
   accepts no other.
 
@@ -258,14 +262,16 @@ time.
 | Type | Written by |
 |---|---|
 | `alert` | `avanzar`, for each alert the orchestrator returns; `POST /interno/alertas` |
-| `evidence` | `PUT /interno/alertas/{id}/causa`, and the cost of a step |
+| `evidence` | `avanzar`, one row per `kpi_consultar` a leaf ran, its SQL as the detail and its `queryId`; `PUT /interno/alertas/{id}/causa` |
 | `proposal` | `PUT /interno/alertas/{id}/propuesta` |
 | `decision` | a person's decision |
 | `action` | `POST /interno/alertas/{id}/ejecutar` |
 | `result` | the resume after an approval, when `Ejecutor` returns an executed action |
 
-On the path that runs, a day's alert lands with only its `alert` row, and an approval with its
-`decision` and `result`: the graph's analysis and proposal leave no row.
+On the path that runs, a day's alert lands with its `alert` row, which cites the KPI's `queryId`,
+and one `evidence` row per query its leaves ran, so every figure of the alert resolves to the SQL
+that returned it; an approval adds its `decision` and `result`. The graph's proposal leaves no row
+of its own.
 
 ## Rules of this level
 

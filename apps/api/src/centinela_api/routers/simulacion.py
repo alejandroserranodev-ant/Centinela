@@ -42,7 +42,9 @@ async def avanzar(
 
         try:
             ctx = get_context()
-            detections = prioritized(detect(ctx, day_str), alertas_repo.ids(conn))
+            with conn.transaction():
+                known = alertas_repo.ids(conn)
+            detections = prioritized(detect(ctx, day_str), known)
             orq = get_orchestrator()
 
             for detection in detections:

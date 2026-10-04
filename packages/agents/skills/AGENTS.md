@@ -4,11 +4,11 @@ A skill is a Markdown file of orders for a model. Skills are grouped by agent, o
 `vigia/`, `analista/`, `estratega/`, `ejecutor/`, and `orquestador/` for the one step of the
 orchestrator that calls a model. What each agent may and may not do is
 [`../AGENTS.md`](../AGENTS.md); a skill turns that page into orders and never widens it. Code reads
-two things here: a leaf's `skill` must name a file under this directory, and
-`estratega/acciones.md` is parsed. No code loads a skill into a model: each leaf of
-`../centinela_agents/agents/` prompts its model with orders written inline in its code, which
-restate the contracts here in part and diverge from them in part. Its cost is two sources for what
-an agent is told, and a change to a skill that reaches no model.
+three things here: a leaf's `skill` must name a file under this directory,
+`estratega/acciones.md` is parsed, and each leaf of `../centinela_agents/agents/` loads its
+agent's contract as its model's system prompt, `../centinela_agents/skills.py:skill(agent, names)`;
+`Ejecutor` also loads `ejecutor/plantillas.md`. The leaf's user prompt carries only the alert and
+the facts its code read.
 
 ## Decisions
 
@@ -40,11 +40,10 @@ an agent is told, and a change to a skill that reaches no model.
   [`../../../data/generator/`](../../../data/generator/); the official answer key is never written
   here, for the reason [`../../../evals/AGENTS.md`](../../../evals/AGENTS.md) gives.
 
-> **Decided, not built.** How a step loads its skills into a model. An agent is given only its own
-> directory. Every file of it is loaded except two kinds: a file named for a metric,
-> `<metric>.md`, is loaded only for an alert of that metric or a chat question anchored to one; and
-> of the table in `estratega/acciones.md` only the rows of the alert's metric are loaded, because
-> the token cost of each alert is recorded and judged. A pending spec adds a file per decision for
+> **Decided, not built.** The metric files: `<metric>.md` is to be loaded for an alert of that
+> metric or a chat question anchored to one, once a leaf can run the view queries its hypotheses
+> name. Of the table in `estratega/acciones.md`, only the rows of the alert's metric reach the
+> model, as refs in the user prompt, because the token cost of each alert is recorded and judged. A pending spec adds a file per decision for
 > `expandir` and `proponer_kpi`, loaded only when the walk reaches that decision's leaf.
 
 ## How a skill is written

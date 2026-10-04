@@ -19,11 +19,12 @@ psql "postgresql://centinela:centinela@localhost:5432/centinela" -f sql/01_esque
 ```
 
 **2. The API**, from `apps/api/`, in a Python 3.12 environment, because `packages/agents` asks for
-it. `apps/api/pyproject.toml` declares `centinela-agents`, and pip finds it only at the path the
-command names:
+it. `apps/api/pyproject.toml` declares `centinela-agents`, which declares `centinela-tools`, and
+pip finds both only at the paths the command names. The agents call OpenAI with the key of
+`.env.local` at the root, as [`SETUP_OPENAI.md`](./SETUP_OPENAI.md) says:
 
 ```bash
-pip install -e ../../packages/agents -e ".[dev]"
+pip install -e ../../packages/tools -e ../../packages/agents -e ".[dev]"
 uvicorn centinela_api.main:app --reload
 ```
 

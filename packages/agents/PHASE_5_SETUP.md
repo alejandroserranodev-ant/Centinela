@@ -7,11 +7,14 @@ interrupts, failures, routing) and links here.
 
 ## What it does
 
-`centinela_agents/orchestrator.py:CentinelaOrchestrator(provider, tools, tree, metrics, catalog, reader, checkpointer, owners)`
+`centinela_agents/orchestrator.py:CentinelaOrchestrator(provider, tools, tree, metrics, catalog, reader, checkpointer, owners, kernel, reasoning_provider)`
 maps each leaf of the tree to a function of [`PHASE_4_SETUP.md`](./PHASE_4_SETUP.md), keyed by
 agent and decision: `vigia`/`titular`, `analista`/`explicar`, `estratega`/`proponer` and
-`revision_manual`, `ejecutor`/`ejecutar` and `nota_manual`. It hands that map, the metrics, the
-KPI catalogue, the reader, a rejection classifier and the checkpointer to
+`revision_manual`, `ejecutor`/`ejecutar` and `nota_manual`. The leaves of `Vigía`, `Analista` and
+`Estratega` share one `centinela_agents/evidence.py:Sources` over `kernel`, or over the reader when
+no kernel is given, as in the tests; `Analista` and `Estratega` call `reasoning_provider` when one
+is given. `revision_manual` is code, over the owners `skills/estratega/acciones.md` names. It hands
+that map, the metrics, the KPI catalogue, the reader, a rejection classifier and the checkpointer to
 `centinela_agents/graph.py:Compiler`, and compiles the tree once.
 
 - `start(detection, alert_id, day, earlier_alerts, cause_rejections, proposal_rejections)` runs
@@ -25,8 +28,10 @@ It adds logging and nothing else; the walk, the gate and the ends are `centinela
 ## Who builds it
 
 `apps/api/src/centinela_api/agentes.py:get_orchestrator()` builds one per process, with the
-provider from `centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)`, an empty `ToolRegistry`, a reader that returns
-demonstration rows, and LangGraph's `InMemorySaver`. That page is
+provider from `centinela_agents/provider_factory.py:get_provider(provider_name, model_name, thinking)`, the reasoning provider of
+`centinela_agents/provider_factory.py:get_reasoning_provider()`, a `ToolRegistry` of the four
+action stubs, the kernel's catalogue, reader and call from
+`centinela_agents/catalog.py:connect_kernel(env)`, and LangGraph's `InMemorySaver`. That page is
 [`../../apps/api/AGENTS.md`](../../apps/api/AGENTS.md).
 
 ## The classifier
