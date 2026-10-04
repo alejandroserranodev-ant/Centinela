@@ -28,9 +28,10 @@ type Entry =
 const ALERT_SUGGESTIONS = ['¿Por qué se generó esta alerta?', '¿Qué propones hacer?', '¿Cuál es la causa?'];
 
 const GLOBAL_SUGGESTIONS = [
-  '¿Qué clientes tienen más saldo vencido hoy?',
-  '¿Cómo va la cobertura de inventario?',
-  '¿Cuál es la tasa de cambio del dólar hoy?',
+  '¿Qué proveedores tienen órdenes de compra más retrasadas?',
+  '¿Qué productos subieron más de costo frente al anterior?',
+  '¿Qué vendedores dieron descuentos por encima del tope permitido?',
+  '¿Cuántos días están tardando los clientes en pagar?',
 ];
 
 const UNANSWERED: Record<Exclude<ChatOutcome, 'answered'>, { title: string; icon: string }> = {
