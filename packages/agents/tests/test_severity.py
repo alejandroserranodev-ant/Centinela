@@ -109,3 +109,9 @@ def test_saldo_vencido_takes_its_tranche_and_the_tranche_its_severity(days, tran
 
 def test_a_metric_with_no_level_holding_takes_por_defecto():
     assert severity_of("margen_pct", {"caida_pts": 9.0}, REAL) == "high"
+
+
+def test_a_string_tramos_is_refused_without_an_exception():
+    metrics = replace(REAL, tranches={**REAL.tranches, "saldo_vencido": "FIN-POL-004 §4 por max_dias_vencido"})
+    found = severity_problems(metrics, KERNEL_CATALOG)
+    assert any("needs fuente, columna and niveles" in problem for problem in found), found

@@ -54,7 +54,7 @@ def severity_problems(metrics: Metrics, catalog: Catalog) -> list[str]:
         if not isinstance(default, Mapping) or default.get("nivel") not in LEVELS or not str(default.get("fuente") or "").strip():
             found.append(f"metric {metric}: severidad.por_defecto needs a nivel of {', '.join(LEVELS)} and a fuente")
             default = None
-        named = {level.get("tramo") for level in (tranches or {}).get("niveles") or [] if isinstance(level, Mapping)}
+        named = {level.get("tramo") for level in (tranches.get("niveles") if isinstance(tranches, Mapping) else None) or [] if isinstance(level, Mapping)}
         for index, level in enumerate(block.get("niveles") or []):
             found += level_problems(f"metric {metric}: severidad.niveles[{index}]", level, columns, named, default)
     return found

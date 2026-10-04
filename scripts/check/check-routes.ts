@@ -21,7 +21,7 @@ export const ROUTES = new Map<string, Budget>([
   ["a screen renders or behaves wrong", [19699, "the screens' decisions and their person-run check are one page"]],
   ["`npm run check` failed, or I am adding a gate", [6000, "one page names every gate and the maps that excuse a case"]],
   ["what the challenge requires, what the jury tests, what is out of scope", [8500, "the brief's requirements are read on one page"]],
-  ["a table, a CSV, a threshold, a policy document, the database setup, the generator", [24000, "one page owns the dataset, its setup and its generator"]],
+  ["a table, a CSV, a threshold, a policy document, the database setup, the generator", [24330, "one page owns the dataset, its setup and its generator"]],
   ["a KPI's definition, the kernel's language, a refusal by a guard", [47000, "the language is data's and the compiler is the tools', so both are read"]],
   ["a node, a leaf, a level, a stage or the registry of the decision tree", [23000, "the tree's own page states every rule a node is written by"]],
   ["an agent, the orchestrator, which model a step uses", [40507, "one page holds the agents, the orchestrator and the model providers"]],
